@@ -1,7 +1,0 @@
-using lib <io>;
-using ns std;
-
-fn main() : int {
-    std::println("Hello World!");
-    return 0;
-};

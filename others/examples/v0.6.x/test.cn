@@ -1,9 +1,0 @@
-using lib <io>;
-using ns std;
-
-fn main() : int {
-    for (i : 0..100000) {
-        std::println(i);
-    };
-    return 0;
-};

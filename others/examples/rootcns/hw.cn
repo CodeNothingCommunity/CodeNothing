@@ -1,7 +1,0 @@
-using lib <io>;
-using ns std;
-
-fn main() : void {
-    println("helloworld");
-    return;
-};

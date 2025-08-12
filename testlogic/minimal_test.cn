@@ -1,6 +1,0 @@
-using lib <io>;
-using ns std;
-
-fn main() : int {
-    return 0;
-};
