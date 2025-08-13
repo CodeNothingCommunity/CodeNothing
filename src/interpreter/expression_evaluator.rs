@@ -1688,23 +1688,25 @@ impl<'a> Interpreter<'a> {
 
     // 处理 super() 构造函数调用
     fn handle_super_constructor_call(&mut self, args: &[Expression], this_obj: &mut ObjectInstance, constructor_env: &HashMap<String, Value>) -> Value {
-        // 首先获取所需的信息，避免借用冲突
-        let current_class_name = this_obj.class_name.clone();
+        self.handle_super_constructor_call_with_context(args, this_obj, constructor_env, &this_obj.class_name.clone())
+    }
 
-        // 获取父类名
+    // 带上下文的 super() 构造函数调用处理
+    fn handle_super_constructor_call_with_context(&mut self, args: &[Expression], this_obj: &mut ObjectInstance, constructor_env: &HashMap<String, Value>, calling_class: &str) -> Value {
+        // 获取调用类的父类名
         let parent_class_name = {
-            let current_class = match self.classes.get(&current_class_name) {
+            let calling_class_def = match self.classes.get(calling_class) {
                 Some(class) => class,
                 None => {
-                    eprintln!("错误: 未找到当前类 '{}'", current_class_name);
+                    eprintln!("错误: 未找到调用类 '{}'", calling_class);
                     return Value::None;
                 }
             };
 
-            match &current_class.super_class {
+            match &calling_class_def.super_class {
                 Some(name) => name.clone(),
                 None => {
-                    eprintln!("错误: 类 '{}' 没有父类，无法调用 super()", current_class_name);
+                    eprintln!("错误: 类 '{}' 没有父类，无法调用 super()", calling_class);
                     return Value::None;
                 }
             }
@@ -1746,9 +1748,9 @@ impl<'a> Interpreter<'a> {
             }
         }
 
-        // 直接执行父类构造函数体，允许其中的 super() 调用
+        // 执行父类构造函数体，使用父类作为上下文
         for statement in &parent_constructor.body {
-            self.execute_constructor_statement(statement, this_obj, &parent_constructor_env);
+            self.execute_constructor_statement_with_context(statement, this_obj, &parent_constructor_env, &parent_class_name);
         }
 
         Value::None // super() 调用不返回值
