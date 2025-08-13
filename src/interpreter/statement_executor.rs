@@ -331,6 +331,8 @@ impl<'a> StatementExecutor for Interpreter<'a> {
                         // 作用域级别导入：将命名空间下所有函数名映射到完整路径
                         let ns_path = path.join("::");
                         let mut import_map = self.namespace_import_stack.last_mut().unwrap();
+
+                        // 检查代码命名空间中的函数
                         for (full_path, _) in &self.namespaced_functions {
                             if full_path.starts_with(&ns_path) {
                                 // 获取函数名
@@ -340,6 +342,24 @@ impl<'a> StatementExecutor for Interpreter<'a> {
                                 }
                             }
                         }
+
+                        // 检查库命名空间中的函数（新增）
+                        if path.len() == 1 {
+                            let ns_name = &path[0];
+                            for (lib_name, lib_functions) in &self.imported_libraries {
+                                let ns_prefix = format!("{}::", ns_name);
+                                for (func_full_path, _) in lib_functions.iter() {
+                                    if func_full_path.starts_with(&ns_prefix) {
+                                        let parts: Vec<&str> = func_full_path.split("::").collect();
+                                        if let Some(func_name) = parts.last() {
+                                            import_map.entry(func_name.to_string()).or_insert_with(Vec::new).push(func_full_path.clone());
+                                            debug_println(&format!("作用域导入库函数: {} -> {}", func_name, func_full_path));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         ExecutionResult::None
                     },
                     _ => handlers::namespace_handler::handle_import_namespace(self, ns_type, path)
@@ -459,8 +479,31 @@ impl<'a> StatementExecutor for Interpreter<'a> {
             if let Some(paths) = import_map.get(function_name) {
                 if paths.len() == 1 {
                     let full_path = &paths[0];
+
+                    // 首先检查是否是代码命名空间函数
                     if let Some(function) = self.namespaced_functions.get(full_path) {
                         return self.call_function_impl(function, args);
+                    }
+
+                    // 然后检查是否是库函数
+                    for (lib_name, lib_functions) in &self.imported_libraries {
+                        if let Some(func) = lib_functions.get(full_path) {
+                            debug_println(&format!("调用作用域导入的库函数: {} 来自库 '{}'", full_path, lib_name));
+                            let string_args = convert_values_to_string_args(&args);
+                            let result = func(string_args);
+                            // 尝试将结果转换为适当的值类型
+                            if let Ok(int_val) = result.parse::<i32>() {
+                                return Value::Int(int_val);
+                            } else if let Ok(float_val) = result.parse::<f64>() {
+                                return Value::Float(float_val);
+                            } else if result == "true" {
+                                return Value::Bool(true);
+                            } else if result == "false" {
+                                return Value::Bool(false);
+                            } else {
+                                return Value::String(result);
+                            }
+                        }
                     }
                 } else if paths.len() > 1 {
                     panic!("函数名 '{}' 有多个匹配: {:?}", function_name, paths);
