@@ -1452,7 +1452,16 @@ impl<'a> Interpreter<'a> {
             },
             Statement::FunctionCallStatement(expr) => {
                 // 处理函数调用语句，特别是 super() 调用
-                self.evaluate_expression_with_constructor_context(expr, this_obj, constructor_env);
+                match expr {
+                    Expression::SuperCall(args) => {
+                        // 直接处理 super() 构造函数调用
+                        self.handle_super_constructor_call(args, this_obj, constructor_env);
+                    },
+                    _ => {
+                        // 其他函数调用
+                        self.evaluate_expression_with_constructor_context(expr, this_obj, constructor_env);
+                    }
+                }
             },
             _ => {
                 // 其他语句暂时跳过
