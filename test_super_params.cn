@@ -50,19 +50,19 @@ class Puppy extends Dog {
 }
 
 fn main() {
-    println("=== 详细的 super() 参数传递测试 ===");
-    
-    println("\n1. 测试 Animal 直接构造:");
+    std::println("=== 详细的 super() 参数传递测试 ===");
+
+    std::println("\n1. 测试 Animal 直接构造:");
     let animal = Animal("Generic", 5, "Unknown");
-    println(animal.getInfo());
-    
-    println("\n2. 测试 Dog 构造 (调用 super 传递固定参数):");
+    std::println(animal.getInfo());
+
+    std::println("\n2. 测试 Dog 构造 (调用 super 传递固定参数):");
     let dog = Dog("Buddy", 3, "Golden Retriever");
-    println(dog.getInfo());
-    
-    println("\n3. 测试 Puppy 构造 (多层参数传递):");
+    std::println(dog.getInfo());
+
+    std::println("\n3. 测试 Puppy 构造 (多层参数传递):");
     let puppy = Puppy("Max", 1, "Labrador", 10);
-    println(puppy.getInfo());
-    
-    println("\n=== 测试完成 ===");
+    std::println(puppy.getInfo());
+
+    std::println("\n=== 测试完成 ===");
 }
