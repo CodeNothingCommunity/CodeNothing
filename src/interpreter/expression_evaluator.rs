@@ -1669,7 +1669,9 @@ impl<'a> Interpreter<'a> {
             Expression::This => Value::Object(this_obj.clone()),
             Expression::SuperCall(args) => {
                 // super() 构造函数调用 - 在构造函数中调用父类构造函数
-                self.handle_super_constructor_call(args, this_obj, constructor_env)
+                // 这里需要特殊处理，因为需要修改 this_obj
+                eprintln!("错误: super() 调用需要在语句级别处理");
+                Value::None
             },
             _ => self.evaluate_expression(expr),
         }
