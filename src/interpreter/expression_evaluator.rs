@@ -1735,7 +1735,6 @@ impl<'a> Interpreter<'a> {
         let mut arg_values = Vec::new();
         for arg in args {
             let value = self.evaluate_expression_with_constructor_context(arg, this_obj, constructor_env);
-            eprintln!("DEBUG: super() 参数 {:?} = {:?}", arg, value);
             arg_values.push(value);
         }
 
@@ -1743,7 +1742,6 @@ impl<'a> Interpreter<'a> {
         let mut parent_constructor_env = HashMap::new();
         for (i, param) in parent_constructor.parameters.iter().enumerate() {
             if i < arg_values.len() {
-                eprintln!("DEBUG: 设置父类构造函数参数 {} = {:?}", param.name, arg_values[i]);
                 parent_constructor_env.insert(param.name.clone(), arg_values[i].clone());
             }
         }
