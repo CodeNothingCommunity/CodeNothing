@@ -1,5 +1,26 @@
 # CodeNothing 更新日志
 
+## [v0.8.5] - 2025-08-13 - 修复了一些东西
+
+### src\interpreter\handlers\namespace_handler.rs
+- 增强命名空间导入功能，支持从库命名空间导入函数，并优化调试信息输出。
+
+### src\interpreter\function_calls.rs
+- 增强函数调用处理，支持从导入库中调用函数并添加自动命名空间查找功能，同时优化错误处理逻辑。
+
+### src\interpreter\interpreter_core.rs
+- 增强解释器功能，支持自动命名空间查找配置，并优化全局命名空间导入的处理逻辑。
+
+### src\interpreter\statement_executor.rs
+- 增强命名空间导入功能，支持从库命名空间中查找和调用函数，并优化函数调用的处理逻辑和调试信息输出。
+
+### src\parser\expression_parser.rs
+- 增强表达式解析器，添加对一元运算符的支持，并引入泛型调用的判断逻辑，以优化解析过程。
+
+### src\main.rs
+- 增强命令行选项，添加自动命名空间查找功能，并更新示例用法以反映新选项。
+
+
 ## [v0.8.4] - 2025-08-11 - 泛型系统完善版本
 
 ### 新增功能
