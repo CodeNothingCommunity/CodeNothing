@@ -1751,30 +1751,7 @@ impl<'a> Interpreter<'a> {
         Value::None // super() 调用不返回值
     }
 
-    // 递归调用构造函数，处理继承链
-    fn call_constructor_recursively(&mut self, class_name: &str, this_obj: &mut ObjectInstance, constructor_env: &HashMap<String, Value>) {
-        // 获取类定义
-        let class_def = match self.classes.get(class_name) {
-            Some(class) => class.clone(),
-            None => {
-                eprintln!("错误: 未找到类 '{}'", class_name);
-                return;
-            }
-        };
 
-        // 如果有父类，先调用父类构造函数（使用空参数环境，因为父类构造函数应该有默认值）
-        if let Some(parent_class_name) = &class_def.super_class {
-            let empty_env = HashMap::new(); // 父类构造函数使用空环境
-            self.call_constructor_recursively(parent_class_name, this_obj, &empty_env);
-        }
-
-        // 然后执行当前类的构造函数体（跳过其中的 super() 调用）
-        if let Some(constructor) = class_def.constructors.first() {
-            for statement in &constructor.body {
-                self.execute_constructor_statement_without_super(statement, this_obj, constructor_env);
-            }
-        }
-    }
 
     // 执行构造函数语句，但跳过 super() 调用
     fn execute_constructor_statement_without_super(&mut self, statement: &Statement, this_obj: &mut ObjectInstance, constructor_env: &HashMap<String, Value>) {
