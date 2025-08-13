@@ -1921,6 +1921,20 @@ impl<'a> Interpreter<'a> {
                     // 处理函数调用语句
                     self.evaluate_expression_with_method_context(expr, &current_this, method_env);
                 },
+                Statement::IfElse(condition, if_block, else_blocks) => {
+                    // 处理 if-else 语句
+                    let result = self.execute_if_else_in_method_context(condition, if_block, else_blocks, &mut current_this, method_env);
+                    match result {
+                        Some(return_value) => {
+                            // 如果 if-else 中有 return 语句，立即返回
+                            self.local_env = old_local_env;
+                            return (return_value, current_this);
+                        },
+                        None => {
+                            // 继续执行后续语句
+                        }
+                    }
+                },
                 _ => {
                     // 其他语句类型可能需要进一步处理
                     // 暂时跳过，但记录警告
