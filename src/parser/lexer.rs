@@ -12,9 +12,9 @@ pub fn remove_comments(source: &str) -> String {
     let mut in_backtick_string = false; // 标记是否在反引号字符串内
     let mut escape = false; // 标记是否是转义字符
     let mut i = 0;
-    
+
     let chars: Vec<char> = source.chars().collect();
-    
+
     while i < chars.len() {
         // 处理双引号字符串
         if in_string {
@@ -31,14 +31,14 @@ pub fn remove_comments(source: &str) -> String {
             }
             i += 1;
             continue;
-        } else if chars[i] == '"' && !in_backtick_string {
-            // 字符串开始
+        } else if chars[i] == '"' && !in_backtick_string && !in_single_line_comment && multi_line_comment_depth == 0 {
+            // 字符串开始（只有在非注释状态下才处理）
             in_string = true;
             result.push(chars[i]);
             i += 1;
             continue;
         }
-        
+
         // 处理反引号字符串
         if in_backtick_string {
             result.push(chars[i]);
@@ -48,44 +48,62 @@ pub fn remove_comments(source: &str) -> String {
             }
             i += 1;
             continue;
-        } else if chars[i] == '`' {
-            // 反引号字符串开始
+        } else if chars[i] == '`' && !in_single_line_comment && multi_line_comment_depth == 0 {
+            // 反引号字符串开始（只有在非注释状态下才处理）
             in_backtick_string = true;
             result.push(chars[i]);
             i += 1;
             continue;
         }
-        
-        // 处理注释
-        if i + 1 < chars.len() && chars[i] == '/' && chars[i + 1] == '/' && multi_line_comment_depth == 0 {
-            // 单行注释开始（仅当不在多行注释中时）
-            in_single_line_comment = true;
-            i += 2;
-        } else if i + 1 < chars.len() && chars[i] == '/' && chars[i + 1] == '!' && !in_single_line_comment {
-            // 多行注释开始
-            multi_line_comment_depth += 1;
-            i += 2;
-        } else if in_single_line_comment && chars[i] == '\n' {
-            // 单行注释结束
-            in_single_line_comment = false;
-            result.push(chars[i]);
-            i += 1;
-        } else if i + 1 < chars.len() && chars[i] == '!' && chars[i + 1] == '/' && !in_single_line_comment {
-            // 多行注释结束
-            if multi_line_comment_depth > 0 {
-                multi_line_comment_depth -= 1;
+
+        // 处理注释（只有在非字符串状态下才处理）
+        if !in_string && !in_backtick_string {
+            if i + 1 < chars.len() && chars[i] == '/' && chars[i + 1] == '/' && multi_line_comment_depth == 0 {
+                // 单行注释开始（仅当不在多行注释中时）
+                in_single_line_comment = true;
+                i += 2;
+                continue;
+            } else if i + 1 < chars.len() && chars[i] == '/' && chars[i + 1] == '!' && !in_single_line_comment {
+                // 多行注释开始 /!
+                multi_line_comment_depth += 1;
+                i += 2;
+                continue;
+            } else if i + 1 < chars.len() && chars[i] == '/' && chars[i + 1] == '*' && !in_single_line_comment {
+                // 多行注释开始 /* (作为 /! 的别名)
+                multi_line_comment_depth += 1;
+                i += 2;
+                continue;
+            } else if in_single_line_comment && chars[i] == '\n' {
+                // 单行注释结束
+                in_single_line_comment = false;
+                result.push(chars[i]);
+                i += 1;
+                continue;
+            } else if i + 1 < chars.len() && chars[i] == '!' && chars[i + 1] == '/' && !in_single_line_comment {
+                // 多行注释结束 !/
+                if multi_line_comment_depth > 0 {
+                    multi_line_comment_depth -= 1;
+                }
+                i += 2;
+                continue;
+            } else if i + 1 < chars.len() && chars[i] == '*' && chars[i + 1] == '/' && !in_single_line_comment {
+                // 多行注释结束 */ (作为 !/ 的别名)
+                if multi_line_comment_depth > 0 {
+                    multi_line_comment_depth -= 1;
+                }
+                i += 2;
+                continue;
             }
-            i += 2;
-        } else if !in_single_line_comment && multi_line_comment_depth == 0 {
+        }
+
+        if !in_single_line_comment && multi_line_comment_depth == 0 {
             // 非注释内容
             result.push(chars[i]);
-            i += 1;
-        } else {
-            // 在注释内，跳过
-            i += 1;
         }
+        // 在注释内，跳过（不添加到result）
+        i += 1;
     }
-    
+
     result
 }
 
