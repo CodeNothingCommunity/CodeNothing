@@ -1732,13 +1732,16 @@ impl<'a> Interpreter<'a> {
         // 计算父类构造函数参数
         let mut arg_values = Vec::new();
         for arg in args {
-            arg_values.push(self.evaluate_expression_with_constructor_context(arg, this_obj, constructor_env));
+            let value = self.evaluate_expression_with_constructor_context(arg, this_obj, constructor_env);
+            eprintln!("DEBUG: super() 参数 {:?} = {:?}", arg, value);
+            arg_values.push(value);
         }
 
         // 创建父类构造函数参数环境
         let mut parent_constructor_env = HashMap::new();
         for (i, param) in parent_constructor.parameters.iter().enumerate() {
             if i < arg_values.len() {
+                eprintln!("DEBUG: 设置父类构造函数参数 {} = {:?}", param.name, arg_values[i]);
                 parent_constructor_env.insert(param.name.clone(), arg_values[i].clone());
             }
         }
