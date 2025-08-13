@@ -207,12 +207,16 @@ fn main() {
         println!("  --cn-loop-stats     显示循环内存管理统计");
         println!("  --cn-loop-debug     启用循环内存调试输出");
         println!("");
+        println!("🆕 命名空间选项:");
+        println!("  --cn-auto-ns        启用自动命名空间查找（默认禁用）");
+        println!("");
         println!("示例:");
         println!("  {} hello.cn", args[0]);
         println!("  {} hello.cn --cn-time", args[0]);
         println!("  {} hello.cn --cn-debug-jit", args[0]);
         println!("  {} hello.cn --cn-debug-lifetime --cn-time", args[0]);
         println!("  {} hello.cn --cn-memory-stats", args[0]);
+        println!("  {} hello.cn --cn-auto-ns", args[0]);
         return;
     }
 
@@ -233,6 +237,7 @@ fn main() {
     let memory_debug = args.iter().any(|arg| arg == "--cn-memory-debug");
     let show_loop_stats = args.iter().any(|arg| arg == "--cn-loop-stats");
     let loop_debug = args.iter().any(|arg| arg == "--cn-loop-debug");
+    let auto_namespace = args.iter().any(|arg| arg == "--cn-auto-ns");
 
     // v0.7.5新增：初始化内存池
     if memory_debug {
@@ -339,7 +344,7 @@ fn main() {
                     }
 
                     // 执行程序
-                    let result = interpreter::interpret(&program);
+                    let result = interpreter::interpret(&program, auto_namespace);
 
                     // 只有当结果不是None且启用了--cn-return参数时才打印
                     if show_return && !matches!(result, Value::None) {
