@@ -1749,7 +1749,62 @@ impl<'a> Interpreter<'a> {
         Value::None // super() 调用不返回值
     }
 
+    // 递归调用构造函数，处理继承链
+    fn call_constructor_recursively(&mut self, class_name: &str, this_obj: &mut ObjectInstance, constructor_env: &HashMap<String, Value>) {
+        // 获取类定义
+        let class_def = match self.classes.get(class_name) {
+            Some(class) => class.clone(),
+            None => {
+                eprintln!("错误: 未找到类 '{}'", class_name);
+                return;
+            }
+        };
 
+        // 如果有父类，先调用父类构造函数
+        if let Some(parent_class_name) = &class_def.super_class {
+            self.call_constructor_recursively(parent_class_name, this_obj, constructor_env);
+        }
+
+        // 然后执行当前类的构造函数体（跳过其中的 super() 调用）
+        if let Some(constructor) = class_def.constructors.first() {
+            for statement in &constructor.body {
+                self.execute_constructor_statement_without_super(statement, this_obj, constructor_env);
+            }
+        }
+    }
+
+    // 执行构造函数语句，但跳过 super() 调用
+    fn execute_constructor_statement_without_super(&mut self, statement: &Statement, this_obj: &mut ObjectInstance, constructor_env: &HashMap<String, Value>) {
+        match statement {
+            Statement::FunctionCallStatement(expr) => {
+                // 检查是否是 super() 调用，如果是则跳过
+                if let Expression::SuperCall(_) = expr {
+                    // 跳过 super() 调用，因为我们已经在递归中处理了继承链
+                    return;
+                }
+                // 其他函数调用正常执行
+                self.evaluate_expression_with_constructor_context(expr, this_obj, constructor_env);
+            },
+            Statement::FieldAssignment(obj_expr, field_name, value_expr) => {
+                // 字段赋值
+                if let Expression::This = **obj_expr {
+                    let value = self.evaluate_expression_with_constructor_context(value_expr, this_obj, constructor_env);
+                    this_obj.fields.insert(field_name.clone(), value);
+                }
+            },
+            Statement::VariableDeclaration(var_name, var_type, init_expr) => {
+                // 局部变量声明（在构造函数中通常不需要处理）
+                self.evaluate_expression_with_constructor_context(init_expr, this_obj, constructor_env);
+            },
+            Statement::VariableAssignment(var_name, value_expr) => {
+                // 变量赋值（在构造函数中通常不需要处理）
+                self.evaluate_expression_with_constructor_context(value_expr, this_obj, constructor_env);
+            },
+            _ => {
+                // 其他语句类型暂时忽略或按需处理
+            }
+        }
+    }
 
     fn call_method(&mut self, obj_expr: &Expression, method_name: &str, args: &[Expression]) -> Value {
         let obj_value = self.evaluate_expression(obj_expr);
