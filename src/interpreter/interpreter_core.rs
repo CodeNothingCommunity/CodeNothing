@@ -255,13 +255,12 @@ impl<'a> Interpreter<'a> {
         interpreter
     }
 
-    /// 检查是否超时（移除操作次数限制）
+    /// 检查是否超时（只有启用时才检查）
     pub fn check_timeout(&mut self) -> Result<(), String> {
-        // 移除操作次数限制，只保留时间限制
-        // self.operation_count += 1;
-        // if self.operation_count > self.max_operations {
-        //     return Err(format!("程序执行操作次数超过限制 ({})", self.max_operations));
-        // }
+        // 如果未启用超时检查，直接返回成功
+        if !self.timeout_enabled {
+            return Ok(());
+        }
 
         // 检查时间限制
         if self.start_time.elapsed() > self.timeout_duration {
