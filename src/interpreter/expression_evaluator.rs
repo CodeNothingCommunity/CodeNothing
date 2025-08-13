@@ -1743,8 +1743,10 @@ impl<'a> Interpreter<'a> {
             }
         }
 
-        // 递归调用父类构造函数，但使用父类的类名作为上下文
-        self.call_constructor_recursively(&parent_class_name, this_obj, &parent_constructor_env);
+        // 直接执行父类构造函数体，使用正确的参数环境
+        for statement in &parent_constructor.body {
+            self.execute_constructor_statement_without_super(statement, this_obj, &parent_constructor_env);
+        }
 
         Value::None // super() 调用不返回值
     }
