@@ -1,18 +1,20 @@
 // 测试 super() 构造函数参数传递的详细测试
 
+using lib<io>;
+
 class Animal {
-    name: string;
-    age: int;
-    species: string;
-    
+    public name: string;
+    public age: int;
+    public species: string;
+
     constructor(name: string, age: int, species: string) {
-        println("Animal 构造函数: name=" + name + ", age=" + age + ", species=" + species);
+        std::println("Animal 构造函数: name=" + name + ", age=" + age + ", species=" + species);
         this.name = name;
         this.age = age;
         this.species = species;
-    }
-    
-    fn getInfo() -> string {
+    };
+
+    public fn getInfo(): string {
         return "Animal: " + this.name + ", " + this.age + ", " + this.species;
     };
 }
