@@ -17,6 +17,7 @@ pub trait ExpressionParser {
     fn parse_primary_expression(&mut self) -> Result<Expression, String>;
     fn parse_expression_type(&mut self) -> Result<Type, String>;
     fn is_lambda_parameter_list(&self) -> bool;
+    fn is_likely_generic_call(&self) -> bool;
     fn peek_ahead(&self, offset: usize) -> Option<&String>;
 }
 
@@ -220,6 +221,15 @@ impl<'a> ExpressionParser for ParserBase<'a> {
                 self.consume(); // 消费 "throw"
                 let exception_expr = self.parse_primary_expression()?;
                 return Ok(Expression::Throw(Box::new(exception_expr)));
+            } else if op == "-" {
+                // 一元负号
+                self.consume(); // 消费 "-"
+                let expr = self.parse_unary_expression()?;
+                return Ok(Expression::BinaryOp(Box::new(Expression::IntLiteral(0)), BinaryOperator::Subtract, Box::new(expr)));
+            } else if op == "+" {
+                // 一元正号（通常可以忽略）
+                self.consume(); // 消费 "+"
+                return self.parse_unary_expression();
             }
         }
         
@@ -567,7 +577,7 @@ impl<'a> ExpressionParser for ParserBase<'a> {
                         return Ok(Expression::This);
                     }
                     
-                    if self.peek() == Some(&"<".to_string()) {
+                    if self.peek() == Some(&"<".to_string()) && self.is_likely_generic_call() {
                         // 泛型函数调用
                         return self.parse_generic_function_call(name);
                     } else if self.peek() == Some(&"(".to_string()) {
@@ -1135,11 +1145,11 @@ impl<'a> ExpressionParser for ParserBase<'a> {
         // 我们需要向前查看，找到匹配的右括号，然后检查是否有 "=>"
         let mut depth = 0;
         let mut pos = 0;
-        
+
         // 跳过当前的 "("
         pos += 1;
         depth += 1;
-        
+
         while let Some(token) = self.peek_ahead(pos) {
             match token.as_str() {
                 "(" => depth += 1,
@@ -1154,8 +1164,35 @@ impl<'a> ExpressionParser for ParserBase<'a> {
             }
             pos += 1;
         }
-        
+
         false
+    }
+
+    fn is_likely_generic_call(&self) -> bool {
+        // 检查 < 后面是否像是泛型参数
+        // 如果 < 后面跟着类型名（如 int, string），则可能是泛型
+        // 如果 < 后面跟着数字、变量名或其他表达式，则可能是比较操作符
+        if let Some(next_token) = self.peek_ahead(1) {
+            // 检查是否是明确的类型名
+            match next_token.as_str() {
+                "int" | "float" | "bool" | "string" | "long" | "void" | "auto" => true,
+                _ => {
+                    // 对于其他标识符，我们需要更保守的判断
+                    // 如果是数字，肯定是比较操作
+                    if next_token.chars().next().unwrap_or('0').is_ascii_digit() {
+                        return false;
+                    }
+
+                    // 对于标识符，检查是否看起来像类型名
+                    // 类型名通常以大写字母开头，但变量名和常量名也可能如此
+                    // 为了安全起见，我们假设大多数情况下 < 是比较操作符
+                    // 只有在明确的类型名情况下才认为是泛型
+                    false
+                }
+            }
+        } else {
+            false
+        }
     }
     
     fn peek_ahead(&self, offset: usize) -> Option<&String> {
