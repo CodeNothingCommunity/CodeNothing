@@ -348,7 +348,7 @@ fn main() {
                     }
 
                     // 执行程序
-                    let result = interpreter::interpret(&program, auto_namespace);
+                    let result = interpreter::interpret_with_timeout(&program, auto_namespace, check_timeout);
 
                     // 只有当结果不是None且启用了--cn-return参数时才打印
                     if show_return && !matches!(result, Value::None) {
