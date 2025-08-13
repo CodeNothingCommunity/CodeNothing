@@ -1760,9 +1760,10 @@ impl<'a> Interpreter<'a> {
             }
         };
 
-        // 如果有父类，先调用父类构造函数
+        // 如果有父类，先调用父类构造函数（使用空参数环境，因为父类构造函数应该有默认值）
         if let Some(parent_class_name) = &class_def.super_class {
-            self.call_constructor_recursively(parent_class_name, this_obj, constructor_env);
+            let empty_env = HashMap::new(); // 父类构造函数使用空环境
+            self.call_constructor_recursively(parent_class_name, this_obj, &empty_env);
         }
 
         // 然后执行当前类的构造函数体（跳过其中的 super() 调用）
