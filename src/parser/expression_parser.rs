@@ -589,6 +589,55 @@ impl<'a> ExpressionParser for ParserBase<'a> {
                     if name == "this" && self.peek() != Some(&".".to_string()) {
                         return Ok(Expression::This);
                     }
+
+                    // 特殊处理super关键字
+                    if name == "super" {
+                        if self.peek() == Some(&"(".to_string()) {
+                            // super() 构造函数调用
+                            self.consume(); // 消费 "("
+                            let mut args = Vec::new();
+
+                            if self.peek() != Some(&")".to_string()) {
+                                loop {
+                                    args.push(self.parse_expression()?);
+                                    if self.peek() != Some(&",".to_string()) {
+                                        break;
+                                    }
+                                    self.consume(); // 消费 ","
+                                }
+                            }
+
+                            self.expect(")")?;
+                            return Ok(Expression::SuperCall(args));
+                        } else if self.peek() == Some(&".".to_string()) {
+                            // super.methodName() 父类方法调用
+                            self.consume(); // 消费 "."
+                            let method_name = self.consume().ok_or_else(|| "期望方法名".to_string())?;
+
+                            if self.peek() == Some(&"(".to_string()) {
+                                self.consume(); // 消费 "("
+                                let mut args = Vec::new();
+
+                                if self.peek() != Some(&")".to_string()) {
+                                    loop {
+                                        args.push(self.parse_expression()?);
+                                        if self.peek() != Some(&",".to_string()) {
+                                            break;
+                                        }
+                                        self.consume(); // 消费 ","
+                                    }
+                                }
+
+                                self.expect(")")?;
+                                return Ok(Expression::SuperMethodCall(method_name, args));
+                            } else {
+                                return Err("super 后必须跟方法调用".to_string());
+                            }
+                        } else {
+                            // 单独的 super 关键字
+                            return Ok(Expression::Super);
+                        }
+                    }
                     
                     if self.peek() == Some(&"<".to_string()) {
                         // 可能是泛型函数调用，使用试探性解析
