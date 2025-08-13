@@ -20,16 +20,16 @@ class Animal {
 }
 
 class Dog extends Animal {
-    breed: string;
-    
+    public breed: string;
+
     constructor(name: string, age: int, breed: string) {
-        println("Dog 构造函数: name=" + name + ", age=" + age + ", breed=" + breed);
+        std::println("Dog 构造函数: name=" + name + ", age=" + age + ", breed=" + breed);
         super(name, age, "Canine");
         this.breed = breed;
-        println("Dog 构造函数完成: breed=" + this.breed);
-    }
-    
-    fn getInfo() -> string {
+        std::println("Dog 构造函数完成: breed=" + this.breed);
+    };
+
+    public fn getInfo(): string {
         return "Dog: " + this.name + ", " + this.age + ", " + this.species + ", " + this.breed;
     };
 }
