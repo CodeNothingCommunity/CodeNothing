@@ -241,6 +241,7 @@ fn main() {
     let show_loop_stats = args.iter().any(|arg| arg == "--cn-loop-stats");
     let loop_debug = args.iter().any(|arg| arg == "--cn-loop-debug");
     let auto_namespace = args.iter().any(|arg| arg == "--cn-auto-ns");
+    let check_timeout = args.iter().any(|arg| arg == "--cn-check-timeout");
 
     // v0.7.5新增：初始化内存池
     if memory_debug {
