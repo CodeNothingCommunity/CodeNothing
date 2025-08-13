@@ -1,0 +1,27 @@
+// 简单的 super() 调用测试
+
+using lib<io>;
+
+class Animal {
+    public name : string;
+    
+    constructor(name : string) {
+        std::println("Animal 构造函数被调用");
+        this.name = name;
+    };
+};
+
+class Dog extends Animal {
+    constructor(name : string) {
+        std::println("Dog 构造函数开始");
+        super(name);
+        std::println("Dog 构造函数完成");
+    };
+};
+
+fn main() : int {
+    std::println("=== 简单 super() 测试 ===");
+    dog : Dog = new Dog("Buddy");
+    std::println("Dog name: " + dog.name);
+    return 0;
+};
