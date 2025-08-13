@@ -159,6 +159,7 @@ pub struct Interpreter<'a> {
     pub timeout_duration: std::time::Duration,
     pub operation_count: usize,
     pub max_operations: usize,
+    pub timeout_enabled: bool,
 }
 
 impl<'a> Interpreter<'a> {
