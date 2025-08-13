@@ -35,16 +35,16 @@ class Dog extends Animal {
 }
 
 class Puppy extends Dog {
-    playfulness: int;
-    
+    public playfulness: int;
+
     constructor(name: string, age: int, breed: string, playfulness: int) {
-        println("Puppy 构造函数: name=" + name + ", age=" + age + ", breed=" + breed + ", playfulness=" + playfulness);
+        std::println("Puppy 构造函数: name=" + name + ", age=" + age + ", breed=" + breed + ", playfulness=" + playfulness);
         super(name, age, breed);
         this.playfulness = playfulness;
-        println("Puppy 构造函数完成: playfulness=" + this.playfulness);
-    }
-    
-    fn getInfo() -> string {
+        std::println("Puppy 构造函数完成: playfulness=" + this.playfulness);
+    };
+
+    public fn getInfo(): string {
         return "Puppy: " + this.name + ", " + this.age + ", " + this.species + ", " + this.breed + ", playfulness=" + this.playfulness;
     };
 }
