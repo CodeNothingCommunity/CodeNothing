@@ -16,9 +16,24 @@ pub fn parse_function(parser: &mut ParserBase) -> Result<Function, String> {
         None => return Err("期望函数名".to_string()),
     };
 
-    // 解析泛型参数 (可选)
-    let generic_parameters = parser.parse_generic_parameters()?;
-    
+    // 解析泛型参数 (可选) - 使用试探性解析
+    let generic_parameters = if parser.peek() == Some(&"<".to_string()) {
+        // 保存当前位置
+        let saved_position = parser.position;
+
+        // 尝试解析泛型参数
+        match parser.parse_generic_parameters() {
+            Ok(params) => params,
+            Err(_) => {
+                // 泛型解析失败，恢复位置
+                parser.position = saved_position;
+                Vec::new()
+            }
+        }
+    } else {
+        Vec::new()
+    };
+
     parser.expect("(")?;
     
     // 解析函数参数
