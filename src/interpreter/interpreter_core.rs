@@ -286,6 +286,11 @@ impl<'a> Interpreter<'a> {
     pub fn set_max_operations(&mut self, max_ops: usize) {
         self.max_operations = max_ops;
     }
+
+    /// 设置是否启用超时检查
+    pub fn set_timeout_enabled(&mut self, enabled: bool) {
+        self.timeout_enabled = enabled;
+    }
     
     // 递归注册命名空间中的所有函数
     fn register_namespace_functions(
