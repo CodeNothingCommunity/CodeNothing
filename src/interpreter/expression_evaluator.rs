@@ -1450,8 +1450,8 @@ impl<'a> Interpreter<'a> {
                     }
                 }
             },
-            Statement::ExpressionStatement(expr) => {
-                // 处理表达式语句，特别是 super() 调用
+            Statement::FunctionCallStatement(expr) => {
+                // 处理函数调用语句，特别是 super() 调用
                 self.evaluate_expression_with_constructor_context(expr, this_obj, constructor_env);
             },
             _ => {
