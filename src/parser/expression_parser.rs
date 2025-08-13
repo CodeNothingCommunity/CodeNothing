@@ -19,6 +19,8 @@ pub trait ExpressionParser {
     fn is_lambda_parameter_list(&self) -> bool;
     fn is_likely_generic_call(&self) -> bool;
     fn peek_ahead(&self, offset: usize) -> Option<&String>;
+    fn is_valid_type_name(&self, name: &str) -> bool;
+    fn check_generic_context_after_closing_bracket(&self) -> bool;
 }
 
 impl<'a> ExpressionParser for ParserBase<'a> {
@@ -473,11 +475,22 @@ impl<'a> ExpressionParser for ParserBase<'a> {
                     self.consume(); // 消费 "new"
                     let class_name = self.consume().ok_or_else(|| "期望类名".to_string())?;
 
-                    // 检查是否有泛型类型参数
+                    // 检查是否有泛型类型参数，使用试探性解析
                     if self.peek() == Some(&"<".to_string()) {
-                        return self.parse_generic_object_creation(class_name);
+                        // 保存当前位置
+                        let saved_position = self.position;
+
+                        // 尝试解析泛型对象创建
+                        match self.parse_generic_object_creation(class_name.clone()) {
+                            Ok(expr) => return Ok(expr),
+                            Err(_) => {
+                                // 泛型解析失败，恢复位置并按普通对象创建处理
+                                self.position = saved_position;
+                            }
+                        }
                     }
 
+                    // 普通对象创建
                     self.expect("(")?;
 
                     let mut args = Vec::new();
@@ -577,9 +590,20 @@ impl<'a> ExpressionParser for ParserBase<'a> {
                         return Ok(Expression::This);
                     }
                     
-                    if self.peek() == Some(&"<".to_string()) && self.is_likely_generic_call() {
-                        // 泛型函数调用
-                        return self.parse_generic_function_call(name);
+                    if self.peek() == Some(&"<".to_string()) {
+                        // 可能是泛型函数调用，使用试探性解析
+                        let saved_position = self.position;
+
+                        // 尝试解析泛型函数调用
+                        match self.parse_generic_function_call(name.clone()) {
+                            Ok(expr) => return Ok(expr),
+                            Err(_) => {
+                                // 泛型解析失败，恢复位置
+                                self.position = saved_position;
+                                // 继续按变量处理
+                                return Ok(Expression::Variable(name));
+                            }
+                        }
                     } else if self.peek() == Some(&"(".to_string()) {
                         // 普通函数调用
                         self.consume(); // 消费 "("
@@ -1169,26 +1193,91 @@ impl<'a> ExpressionParser for ParserBase<'a> {
     }
 
     fn is_likely_generic_call(&self) -> bool {
-        // 检查 < 后面是否像是泛型参数
-        // 如果 < 后面跟着类型名（如 int, string），则可能是泛型
-        // 如果 < 后面跟着数字、变量名或其他表达式，则可能是比较操作符
+        // 增强的泛型调用检测逻辑
+        // 检查当前上下文是否更可能是泛型调用而不是比较操作
+
+        // 首先检查前一个token，看是否是函数名、类名或new关键字
+        let prev_token = if self.position > 0 {
+            self.tokens.get(self.position - 1)
+        } else {
+            None
+        };
+
+        // 检查下一个token（< 后面的内容）
         if let Some(next_token) = self.peek_ahead(1) {
+            // 如果前面是 new 关键字，很可能是泛型对象创建
+            if let Some(prev) = prev_token {
+                if prev == "new" {
+                    return self.is_valid_type_name(next_token);
+                }
+            }
+
             // 检查是否是明确的类型名
             match next_token.as_str() {
                 "int" | "float" | "bool" | "string" | "long" | "void" | "auto" => true,
                 _ => {
-                    // 对于其他标识符，我们需要更保守的判断
                     // 如果是数字，肯定是比较操作
                     if next_token.chars().next().unwrap_or('0').is_ascii_digit() {
                         return false;
                     }
 
-                    // 对于标识符，检查是否看起来像类型名
-                    // 类型名通常以大写字母开头，但变量名和常量名也可能如此
-                    // 为了安全起见，我们假设大多数情况下 < 是比较操作符
-                    // 只有在明确的类型名情况下才认为是泛型
+                    // 检查是否看起来像类型名（大写字母开头的标识符）
+                    if self.is_valid_type_name(next_token) {
+                        // 进一步检查：看看 > 后面是什么
+                        // 如果 > 后面是 (，很可能是泛型函数调用
+                        // 如果 > 后面是 =，很可能是泛型变量声明
+                        return self.check_generic_context_after_closing_bracket();
+                    }
+
                     false
                 }
+            }
+        } else {
+            false
+        }
+    }
+
+    // 新增：检查是否是有效的类型名
+    fn is_valid_type_name(&self, name: &str) -> bool {
+        // 类型名通常以大写字母开头，或者是已知的类型
+        if name.is_empty() {
+            return false;
+        }
+
+        let first_char = name.chars().next().unwrap();
+
+        // 内置类型
+        match name {
+            "int" | "float" | "bool" | "string" | "long" | "void" | "auto" => true,
+            _ => {
+                // 自定义类型通常以大写字母开头
+                first_char.is_uppercase() && name.chars().all(|c| c.is_alphanumeric() || c == '_')
+            }
+        }
+    }
+
+    // 新增：检查泛型结束符号后的上下文
+    fn check_generic_context_after_closing_bracket(&self) -> bool {
+        // 尝试找到匹配的 > 符号
+        let mut bracket_count = 1;
+        let mut pos = self.position + 2; // 跳过当前的 < 和下一个token
+
+        while pos < self.tokens.len() && bracket_count > 0 {
+            match self.tokens[pos].as_str() {
+                "<" => bracket_count += 1,
+                ">" => bracket_count -= 1,
+                _ => {}
+            }
+            pos += 1;
+        }
+
+        // 如果找到了匹配的 >，检查后面的内容
+        if bracket_count == 0 && pos < self.tokens.len() {
+            match self.tokens[pos].as_str() {
+                "(" => true,  // 泛型函数调用
+                "=" => true,  // 泛型变量声明
+                "{" => true,  // 泛型类定义
+                _ => false,
             }
         } else {
             false
