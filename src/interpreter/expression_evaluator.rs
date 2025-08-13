@@ -446,6 +446,16 @@ impl<'a> ExpressionEvaluator for Interpreter<'a> {
                 // TODO: 实现super关键字，需要当前类上下文
                 Value::None
             },
+            Expression::SuperCall(args) => {
+                // super() 构造函数调用 - 只能在构造函数中使用
+                eprintln!("错误: super() 调用只能在构造函数中使用");
+                Value::None
+            },
+            Expression::SuperMethodCall(method_name, args) => {
+                // super.methodName() 父类方法调用 - 只能在方法中使用
+                eprintln!("错误: super.{}() 调用只能在方法中使用", method_name);
+                Value::None
+            },
             Expression::StaticAccess(class_name, member_name) => {
                 // 简化的静态访问实现
                 if let Some(static_members) = self.static_members.get(class_name) {
