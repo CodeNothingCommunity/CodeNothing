@@ -13,7 +13,7 @@ pub mod pattern_matcher;
 pub mod pattern_jit;
 
 // Re-export main types and functions
-pub use interpreter_core::{interpret, Interpreter, debug_println};
+pub use interpreter_core::{interpret, interpret_with_timeout, Interpreter, debug_println};
 pub use function_calls::FunctionCallHandler;
 pub use expression_evaluator::ExpressionEvaluator;
 pub use statement_executor::StatementExecutor;
