@@ -1743,9 +1743,9 @@ impl<'a> Interpreter<'a> {
             }
         }
 
-        // 执行父类构造函数体，修改当前对象的字段
+        // 执行父类构造函数体，但跳过其中的 super() 调用以避免无限递归
         for statement in &parent_constructor.body {
-            self.execute_constructor_statement(statement, this_obj, &parent_constructor_env);
+            self.execute_constructor_statement_skip_super(statement, this_obj, &parent_constructor_env);
         }
 
         Value::None // super() 调用不返回值
