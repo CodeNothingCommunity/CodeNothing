@@ -1,0 +1,7 @@
+using lib<io>;
+
+fn main() : int {
+    text : string = "Hello";
+    std::println("\"" + text + "\"");
+    return 0;
+};

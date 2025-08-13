@@ -1,0 +1,36 @@
+using lib<io>;
+
+fn isPrime(n : int) : bool {
+    if (n <= 1) {
+        return false;
+    };
+    if (n <= 3) {
+        return true;
+    };
+    if (n % 2 == 0) {
+        return false;
+    };
+    
+    i : int = 3;
+    while (i * i <= n) {
+        if (n % i == 0) {
+            return false;
+        };
+        i = i + 2;
+    };
+    return true;
+};
+
+fn main() : int {
+    std::println("=== 质数测试 ===");
+    
+    test_nums : int = 2;
+    while (test_nums <= 10) {
+        if (isPrime(test_nums)) {
+            std::println(test_nums + " 是质数");
+        };
+        test_nums = test_nums + 1;
+    };
+    
+    return 0;
+};

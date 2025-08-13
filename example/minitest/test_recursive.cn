@@ -1,0 +1,19 @@
+using lib<io>;
+
+// 简单的递归函数测试
+fn factorial(n : int) : int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    };
+};
+
+fn main() : int {
+    std::println("=== 递归函数测试 ===");
+    
+    result : int = factorial(5);
+    std::println("5! = " + result);
+    
+    return 0;
+};

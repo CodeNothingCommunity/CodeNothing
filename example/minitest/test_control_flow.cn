@@ -1,0 +1,13 @@
+using lib<io>;
+
+fn main() : int {
+    x : int = 42;
+    
+    if (x > 0) {
+        std::println("x is positive");
+    } else {
+        std::println("x is not positive");
+    };
+    
+    return 0;
+};

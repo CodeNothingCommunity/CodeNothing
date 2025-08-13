@@ -1,0 +1,11 @@
+using lib<io>;
+
+fn main() : int {
+    x : int = -5;
+    y : int = -10;
+    z : int = x + y;
+    std::println("x = " + x);
+    std::println("y = " + y);
+    std::println("z = " + z);
+    return 0;
+};

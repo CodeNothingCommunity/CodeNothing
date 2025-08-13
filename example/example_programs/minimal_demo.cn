@@ -1,0 +1,58 @@
+// CodeNothing 最小演示程序
+
+using lib<io>;
+
+// 全局常量
+const PI : float = 3.14159;
+
+// 基础函数演示
+fn greet(name : string) : string {
+    return "Hello, " + name;
+};
+
+// 计算圆面积的函数
+fn calculateArea(radius : float) : float {
+    area : float = PI * radius * radius;
+    return area;
+};
+
+// 主函数
+fn main() : int {
+    std::println("=== CodeNothing 演示 ===");
+
+    // 函数调用演示
+    greeting : string = greet("CodeNothing");
+    std::println(greeting);
+
+    // 计算演示
+    area : float = calculateArea(2.0);
+    std::println("半径2.0的圆面积: " + area);
+
+    // 变量演示
+    x : int = 42;
+    y : float = 3.14;
+    name : string = "Alice";
+    flag : bool = true;
+
+    std::println("整数: " + x);
+    std::println("浮点数: " + y);
+    std::println("字符串: " + name);
+    std::println("布尔值: " + flag);
+
+    // 控制流演示
+    if (x > 0) {
+        std::println("x 是正数");
+    } else {
+        std::println("x 不是正数");
+    };
+
+    // 循环演示
+    count : int = 0;
+    while (count < 3) {
+        std::println("循环计数: " + count);
+        count = count + 1;
+    };
+
+    std::println("演示完成!");
+    return 0;
+};

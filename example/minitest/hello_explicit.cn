@@ -1,0 +1,6 @@
+using lib <io>;
+
+fn main() : int {
+    std::println("Hello, World! (使用显式命名空间)");
+    return 0;
+};

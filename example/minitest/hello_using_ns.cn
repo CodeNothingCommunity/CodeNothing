@@ -1,0 +1,7 @@
+using lib <io>;
+using ns std;
+
+fn main() : int {
+    println("Hello, World! (使用 using ns std 导入)");
+    return 0;
+};

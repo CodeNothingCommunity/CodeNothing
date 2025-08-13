@@ -1,0 +1,243 @@
+// CodeNothing 综合语法演示程序（修复版本）
+// 使用已支持的语法展示各种编程特性
+
+using lib<io>;
+
+// 全局常量
+const MAX_STUDENTS : int = 100;
+const PASSING_GRADE : float = 60.0;
+const APP_VERSION : string = "1.0.0";
+
+// 学生信息管理（使用简单变量代替类）
+// 添加学生成绩
+fn addStudentGrade(name : string, grade : float) : bool {
+    if (grade >= 0.0 && grade <= 100.0) {
+        std::println("添加学生: " + name + ", 成绩: " + grade);
+        return true;
+    } else {
+        std::println("无效成绩: " + grade);
+        return false;
+    };
+};
+
+// 计算平均成绩（简化版本）
+fn calculateAverageGrade() : float {
+    // 简化：假设只有3个学生的成绩
+    grade1 : float = 85.5;
+    grade2 : float = 92.0;
+    grade3 : float = 78.5;
+
+    total : float = grade1 + grade2 + grade3;
+    return total / 3.0;
+};
+
+// 判断是否及格
+fn isPassingGrade(grade : float) : bool {
+    return grade >= PASSING_GRADE;
+};
+
+// 数学工具函数
+fn abs(x : float) : float {
+    if (x < 0.0) {
+        return -x;
+    };
+    return x;
+};
+
+fn max(a : float, b : float) : float {
+    if (a > b) {
+        return a;
+    };
+    return b;
+};
+
+fn min(a : float, b : float) : float {
+    if (a < b) {
+        return a;
+    };
+    return b;
+};
+
+// 字符串处理函数
+fn stringLength(str : string) : int {
+    // 简化：返回固定长度（实际实现需要字符串长度函数）
+    if (str == "") {
+        return 0;
+    } else if (str == "a" || str == "b" || str == "c") {
+        return 1;
+    } else {
+        return 10; // 假设其他字符串长度为10
+    };
+};
+
+fn stringContains(str : string, substr : string) : bool {
+    // 简化：只检查几种情况
+    if (substr == "test" && str == "testing") {
+        return true;
+    } else if (substr == "demo" && str == "demonstration") {
+        return true;
+    };
+    return false;
+};
+
+// 数组操作模拟（使用多个变量）
+fn arrayOperationsDemo() : void {
+    std::println("=== 数组操作演示 ===");
+    
+    // 模拟数组：存储3个整数
+    arr0 : int = 10;
+    arr1 : int = 20;
+    arr2 : int = 30;
+    
+    std::println("数组元素:");
+    std::println("arr[0] = " + arr0);
+    std::println("arr[1] = " + arr1);
+    std::println("arr[2] = " + arr2);
+    
+    // 数组求和
+    sum : int = arr0 + arr1 + arr2;
+    std::println("数组总和: " + sum);
+    
+    // 查找最大值
+    maxVal : int = arr0;
+    if (arr1 > maxVal) {
+        maxVal = arr1;
+    };
+    if (arr2 > maxVal) {
+        maxVal = arr2;
+    };
+    std::println("最大值: " + maxVal);
+};
+
+// 控制流演示
+fn controlFlowDemo() : void {
+    std::println("=== 控制流演示 ===");
+    
+    // 条件语句演示
+    score : float = 85.5;
+    grade : string = "";
+    
+    if (score >= 90.0) {
+        grade = "A";
+    } else if (score >= 80.0) {
+        grade = "B";
+    } else if (score >= 70.0) {
+        grade = "C";
+    } else if (score >= 60.0) {
+        grade = "D";
+    } else {
+        grade = "F";
+    };
+    
+    std::println("分数: " + score + ", 等级: " + grade);
+    
+    // 循环演示
+    std::println("倒计时:");
+    count : int = 5;
+    while (count > 0) {
+        std::println(count);
+        count = count - 1;
+    };
+    std::println("发射!");
+};
+
+// 函数式编程风格演示（简化版）
+fn functionalStyleDemo() : void {
+    std::println("=== 函数式编程风格演示 ===");
+    
+    // 模拟 map 操作：将数组每个元素乘以2
+    original1 : int = 1;
+    original2 : int = 2;
+    original3 : int = 3;
+    
+    mapped1 : int = original1 * 2;
+    mapped2 : int = original2 * 2;
+    mapped3 : int = original3 * 2;
+    
+    std::println("原始数组: [" + original1 + ", " + original2 + ", " + original3 + "]");
+    std::println("映射后: [" + mapped1 + ", " + mapped2 + ", " + mapped3 + "]");
+    
+    // 模拟 filter 操作：筛选偶数
+    std::println("筛选偶数:");
+    if (original1 % 2 == 0) {
+        std::println(original1 + " 是偶数");
+    };
+    if (original2 % 2 == 0) {
+        std::println(original2 + " 是偶数");
+    };
+    if (original3 % 2 == 0) {
+        std::println(original3 + " 是偶数");
+    };
+};
+
+// 错误处理演示（简化版）
+fn errorHandlingDemo() : void {
+    std::println("=== 错误处理演示 ===");
+    
+    // 模拟除法操作
+    dividend : int = 10;
+    divisor : int = 0;
+    
+    if (divisor != 0) {
+        result : int = dividend / divisor;
+        std::println("结果: " + result);
+    } else {
+        std::println("错误: 除数不能为零");
+    };
+    
+    // 模拟数组越界检查
+    arraySize : int = 3;
+    index : int = 5;
+    
+    if (index >= 0 && index < arraySize) {
+        std::println("访问数组索引 " + index + " 成功");
+    } else {
+        std::println("错误: 数组索引 " + index + " 越界");
+    };
+};
+
+// 主函数
+fn main() : int {
+    std::println("=== CodeNothing 综合语法演示 ===");
+    std::println("版本: " + APP_VERSION);
+    std::println("最大学生数: " + MAX_STUDENTS);
+    
+    // 学生成绩管理演示
+    std::println("=== 学生成绩管理演示 ===");
+    addStudentGrade("Alice", 85.5);
+    addStudentGrade("Bob", 92.0);
+    addStudentGrade("Charlie", 78.5);
+    
+    avgGrade : float = calculateAverageGrade();
+    std::println("平均成绩: " + avgGrade);
+    
+    if (isPassingGrade(avgGrade)) {
+        std::println("班级平均成绩及格");
+    } else {
+        std::println("班级平均成绩不及格");
+    };
+    
+    // 数学函数演示
+    std::println("=== 数学函数演示 ===");
+    x : float = -5.5;
+    y : float = 3.2;
+    std::println("abs(" + x + ") = " + abs(x));
+    std::println("max(" + x + ", " + y + ") = " + max(x, y));
+    std::println("min(" + x + ", " + y + ") = " + min(x, y));
+    
+    // 字符串处理演示
+    std::println("=== 字符串处理演示 ===");
+    testStr : string = "testing";
+    std::println("字符串: " + testStr);
+    std::println("长度: " + stringLength(testStr));
+    std::println("包含 'test': " + stringContains(testStr, "test"));
+    
+    // 各种演示
+    arrayOperationsDemo();
+    controlFlowDemo();
+    functionalStyleDemo();
+    errorHandlingDemo();
+    
+    std::println("=== 演示完成 ===");
+    return 0;
+};

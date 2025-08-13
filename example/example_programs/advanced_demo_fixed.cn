@@ -1,0 +1,150 @@
+// CodeNothing 高级特性演示程序（修复版本）
+// 展示递归、数学函数、复杂控制流等特性
+
+using lib<io>;
+
+// 全局常量
+const FIBONACCI_LIMIT : int = 6;
+const FACTORIAL_INPUT : int = 5;
+
+// 递归函数：斐波那契数列
+fn fibonacci(n : int) : int {
+    if (n <= 1) {
+        return n;
+    } else {
+        return fibonacci(n - 1) + fibonacci(n - 2);
+    };
+};
+
+// 递归函数：阶乘
+fn factorial(n : int) : int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    };
+};
+
+// 最大公约数
+fn gcd(a : int, b : int) : int {
+    while (b != 0) {
+        temp : int = b;
+        b = a % b;
+        a = temp;
+    };
+    return a;
+};
+
+// 质数判断
+fn isPrime(n : int) : bool {
+    if (n <= 1) {
+        return false;
+    };
+    if (n <= 3) {
+        return true;
+    };
+    if (n % 2 == 0) {
+        return false;
+    };
+    
+    i : int = 3;
+    while (i * i <= n) {
+        if (n % i == 0) {
+            return false;
+        };
+        i = i + 2;
+    };
+    return true;
+};
+
+// 数字分类
+fn classifyNumber(num : int) : string {
+    if (num == 0) {
+        return "零";
+    };
+    
+    result : string = "";
+    absNum : int = num;
+    
+    if (num > 0) {
+        result = "正数";
+    } else {
+        result = "负数";
+        absNum = -num;
+    };
+    
+    if (absNum % 2 == 0) {
+        result = result + ", 偶数";
+    } else {
+        result = result + ", 奇数";
+    };
+    
+    return result;
+};
+
+// 嵌套循环演示
+fn multiplicationTable() : void {
+    std::println("=== 乘法表演示 ===");
+    i : int = 1;
+    while (i <= 3) {
+        j : int = 1;
+        while (j <= 3) {
+            product : int = i * j;
+            std::println(i + " x " + j + " = " + product);
+            j = j + 1;
+        };
+        i = i + 1;
+    };
+};
+
+// 主函数
+fn main() : int {
+    std::println("=== CodeNothing 高级特性演示 ===");
+    
+    // 递归函数演示
+    std::println("=== 递归函数演示 ===");
+    std::println("斐波那契数列前" + FIBONACCI_LIMIT + "项:");
+    i : int = 0;
+    while (i < FIBONACCI_LIMIT) {
+        fib : int = fibonacci(i);
+        std::println("F(" + i + ") = " + fib);
+        i = i + 1;
+    };
+    
+    fact : int = factorial(FACTORIAL_INPUT);
+    std::println(FACTORIAL_INPUT + "! = " + fact);
+    
+    // 数学函数演示
+    std::println("=== 数学函数演示 ===");
+    a : int = 48;
+    b : int = 18;
+    gcd_result : int = gcd(a, b);
+    std::println("gcd(" + a + ", " + b + ") = " + gcd_result);
+    
+    // 质数判断演示
+    std::println("=== 质数判断演示 ===");
+    test_nums : int = 2;
+    while (test_nums <= 10) {
+        if (isPrime(test_nums)) {
+            std::println(test_nums + " 是质数");
+        };
+        test_nums = test_nums + 1;
+    };
+    
+    // 嵌套循环演示
+    multiplicationTable();
+    
+    // 数字分类演示
+    std::println("=== 数字分类演示 ===");
+    numbers : int = -3;
+    while (numbers <= 3) {
+        if (numbers != 0) {
+            classification : string = classifyNumber(numbers);
+            std::println(numbers + ": " + classification);
+        };
+        numbers = numbers + 1;
+    };
+    
+    std::println("高级特性演示完成!");
+    return 0;
+};

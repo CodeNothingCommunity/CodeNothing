@@ -1,0 +1,11 @@
+using lib<io>;
+
+fn main() : int {
+    count : int = 0;
+    while (count < 2) {
+        std::println("Count: " + count);
+        count = count + 1;
+    };
+    std::println("Done");
+    return 0;
+};

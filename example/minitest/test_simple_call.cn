@@ -1,0 +1,7 @@
+using lib<io>;
+
+fn main() : int {
+    x : int = 42;
+    std::println("Hello");
+    return 0;
+};

@@ -1,0 +1,20 @@
+using lib<io>;
+
+const FACTORIAL_INPUT : int = 5;
+
+fn factorial(n : int) : int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    };
+};
+
+fn main() : int {
+    std::println("=== 最小高级特性测试 ===");
+    
+    fact : int = factorial(FACTORIAL_INPUT);
+    std::println(FACTORIAL_INPUT + "! = " + fact);
+    
+    return 0;
+};

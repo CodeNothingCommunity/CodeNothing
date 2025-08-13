@@ -1,0 +1,68 @@
+using lib<io>;
+
+const FACTORIAL_INPUT : int = 5;
+
+fn factorial(n : int) : int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    };
+};
+
+fn fibonacci(n : int) : int {
+    if (n <= 1) {
+        return n;
+    } else {
+        return fibonacci(n - 1) + fibonacci(n - 2);
+    };
+};
+
+fn gcd(a : int, b : int) : int {
+    while (b != 0) {
+        temp : int = b;
+        b = a % b;
+        a = temp;
+    };
+    return a;
+};
+
+fn isPrime(n : int) : bool {
+    if (n <= 1) {
+        return false;
+    };
+    if (n <= 3) {
+        return true;
+    };
+    if (n % 2 == 0) {
+        return false;
+    };
+
+    i : int = 3;
+    while (i * i <= n) {
+        if (n % i == 0) {
+            return false;
+        };
+        i = i + 2;
+    };
+    return true;
+};
+
+fn main() : int {
+    std::println("=== 逐步测试 ===");
+
+    fact : int = factorial(FACTORIAL_INPUT);
+    std::println("阶乘: " + fact);
+
+    gcd_result : int = gcd(48, 18);
+    std::println("最大公约数: " + gcd_result);
+
+    if (isPrime(7)) {
+        std::println("7 是质数");
+    };
+
+    fib : int = fibonacci(6);
+    std::println("F(6) = " + fib);
+
+    return 0;
+};

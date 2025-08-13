@@ -1,0 +1,10 @@
+using lib<io>;
+
+fn main() : int {
+    count : int = 0;
+    while (count < 3) {
+        std::println("Count: " + count);
+        count = count + 1;
+    };
+    return 0;
+};

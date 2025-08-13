@@ -1,0 +1,8 @@
+using lib<io>;
+
+fn main() : int {
+    std::println("Hello from CodeNothing!");
+    x : int = 42;
+    std::println("The answer is: " + x);
+    return 0;
+};

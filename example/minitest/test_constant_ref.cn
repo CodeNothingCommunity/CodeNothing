@@ -1,0 +1,24 @@
+using lib<io>;
+
+const FACTORIAL_INPUT : int = 5;
+
+fn factorial(n : int) : int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    };
+};
+
+fn main() : int {
+    std::println("=== 常量引用测试 ===");
+    
+    // 直接使用常量
+    std::println("常量值: " + FACTORIAL_INPUT);
+    
+    // 在函数调用中使用常量
+    fact : int = factorial(FACTORIAL_INPUT);
+    std::println("结果: " + fact);
+    
+    return 0;
+};

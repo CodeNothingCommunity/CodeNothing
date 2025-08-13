@@ -1,0 +1,274 @@
+// CodeNothing Pattern Matching and Functional Programming Demo (Fixed Version)
+// Using supported syntax to simulate pattern matching and functional programming
+
+using lib<io>;
+
+// Simulating enums with constants and functions
+const COLOR_RED : int = 1;
+const COLOR_GREEN : int = 2;
+const COLOR_BLUE : int = 3;
+
+const SHAPE_CIRCLE : int = 1;
+const SHAPE_RECTANGLE : int = 2;
+const SHAPE_TRIANGLE : int = 3;
+
+// Simulating pattern matching with if-else chains
+fn colorToString(color : int) : string {
+    if (color == COLOR_RED) {
+        return "Red";
+    } else if (color == COLOR_GREEN) {
+        return "Green";
+    } else if (color == COLOR_BLUE) {
+        return "Blue";
+    } else {
+        return "Unknown";
+    };
+};
+
+fn shapeToString(shape : int) : string {
+    if (shape == SHAPE_CIRCLE) {
+        return "Circle";
+    } else if (shape == SHAPE_RECTANGLE) {
+        return "Rectangle";
+    } else if (shape == SHAPE_TRIANGLE) {
+        return "Triangle";
+    } else {
+        return "Unknown";
+    };
+};
+
+// Simulating pattern matching with complex conditions
+fn analyzeNumber(num : int) : string {
+    if (num == 0) {
+        return "Zero";
+    } else if (num > 0 && num <= 10) {
+        return "Small positive";
+    } else if (num > 10 && num <= 100) {
+        return "Medium positive";
+    } else if (num > 100) {
+        return "Large positive";
+    } else if (num < 0 && num >= -10) {
+        return "Small negative";
+    } else if (num < -10 && num >= -100) {
+        return "Medium negative";
+    } else {
+        return "Large negative";
+    };
+};
+
+// Simulating functional programming with higher-order functions
+fn applyOperation(value : int, operation : string) : int {
+    if (operation == "double") {
+        return value * 2;
+    } else if (operation == "square") {
+        return value * value;
+    } else if (operation == "increment") {
+        return value + 1;
+    } else if (operation == "negate") {
+        return -value;
+    } else {
+        return value;
+    };
+};
+
+// Simulating map operation
+fn mapArray(arr1 : int, arr2 : int, arr3 : int, operation : string) : void {
+    std::println("Original array: [" + arr1 + ", " + arr2 + ", " + arr3 + "]");
+    
+    result1 : int = applyOperation(arr1, operation);
+    result2 : int = applyOperation(arr2, operation);
+    result3 : int = applyOperation(arr3, operation);
+    
+    std::println("After " + operation + ": [" + result1 + ", " + result2 + ", " + result3 + "]");
+};
+
+// Simulating filter operation
+fn filterArray(arr1 : int, arr2 : int, arr3 : int, condition : string) : void {
+    std::println("Original array: [" + arr1 + ", " + arr2 + ", " + arr3 + "]");
+    std::println("Filtering by: " + condition);
+    
+    if (condition == "positive") {
+        if (arr1 > 0) {
+            std::println("  " + arr1);
+        };
+        if (arr2 > 0) {
+            std::println("  " + arr2);
+        };
+        if (arr3 > 0) {
+            std::println("  " + arr3);
+        };
+    } else if (condition == "even") {
+        if (arr1 % 2 == 0) {
+            std::println("  " + arr1);
+        };
+        if (arr2 % 2 == 0) {
+            std::println("  " + arr2);
+        };
+        if (arr3 % 2 == 0) {
+            std::println("  " + arr3);
+        };
+    } else if (condition == "greater_than_5") {
+        if (arr1 > 5) {
+            std::println("  " + arr1);
+        };
+        if (arr2 > 5) {
+            std::println("  " + arr2);
+        };
+        if (arr3 > 5) {
+            std::println("  " + arr3);
+        };
+    };
+};
+
+// Simulating reduce operation
+fn reduceArray(arr1 : int, arr2 : int, arr3 : int, operation : string) : int {
+    std::println("Original array: [" + arr1 + ", " + arr2 + ", " + arr3 + "]");
+    std::println("Reducing with: " + operation);
+    
+    if (operation == "sum") {
+        result : int = arr1 + arr2 + arr3;
+        std::println("Sum: " + result);
+        return result;
+    } else if (operation == "product") {
+        result : int = arr1 * arr2 * arr3;
+        std::println("Product: " + result);
+        return result;
+    } else if (operation == "max") {
+        result : int = arr1;
+        if (arr2 > result) {
+            result = arr2;
+        };
+        if (arr3 > result) {
+            result = arr3;
+        };
+        std::println("Max: " + result);
+        return result;
+    } else {
+        std::println("Unknown operation");
+        return 0;
+    };
+};
+
+// Simulating function composition
+fn compose(value : int, op1 : string, op2 : string) : int {
+    intermediate : int = applyOperation(value, op1);
+    result : int = applyOperation(intermediate, op2);
+    return result;
+};
+
+// Simulating recursive functional patterns
+fn factorial(n : int) : int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    };
+};
+
+fn fibonacci(n : int) : int {
+    if (n <= 1) {
+        return n;
+    } else {
+        return fibonacci(n - 1) + fibonacci(n - 2);
+    };
+};
+
+// Demo functions
+fn patternMatchingDemo() : void {
+    std::println("=== Pattern Matching Demo ===");
+    
+    // Color pattern matching
+    color1 : int = COLOR_RED;
+    color2 : int = COLOR_GREEN;
+    color3 : int = COLOR_BLUE;
+    
+    std::println("Color 1: " + colorToString(color1));
+    std::println("Color 2: " + colorToString(color2));
+    std::println("Color 3: " + colorToString(color3));
+    
+    // Shape pattern matching
+    shape1 : int = SHAPE_CIRCLE;
+    shape2 : int = SHAPE_RECTANGLE;
+    
+    std::println("Shape 1: " + shapeToString(shape1));
+    std::println("Shape 2: " + shapeToString(shape2));
+    
+    // Number analysis
+    std::println("Number analysis:");
+    std::println("0: " + analyzeNumber(0));
+    std::println("5: " + analyzeNumber(5));
+    std::println("50: " + analyzeNumber(50));
+    std::println("500: " + analyzeNumber(500));
+    std::println("-5: " + analyzeNumber(-5));
+};
+
+fn functionalProgrammingDemo() : void {
+    std::println("=== Functional Programming Demo ===");
+    
+    // Map operation demo
+    std::println("Map operations:");
+    mapArray(1, 2, 3, "double");
+    mapArray(2, 3, 4, "square");
+    mapArray(5, 6, 7, "increment");
+    
+    // Filter operation demo
+    std::println("Filter operations:");
+    filterArray(-2, 3, -4, "positive");
+    filterArray(1, 2, 3, "even");
+    filterArray(3, 7, 2, "greater_than_5");
+    
+    // Reduce operation demo
+    std::println("Reduce operations:");
+    reduceArray(1, 2, 3, "sum");
+    reduceArray(2, 3, 4, "product");
+    reduceArray(5, 2, 8, "max");
+};
+
+fn compositionDemo() : void {
+    std::println("=== Function Composition Demo ===");
+    
+    value : int = 5;
+    std::println("Starting value: " + value);
+    
+    result1 : int = compose(value, "increment", "double");
+    std::println("increment then double: " + result1);
+    
+    result2 : int = compose(value, "double", "square");
+    std::println("double then square: " + result2);
+    
+    result3 : int = compose(value, "square", "negate");
+    std::println("square then negate: " + result3);
+};
+
+fn recursiveDemo() : void {
+    std::println("=== Recursive Patterns Demo ===");
+    
+    std::println("Factorial:");
+    i : int = 1;
+    while (i <= 5) {
+        fact : int = factorial(i);
+        std::println("factorial(" + i + ") = " + fact);
+        i = i + 1;
+    };
+    
+    std::println("Fibonacci:");
+    j : int = 0;
+    while (j <= 6) {
+        fib : int = fibonacci(j);
+        std::println("fibonacci(" + j + ") = " + fib);
+        j = j + 1;
+    };
+};
+
+// Main function
+fn main() : int {
+    std::println("=== CodeNothing Pattern Matching and Functional Programming Demo ===");
+    
+    patternMatchingDemo();
+    functionalProgrammingDemo();
+    compositionDemo();
+    recursiveDemo();
+    
+    std::println("=== Pattern Matching and Functional Programming Demo Complete ===");
+    return 0;
+};

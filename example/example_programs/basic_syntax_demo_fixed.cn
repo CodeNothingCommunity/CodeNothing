@@ -1,0 +1,143 @@
+// CodeNothing 基础语法演示程序（修复版）
+// 展示变量声明、函数定义、控制流等基础特性
+
+using lib<io>;
+
+// 全局常量
+const PI : float = 3.14159;
+const MAX_STUDENTS : int = 100;
+const APP_NAME : string = "CodeNothing Demo";
+
+// 基础函数演示
+fn greet(name : string) : string {
+    return "Hello, " + name + "! Welcome to CodeNothing";
+};
+
+// 计算圆面积的函数
+fn calculateArea(radius : float) : float {
+    area : float = PI * radius * radius;
+    return area;
+};
+
+// 控制流演示函数
+fn analyzeNumber(num : int) : string {
+    result : string = "";
+
+    // if-else 语句
+    if (num > 0) {
+        result = "positive";
+    } else if (num < 0) {
+        result = "negative";
+    } else {
+        result = "zero";
+    };
+
+    // 简单的奇偶判断
+    category : string = "unknown";
+    if (num % 2 == 0) {
+        category = "even";
+    } else {
+        category = "odd";
+    };
+
+    return result + " and " + category;
+};
+
+// 循环演示函数
+fn demonstrateLoops() : void {
+    std::println("=== 循环演示 ===");
+
+    // while 循环
+    std::println("While 循环:");
+    count : int = 0;
+    while (count < 3) {
+        std::println("Count: " + count);
+        count = count + 1;
+    };
+
+    std::println("循环演示完成");
+};
+
+// 变量类型演示
+fn variableTypes() : void {
+    std::println("=== 变量类型演示 ===");
+
+    // 基础类型
+    age : int = 25;
+    height : float = 175.5;
+    isStudent : bool = true;
+    name : string = "Alice";
+
+    // 自动类型推断
+    autoInt : auto = 42;
+    autoString : auto = "推断的字符串";
+
+    std::println("年龄: " + age);
+    std::println("身高: " + height);
+    std::println("学生: " + isStudent);
+    std::println("姓名: " + name);
+    std::println("自动推断整数: " + autoInt);
+    std::println("自动推断字符串: " + autoString);
+
+    std::println("变量类型演示完成");
+};
+
+// 简单的数学运算演示
+fn mathOperations() : void {
+    std::println("=== 数学运算演示 ===");
+
+    a : int = 10;
+    b : int = 3;
+
+    sum : int = a + b;
+    diff : int = a - b;
+    product : int = a * b;
+    quotient : int = a / b;
+
+    std::println("加法: " + a + " + " + b + " = " + sum);
+    std::println("减法: " + a + " - " + b + " = " + diff);
+    std::println("乘法: " + a + " * " + b + " = " + product);
+    std::println("除法: " + a + " / " + b + " = " + quotient);
+
+    std::println("数学运算演示完成");
+};
+
+// 主函数
+fn main() : int {
+    std::println("=== CodeNothing 基础语法演示 ===");
+
+    // 函数调用演示
+    greeting : string = greet("CodeNothing");
+    std::println(greeting);
+
+    // 计算演示
+    area1 : float = calculateArea(1.0);
+    area2 : float = calculateArea(2.5);
+    std::println("半径1.0的圆面积: " + area1);
+    std::println("半径2.5的圆面积: " + area2);
+
+    // 数字分析
+    std::println("=== 数字分析 ===");
+    num1 : int = -5;
+    num2 : int = 0;
+    num3 : int = 7;
+    num4 : int = 12;
+
+    analysis1 : string = analyzeNumber(num1);
+    analysis2 : string = analyzeNumber(num2);
+    analysis3 : string = analyzeNumber(num3);
+    analysis4 : string = analyzeNumber(num4);
+
+    std::println(num1 + " 是 " + analysis1);
+    std::println(num2 + " 是 " + analysis2);
+    std::println(num3 + " 是 " + analysis3);
+    std::println(num4 + " 是 " + analysis4);
+
+    // 调用各种演示函数
+    demonstrateLoops();
+    variableTypes();
+    mathOperations();
+
+    std::println("程序执行完成!");
+    return 0;
+};

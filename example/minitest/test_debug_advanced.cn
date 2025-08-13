@@ -1,0 +1,64 @@
+using lib<io>;
+
+const FIBONACCI_LIMIT : int = 6;
+const FACTORIAL_INPUT : int = 5;
+
+fn factorial(n : int) : int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    };
+};
+
+fn fibonacci(n : int) : int {
+    if (n <= 1) {
+        return n;
+    } else {
+        return fibonacci(n - 1) + fibonacci(n - 2);
+    };
+};
+
+fn isPrime(n : int) : bool {
+    if (n <= 1) {
+        return false;
+    };
+    if (n <= 3) {
+        return true;
+    };
+    if (n % 2 == 0) {
+        return false;
+    };
+
+    i : int = 3;
+    while (i * i <= n) {
+        if (n % i == 0) {
+            return false;
+        };
+        i = i + 2;
+    };
+    return true;
+};
+
+fn main() : int {
+    std::println("=== 测试 ===");
+    
+    i : int = 0;
+    while (i < FIBONACCI_LIMIT) {
+        fib : int = fibonacci(i);
+        std::println("F(" + i + ") = " + fib);
+        i = i + 1;
+    };
+    
+    fact : int = factorial(FACTORIAL_INPUT);
+    std::println("结果: " + fact);
+
+    if (isPrime(7)) {
+        std::println("7 是质数");
+    };
+
+    fib : int = fibonacci(6);
+    std::println("F(6) = " + fib);
+
+    return 0;
+};

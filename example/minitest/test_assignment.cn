@@ -1,0 +1,9 @@
+using lib<io>;
+
+fn main() : int {
+    count : int = 0;
+    std::println("Initial count: " + count);
+    count = 5;
+    std::println("Updated count: " + count);
+    return 0;
+};

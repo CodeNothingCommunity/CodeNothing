@@ -1,0 +1,14 @@
+using lib<io>;
+
+const PI : float = 3.14159;
+
+fn calculateArea(radius : float) : float {
+    area : float = PI * radius * radius;
+    return area;
+};
+
+fn main() : int {
+    area : float = calculateArea(2.0);
+    std::println("Area: " + area);
+    return 0;
+};

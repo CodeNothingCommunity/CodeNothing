@@ -1,0 +1,289 @@
+// CodeNothing Memory Management Demo (Fixed Version)
+// Using supported syntax to simulate pointer operations and memory management
+
+using lib<io>;
+
+// Simulating memory addresses with integers
+const NULL_ADDRESS : int = 0;
+const MEMORY_BASE : int = 1000;
+
+// Simulating pointer operations with functions
+fn allocateMemory(size : int) : int {
+    // Simulate memory allocation by returning an address
+    if (size > 0 && size <= 100) {
+        return MEMORY_BASE + size;
+    } else {
+        return NULL_ADDRESS;
+    };
+};
+
+fn deallocateMemory(address : int) : bool {
+    // Simulate memory deallocation
+    if (address != NULL_ADDRESS && address >= MEMORY_BASE) {
+        std::println("Memory at address " + address + " deallocated");
+        return true;
+    } else {
+        std::println("Invalid memory address: " + address);
+        return false;
+    };
+};
+
+fn isValidAddress(address : int) : bool {
+    return address != NULL_ADDRESS && address >= MEMORY_BASE;
+};
+
+// Simulating pointer arithmetic
+fn pointerAdd(address : int, offset : int) : int {
+    if (isValidAddress(address)) {
+        return address + offset;
+    } else {
+        return NULL_ADDRESS;
+    };
+};
+
+fn pointerSubtract(address : int, offset : int) : int {
+    if (isValidAddress(address)) {
+        newAddress : int = address - offset;
+        if (newAddress >= MEMORY_BASE) {
+            return newAddress;
+        } else {
+            return NULL_ADDRESS;
+        };
+    } else {
+        return NULL_ADDRESS;
+    };
+};
+
+fn pointerDistance(addr1 : int, addr2 : int) : int {
+    if (isValidAddress(addr1) && isValidAddress(addr2)) {
+        if (addr1 > addr2) {
+            return addr1 - addr2;
+        } else {
+            return addr2 - addr1;
+        };
+    } else {
+        return -1; // Error indicator
+    };
+};
+
+// Simulating memory operations
+fn writeToMemory(address : int, value : int) : bool {
+    if (isValidAddress(address)) {
+        std::println("Writing value " + value + " to address " + address);
+        return true;
+    } else {
+        std::println("Cannot write to invalid address: " + address);
+        return false;
+    };
+};
+
+fn readFromMemory(address : int) : int {
+    if (isValidAddress(address)) {
+        // Simulate reading a value from memory
+        // For demo purposes, return a calculated value based on address
+        value : int = (address - MEMORY_BASE) * 2;
+        std::println("Reading value " + value + " from address " + address);
+        return value;
+    } else {
+        std::println("Cannot read from invalid address: " + address);
+        return -1;
+    };
+};
+
+// Simulating array operations with pointer-like behavior
+fn createArray(size : int) : int {
+    // Return the base address of the array
+    return allocateMemory(size * 4); // Assume 4 bytes per element
+};
+
+fn getArrayElement(baseAddress : int, index : int) : int {
+    elementAddress : int = pointerAdd(baseAddress, index * 4);
+    return readFromMemory(elementAddress);
+};
+
+fn setArrayElement(baseAddress : int, index : int, value : int) : bool {
+    elementAddress : int = pointerAdd(baseAddress, index * 4);
+    return writeToMemory(elementAddress, value);
+};
+
+// Simulating function pointers with string identifiers
+fn callFunction(functionName : string, arg : int) : int {
+    if (functionName == "double") {
+        return arg * 2;
+    } else if (functionName == "square") {
+        return arg * arg;
+    } else if (functionName == "increment") {
+        return arg + 1;
+    } else if (functionName == "negate") {
+        return -arg;
+    } else {
+        std::println("Unknown function: " + functionName);
+        return arg;
+    };
+};
+
+fn applyFunctionPointer(functionName : string, value : int) : int {
+    std::println("Calling function '" + functionName + "' with argument " + value);
+    result : int = callFunction(functionName, value);
+    std::println("Result: " + result);
+    return result;
+};
+
+// Simulating reference counting for memory management
+fn createReference(address : int) : int {
+    if (isValidAddress(address)) {
+        std::println("Creating reference to address " + address);
+        return 1; // Reference count
+    } else {
+        return 0;
+    };
+};
+
+fn addReference(refCount : int) : int {
+    newCount : int = refCount + 1;
+    std::println("Reference count increased to " + newCount);
+    return newCount;
+};
+
+fn removeReference(refCount : int) : int {
+    if (refCount > 0) {
+        newCount : int = refCount - 1;
+        std::println("Reference count decreased to " + newCount);
+        if (newCount == 0) {
+            std::println("Object can be deallocated");
+        };
+        return newCount;
+    } else {
+        std::println("Warning: Reference count already at 0");
+        return 0;
+    };
+};
+
+// Demo functions
+fn memoryAllocationDemo() : void {
+    std::println("=== Memory Allocation Demo ===");
+    
+    // Allocate memory
+    ptr1 : int = allocateMemory(10);
+    ptr2 : int = allocateMemory(20);
+    ptr3 : int = allocateMemory(0); // Invalid size
+    
+    std::println("Allocated memory at address: " + ptr1);
+    std::println("Allocated memory at address: " + ptr2);
+    std::println("Failed allocation returned: " + ptr3);
+    
+    // Deallocate memory
+    deallocateMemory(ptr1);
+    deallocateMemory(ptr2);
+    deallocateMemory(ptr3); // Should fail
+};
+
+fn pointerArithmeticDemo() : void {
+    std::println("=== Pointer Arithmetic Demo ===");
+    
+    basePtr : int = allocateMemory(50);
+    std::println("Base pointer: " + basePtr);
+    
+    // Pointer arithmetic
+    ptr1 : int = pointerAdd(basePtr, 10);
+    ptr2 : int = pointerAdd(basePtr, 20);
+    ptr3 : int = pointerSubtract(ptr2, 5);
+    
+    std::println("Base + 10: " + ptr1);
+    std::println("Base + 20: " + ptr2);
+    std::println("(Base + 20) - 5: " + ptr3);
+    
+    // Calculate distance
+    distance : int = pointerDistance(ptr1, ptr2);
+    std::println("Distance between ptr1 and ptr2: " + distance);
+    
+    deallocateMemory(basePtr);
+};
+
+fn memoryOperationsDemo() : void {
+    std::println("=== Memory Operations Demo ===");
+    
+    ptr : int = allocateMemory(16);
+    
+    // Write and read operations
+    writeToMemory(ptr, 42);
+    writeToMemory(pointerAdd(ptr, 4), 84);
+    
+    value1 : int = readFromMemory(ptr);
+    value2 : int = readFromMemory(pointerAdd(ptr, 4));
+    
+    std::println("Read values: " + value1 + ", " + value2);
+    
+    deallocateMemory(ptr);
+};
+
+fn arraySimulationDemo() : void {
+    std::println("=== Array Simulation Demo ===");
+    
+    arrayPtr : int = createArray(5);
+    std::println("Created array at address: " + arrayPtr);
+    
+    // Set array elements
+    setArrayElement(arrayPtr, 0, 10);
+    setArrayElement(arrayPtr, 1, 20);
+    setArrayElement(arrayPtr, 2, 30);
+    
+    // Get array elements
+    elem0 : int = getArrayElement(arrayPtr, 0);
+    elem1 : int = getArrayElement(arrayPtr, 1);
+    elem2 : int = getArrayElement(arrayPtr, 2);
+    
+    std::println("Array elements: [" + elem0 + ", " + elem1 + ", " + elem2 + "]");
+    
+    deallocateMemory(arrayPtr);
+};
+
+fn functionPointerDemo() : void {
+    std::println("=== Function Pointer Demo ===");
+    
+    value : int = 5;
+    std::println("Starting value: " + value);
+    
+    // Simulate function pointer calls
+    result1 : int = applyFunctionPointer("double", value);
+    result2 : int = applyFunctionPointer("square", value);
+    result3 : int = applyFunctionPointer("increment", value);
+    result4 : int = applyFunctionPointer("negate", value);
+    
+    std::println("Final results: " + result1 + ", " + result2 + ", " + result3 + ", " + result4);
+};
+
+fn referenceCountingDemo() : void {
+    std::println("=== Reference Counting Demo ===");
+    
+    ptr : int = allocateMemory(32);
+    refCount : int = createReference(ptr);
+    
+    // Simulate multiple references
+    refCount = addReference(refCount);
+    refCount = addReference(refCount);
+    
+    std::println("Current reference count: " + refCount);
+    
+    // Remove references
+    refCount = removeReference(refCount);
+    refCount = removeReference(refCount);
+    refCount = removeReference(refCount); // Should trigger deallocation message
+    
+    deallocateMemory(ptr);
+};
+
+// Main function
+fn main() : int {
+    std::println("=== CodeNothing Memory Management Demo ===");
+    
+    memoryAllocationDemo();
+    pointerArithmeticDemo();
+    memoryOperationsDemo();
+    arraySimulationDemo();
+    functionPointerDemo();
+    referenceCountingDemo();
+    
+    std::println("=== Memory Management Demo Complete ===");
+    return 0;
+};

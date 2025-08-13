@@ -1,0 +1,21 @@
+using lib<io>;
+
+fn gcd(a : int, b : int) : int {
+    while (b != 0) {
+        temp : int = b;
+        b = a % b;
+        a = temp;
+    };
+    return a;
+};
+
+fn main() : int {
+    std::println("=== GCD 测试 ===");
+    
+    a : int = 48;
+    b : int = 18;
+    result : int = gcd(a, b);
+    std::println("gcd(" + a + ", " + b + ") = " + result);
+    
+    return 0;
+};

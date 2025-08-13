@@ -1,0 +1,248 @@
+// CodeNothing 高级特性演示（修复版本）
+// 使用已支持的语法模拟泛型编程和高级特性
+
+using lib<io>;
+
+// 模拟容器操作（使用具体类型代替泛型）
+
+// 整数容器操作
+fn createIntContainer() : int {
+    // 模拟创建容器，返回容器大小
+    return 0;
+};
+
+fn addToIntContainer(size : int, item : int) : int {
+    std::println("添加整数到容器: " + item);
+    return size + 1;
+};
+
+fn getFromIntContainer(index : int, item1 : int, item2 : int, item3 : int) : int {
+    if (index == 0) {
+        return item1;
+    } else if (index == 1) {
+        return item2;
+    } else if (index == 2) {
+        return item3;
+    } else {
+        std::println("索引越界: " + index);
+        return -1;
+    };
+};
+
+// 字符串容器操作
+fn createStringContainer() : int {
+    return 0;
+};
+
+fn addToStringContainer(size : int, item : string) : int {
+    std::println("添加字符串到容器: " + item);
+    return size + 1;
+};
+
+fn getFromStringContainer(index : int, item1 : string, item2 : string, item3 : string) : string {
+    if (index == 0) {
+        return item1;
+    } else if (index == 1) {
+        return item2;
+    } else if (index == 2) {
+        return item3;
+    } else {
+        std::println("索引越界: " + index);
+        return "";
+    };
+};
+
+// 模拟高阶函数操作
+
+// 对整数数组应用函数（模拟 map 操作）
+fn mapIntArray(item1 : int, item2 : int, item3 : int) : void {
+    std::println("=== 映射操作演示 ===");
+    std::println("原始数组: [" + item1 + ", " + item2 + ", " + item3 + "]");
+    
+    // 模拟 x => x * 2
+    mapped1 : int = item1 * 2;
+    mapped2 : int = item2 * 2;
+    mapped3 : int = item3 * 2;
+    
+    std::println("乘以2后: [" + mapped1 + ", " + mapped2 + ", " + mapped3 + "]");
+};
+
+// 过滤操作（模拟 filter）
+fn filterIntArray(item1 : int, item2 : int, item3 : int) : void {
+    std::println("=== 过滤操作演示 ===");
+    std::println("原始数组: [" + item1 + ", " + item2 + ", " + item3 + "]");
+    std::println("筛选偶数:");
+    
+    if (item1 % 2 == 0) {
+        std::println("  " + item1);
+    };
+    if (item2 % 2 == 0) {
+        std::println("  " + item2);
+    };
+    if (item3 % 2 == 0) {
+        std::println("  " + item3);
+    };
+};
+
+// 归约操作（模拟 reduce）
+fn reduceIntArray(item1 : int, item2 : int, item3 : int) : int {
+    std::println("=== 归约操作演示 ===");
+    std::println("原始数组: [" + item1 + ", " + item2 + ", " + item3 + "]");
+    
+    // 模拟求和
+    sum : int = item1 + item2 + item3;
+    std::println("求和结果: " + sum);
+    return sum;
+};
+
+// 模拟函数式编程风格
+fn applyFunction(value : int, operation : string) : int {
+    if (operation == "double") {
+        return value * 2;
+    } else if (operation == "square") {
+        return value * value;
+    } else if (operation == "increment") {
+        return value + 1;
+    } else {
+        return value;
+    };
+};
+
+// 链式操作演示
+fn chainOperations(value : int) : int {
+    std::println("=== 链式操作演示 ===");
+    std::println("初始值: " + value);
+    
+    // 模拟 value.increment().double().square()
+    step1 : int = applyFunction(value, "increment");
+    std::println("增加1后: " + step1);
+    
+    step2 : int = applyFunction(step1, "double");
+    std::println("乘以2后: " + step2);
+    
+    step3 : int = applyFunction(step2, "square");
+    std::println("平方后: " + step3);
+    
+    return step3;
+};
+
+// 模拟类型转换和类型检查
+fn typeConversionDemo() : void {
+    std::println("=== 类型转换演示 ===");
+
+    // 整数到浮点数
+    intVal : int = 42;
+    floatVal : float = 42.0; // 显式使用浮点数
+    std::println("整数 " + intVal + " 对应的浮点数: " + floatVal);
+
+    // 浮点数到整数（截断）
+    floatVal2 : float = 3.14159;
+    intVal2 : int = 3; // 显式使用截断后的值
+    std::println("浮点数 " + floatVal2 + " 截断为整数: " + intVal2);
+
+    // 数字到字符串
+    num : int = 123;
+    str : string = "123"; // 显式使用字符串
+    std::println("数字 " + num + " 对应的字符串: '" + str + "'");
+};
+
+// 模拟错误处理和选项类型
+fn safeOperation(a : int, b : int, operation : string) : int {
+    std::println("=== 安全操作演示 ===");
+    std::println("操作: " + a + " " + operation + " " + b);
+    
+    if (operation == "divide") {
+        if (b == 0) {
+            std::println("错误: 除数不能为零");
+            return -1; // 错误标志
+        } else {
+            result : int = a / b;
+            std::println("结果: " + result);
+            return result;
+        };
+    } else if (operation == "add") {
+        result : int = a + b;
+        std::println("结果: " + result);
+        return result;
+    } else if (operation == "multiply") {
+        result : int = a * b;
+        std::println("结果: " + result);
+        return result;
+    } else {
+        std::println("错误: 不支持的操作");
+        return -1;
+    };
+};
+
+// 模拟迭代器模式
+fn iteratorDemo() : void {
+    std::println("=== 迭代器演示 ===");
+    
+    // 模拟数组迭代
+    arr1 : int = 10;
+    arr2 : int = 20;
+    arr3 : int = 30;
+    
+    std::println("遍历数组:");
+    std::println("元素: " + arr1);
+    std::println("元素: " + arr2);
+    std::println("元素: " + arr3);
+    
+    // 模拟条件迭代
+    std::println("条件遍历（只显示大于15的元素）:");
+    if (arr1 > 15) {
+        std::println("元素: " + arr1);
+    };
+    if (arr2 > 15) {
+        std::println("元素: " + arr2);
+    };
+    if (arr3 > 15) {
+        std::println("元素: " + arr3);
+    };
+};
+
+// 主函数
+fn main() : int {
+    std::println("=== CodeNothing 高级特性演示 ===");
+    
+    // 容器操作演示
+    std::println("=== 容器操作演示 ===");
+    intSize : int = createIntContainer();
+    intSize = addToIntContainer(intSize, 10);
+    intSize = addToIntContainer(intSize, 20);
+    intSize = addToIntContainer(intSize, 30);
+    
+    item : int = getFromIntContainer(1, 10, 20, 30);
+    std::println("获取索引1的元素: " + item);
+    
+    stringSize : int = createStringContainer();
+    stringSize = addToStringContainer(stringSize, "Hello");
+    stringSize = addToStringContainer(stringSize, "World");
+    stringSize = addToStringContainer(stringSize, "!");
+    
+    strItem : string = getFromStringContainer(0, "Hello", "World", "!");
+    std::println("获取索引0的字符串: " + strItem);
+    
+    // 高阶函数演示
+    mapIntArray(1, 2, 3);
+    filterIntArray(1, 2, 3);
+    sum : int = reduceIntArray(1, 2, 3);
+    
+    // 链式操作演示
+    result : int = chainOperations(5);
+    std::println("最终结果: " + result);
+    
+    // 类型转换演示
+    typeConversionDemo();
+    
+    // 安全操作演示
+    safeOperation(10, 2, "divide");
+    safeOperation(10, 0, "divide");
+    safeOperation(5, 3, "add");
+    
+    // 迭代器演示
+    iteratorDemo();
+    
+    std::println("=== 高级特性演示完成 ===");
+    return 0;
+};

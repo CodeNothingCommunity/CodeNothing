@@ -1,0 +1,6 @@
+using lib <io>;
+
+fn main() : int {
+    std::println("显式命名空间调用");
+    return 0;
+};

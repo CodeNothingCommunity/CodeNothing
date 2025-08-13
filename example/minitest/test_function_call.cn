@@ -1,0 +1,11 @@
+using lib<io>;
+
+fn greet(name : string) : string {
+    return "Hello, " + name;
+};
+
+fn main() : int {
+    greeting : string = greet("CodeNothing");
+    std::println(greeting);
+    return 0;
+};
