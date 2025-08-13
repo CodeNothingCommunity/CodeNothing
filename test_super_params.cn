@@ -2,6 +2,7 @@
 
 using lib<io>;
 
+// 基础父类
 class Animal {
     public name: string;
     public age: int;
