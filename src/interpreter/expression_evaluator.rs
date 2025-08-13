@@ -1948,7 +1948,167 @@ impl<'a> Interpreter<'a> {
 
         (Value::None, current_this)
     }
-    
+
+    // 在方法上下文中执行 if-else 语句
+    fn execute_if_else_in_method_context(
+        &mut self,
+        condition: &Expression,
+        if_block: &[crate::ast::Statement],
+        else_blocks: &[(Option<Expression>, Vec<crate::ast::Statement>)],
+        current_this: &mut ObjectInstance,
+        method_env: &HashMap<String, Value>
+    ) -> Option<Value> {
+        // 计算条件表达式
+        let condition_value = self.evaluate_expression_with_method_context(condition, current_this, method_env);
+
+        // 检查条件是否为真
+        let is_true = match condition_value {
+            Value::Bool(b) => b,
+            _ => {
+                eprintln!("错误: if 条件表达式必须是布尔类型，得到: {:?}", condition_value);
+                return None;
+            }
+        };
+
+        if is_true {
+            // 执行 if 块
+            for stmt in if_block {
+                match stmt {
+                    crate::ast::Statement::Return(expr) => {
+                        // 处理 return 语句
+                        if let Some(expr) = expr {
+                            let result = self.evaluate_expression_with_method_context(expr, current_this, method_env);
+                            return Some(result);
+                        } else {
+                            return Some(Value::None);
+                        }
+                    },
+                    _ => {
+                        // 递归处理其他语句
+                        if let Some(return_value) = self.execute_statement_in_method_context(stmt, current_this, method_env) {
+                            return Some(return_value);
+                        }
+                    }
+                }
+            }
+        } else {
+            // 尝试执行 else-if 或 else 块
+            for (maybe_condition, block) in else_blocks {
+                match maybe_condition {
+                    Some(else_if_condition) => {
+                        // 这是 else-if 块，需要计算条件
+                        let else_if_value = self.evaluate_expression_with_method_context(else_if_condition, current_this, method_env);
+                        let else_if_is_true = match else_if_value {
+                            Value::Bool(b) => b,
+                            _ => {
+                                eprintln!("错误: else-if 条件表达式必须是布尔类型，得到: {:?}", else_if_value);
+                                continue;
+                            }
+                        };
+
+                        if else_if_is_true {
+                            // 执行这个 else-if 块
+                            for stmt in block {
+                                match stmt {
+                                    crate::ast::Statement::Return(expr) => {
+                                        // 处理 return 语句
+                                        if let Some(expr) = expr {
+                                            let result = self.evaluate_expression_with_method_context(expr, current_this, method_env);
+                                            return Some(result);
+                                        } else {
+                                            return Some(Value::None);
+                                        }
+                                    },
+                                    _ => {
+                                        // 递归处理其他语句
+                                        if let Some(return_value) = self.execute_statement_in_method_context(stmt, current_this, method_env) {
+                                            return Some(return_value);
+                                        }
+                                    }
+                                }
+                            }
+                            break; // 执行了一个 else-if 块后就退出
+                        }
+                    },
+                    None => {
+                        // 这是 else 块，直接执行
+                        for stmt in block {
+                            match stmt {
+                                crate::ast::Statement::Return(expr) => {
+                                    // 处理 return 语句
+                                    if let Some(expr) = expr {
+                                        let result = self.evaluate_expression_with_method_context(expr, current_this, method_env);
+                                        return Some(result);
+                                    } else {
+                                        return Some(Value::None);
+                                    }
+                                },
+                                _ => {
+                                    // 递归处理其他语句
+                                    if let Some(return_value) = self.execute_statement_in_method_context(stmt, current_this, method_env) {
+                                        return Some(return_value);
+                                    }
+                                }
+                            }
+                        }
+                        break; // 执行了 else 块后就退出
+                    }
+                }
+            }
+        }
+
+        None // 没有 return 语句
+    }
+
+    // 在方法上下文中执行单个语句
+    fn execute_statement_in_method_context(
+        &mut self,
+        statement: &crate::ast::Statement,
+        current_this: &mut ObjectInstance,
+        method_env: &HashMap<String, Value>
+    ) -> Option<Value> {
+        use crate::ast::Statement;
+
+        match statement {
+            Statement::Return(expr) => {
+                if let Some(expr) = expr {
+                    let result = self.evaluate_expression_with_method_context(expr, current_this, method_env);
+                    Some(result)
+                } else {
+                    Some(Value::None)
+                }
+            },
+            Statement::FieldAssignment(obj_expr, field_name, value_expr) => {
+                // 处理字段赋值
+                if let crate::ast::Expression::This = **obj_expr {
+                    // this.field = value
+                    let new_value = self.evaluate_expression_with_method_context(value_expr, current_this, method_env);
+                    current_this.fields.insert(field_name.clone(), new_value);
+                }
+                None
+            },
+            Statement::VariableDeclaration(var_name, _, init_expr) => {
+                // 处理局部变量声明
+                let value = self.evaluate_expression_with_method_context(init_expr, current_this, method_env);
+                self.local_env.insert(var_name.clone(), value);
+                None
+            },
+            Statement::FunctionCallStatement(expr) => {
+                // 处理函数调用语句
+                self.evaluate_expression_with_method_context(expr, current_this, method_env);
+                None
+            },
+            Statement::IfElse(condition, if_block, else_blocks) => {
+                // 递归处理嵌套的 if-else
+                self.execute_if_else_in_method_context(condition, if_block, else_blocks, current_this, method_env)
+            },
+            _ => {
+                eprintln!("警告: 方法体中的语句类型暂未完全支持: {:?}", statement);
+                None
+            }
+        }
+    }
+
     fn evaluate_expression_with_method_context(&mut self, expr: &Expression, this_obj: &ObjectInstance, method_env: &HashMap<String, Value>) -> Value {
         match expr {
             Expression::This => Value::Object(this_obj.clone()),
