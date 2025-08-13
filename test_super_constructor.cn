@@ -1,0 +1,109 @@
+// CodeNothing super() 构造函数调用测试
+// 测试子类构造函数中调用父类构造函数
+
+using lib<io>;
+
+// 基础父类
+class Animal {
+    public name : string;
+    public age : int;
+    public species : string;
+    
+    constructor(name : string, age : int, species : string) {
+        std::println("Animal 构造函数被调用");
+        this.name = name;
+        this.age = age;
+        this.species = species;
+    };
+    
+    public fn getInfo() : string {
+        return "Name: " + this.name + ", Age: " + this.age + ", Species: " + this.species;
+    };
+    
+    public fn speak() : string {
+        return "Animal makes a sound";
+    };
+};
+
+// 子类继承测试
+class Dog extends Animal {
+    public breed : string;
+    
+    constructor(name : string, age : int, breed : string) {
+        std::println("Dog 构造函数开始");
+        
+        // 调用父类构造函数
+        super(name, age, "Canine");
+        
+        // 设置子类特有字段
+        this.breed = breed;
+        
+        std::println("Dog 构造函数完成");
+    };
+    
+    // 方法重写测试
+    public fn speak() : string {
+        return "Woof! Woof!";
+    };
+    
+    public fn getBreed() : string {
+        return "Breed: " + this.breed;
+    };
+};
+
+// 更深层次的继承测试
+class Puppy extends Dog {
+    public isPlayful : bool;
+    
+    constructor(name : string, age : int, breed : string, isPlayful : bool) {
+        std::println("Puppy 构造函数开始");
+        
+        // 调用父类构造函数
+        super(name, age, breed);
+        
+        // 设置子类特有字段
+        this.isPlayful = isPlayful;
+        
+        std::println("Puppy 构造函数完成");
+    };
+    
+    public fn play() : string {
+        if (this.isPlayful) {
+            return this.name + " is playing happily!";
+        } else {
+            return this.name + " is too tired to play.";
+        };
+    };
+};
+
+fn main() : int {
+    std::println("=== super() 构造函数调用测试 ===");
+    
+    // 测试基础类
+    std::println("1. 基础类测试:");
+    animal : Animal = new Animal("Generic Animal", 5, "Unknown");
+    std::println(animal.getInfo());
+    std::println(animal.speak());
+    
+    std::println("");
+    
+    // 测试继承类的 super() 调用
+    std::println("2. 继承类 super() 测试:");
+    dog : Dog = new Dog("Buddy", 3, "Golden Retriever");
+    std::println(dog.getInfo()); // 应该显示父类设置的信息
+    std::println(dog.speak());   // 重写的方法
+    std::println(dog.getBreed()); // 子类特有方法
+    
+    std::println("");
+    
+    // 测试多层继承的 super() 调用
+    std::println("3. 多层继承 super() 测试:");
+    puppy : Puppy = new Puppy("Max", 1, "Labrador", true);
+    std::println(puppy.getInfo()); // 应该显示祖父类设置的信息
+    std::println(puppy.speak());   // 父类重写的方法
+    std::println(puppy.getBreed()); // 父类特有方法
+    std::println(puppy.play());    // 子类特有方法
+    
+    std::println("=== super() 构造函数调用测试完成 ===");
+    return 0;
+};
