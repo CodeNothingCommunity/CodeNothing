@@ -1772,11 +1772,9 @@ impl<'a> Interpreter<'a> {
             },
             Statement::VariableDeclaration(var_name, var_type, init_expr) => {
                 // 局部变量声明（在构造函数中通常不需要处理）
-                if let Some(expr) = init_expr {
-                    self.evaluate_expression_with_constructor_context(expr, this_obj, constructor_env);
-                }
+                self.evaluate_expression_with_constructor_context(init_expr, this_obj, constructor_env);
             },
-            Statement::Assignment(var_name, value_expr) => {
+            Statement::VariableAssignment(var_name, value_expr) => {
                 // 变量赋值（在构造函数中通常不需要处理）
                 self.evaluate_expression_with_constructor_context(value_expr, this_obj, constructor_env);
             },
