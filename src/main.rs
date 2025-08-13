@@ -210,6 +210,9 @@ fn main() {
         println!("🆕 命名空间选项:");
         println!("  --cn-auto-ns        启用自动命名空间查找（默认禁用）");
         println!("");
+        println!("🔧 执行控制选项:");
+        println!("  --cn-check-timeout  启用超时检查（默认禁用）");
+        println!("");
         println!("示例:");
         println!("  {} hello.cn", args[0]);
         println!("  {} hello.cn --cn-time", args[0]);
