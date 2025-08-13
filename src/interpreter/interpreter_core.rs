@@ -160,6 +160,7 @@ pub struct Interpreter<'a> {
     pub operation_count: usize,
     pub max_operations: usize,
     pub timeout_enabled: bool,
+    pub timeout_enabled: bool,
 }
 
 impl<'a> Interpreter<'a> {
