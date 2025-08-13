@@ -88,6 +88,8 @@ pub enum Expression {
     FieldAccess(Box<Expression>, String), // 字段访问 (obj.field)
     This, // this 关键字
     Super, // super 关键字
+    SuperCall(Vec<Expression>), // super() 构造函数调用
+    SuperMethodCall(String, Vec<Expression>), // super.methodName() 父类方法调用
     StaticAccess(String, String), // 静态访问 (ClassName::member)
     StaticMethodCall(String, String, Vec<Expression>), // 静态方法调用 (ClassName::method(args))
     // Lambda表达式和函数式编程
