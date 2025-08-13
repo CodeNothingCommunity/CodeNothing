@@ -323,33 +323,64 @@ impl<'a> StatementParser for ParserBase<'a> {
                             return Err(format!("期望 '=' 或 '(' 在 '{}::{}' 之后", var_name, member_name));
                         }
                     } else if next_token == "(" {
-                        // 函数调用语句
-                        self.consume(); // 消费 "("
-                        
-                        let mut args = Vec::new();
-                        
-                        if self.peek() != Some(&")".to_string()) {
-                            // 解析参数列表
-                            loop {
-                                let arg = self.parse_expression()?;
-                                args.push(arg);
-                                
-                                if self.peek() != Some(&",".to_string()) {
-                                    break;
+                        // 函数调用语句 - 特殊处理 super() 调用
+                        if var_name == "super" {
+                            // super() 构造函数调用
+                            self.consume(); // 消费 "("
+
+                            let mut args = Vec::new();
+
+                            if self.peek() != Some(&")".to_string()) {
+                                // 解析参数列表
+                                loop {
+                                    let arg = self.parse_expression()?;
+                                    args.push(arg);
+
+                                    if self.peek() != Some(&",".to_string()) {
+                                        break;
+                                    }
+
+                                    self.consume(); // 消费 ","
                                 }
-                                
-                                self.consume(); // 消费 ","
                             }
+
+                            self.expect(")")?;
+                            self.expect(";")?;
+
+                            // 创建 super() 调用表达式
+                            let super_call_expr = Expression::SuperCall(args);
+
+                            // 返回函数调用语句
+                            Ok(Statement::FunctionCallStatement(super_call_expr))
+                        } else {
+                            // 普通函数调用语句
+                            self.consume(); // 消费 "("
+
+                            let mut args = Vec::new();
+
+                            if self.peek() != Some(&")".to_string()) {
+                                // 解析参数列表
+                                loop {
+                                    let arg = self.parse_expression()?;
+                                    args.push(arg);
+
+                                    if self.peek() != Some(&",".to_string()) {
+                                        break;
+                                    }
+
+                                    self.consume(); // 消费 ","
+                                }
+                            }
+
+                            self.expect(")")?;
+                            self.expect(";")?;
+
+                            // 创建函数调用表达式
+                            let func_call_expr = Expression::FunctionCall(var_name, args);
+
+                            // 返回函数调用语句
+                            Ok(Statement::FunctionCallStatement(func_call_expr))
                         }
-                        
-                        self.expect(")")?;
-                        self.expect(";")?;
-                        
-                        // 创建函数调用表达式
-                        let func_call_expr = Expression::FunctionCall(var_name, args);
-                        
-                        // 返回函数调用语句
-                        Ok(Statement::FunctionCallStatement(func_call_expr))
                     } else if next_token == "." {
                         // 处理对象方法调用或字段访问
                         self.consume(); // 消费 "."
