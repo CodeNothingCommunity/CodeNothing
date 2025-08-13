@@ -1756,6 +1756,40 @@ impl<'a> Interpreter<'a> {
         Value::None // super() 调用不返回值
     }
 
+    // 带上下文的构造函数语句执行
+    fn execute_constructor_statement_with_context(&mut self, statement: &Statement, this_obj: &mut ObjectInstance, constructor_env: &HashMap<String, Value>, context_class: &str) {
+        match statement {
+            Statement::FunctionCallStatement(expr) => {
+                // 检查是否是 super() 调用
+                if let Expression::SuperCall(args) = expr {
+                    // 使用当前上下文类来处理 super() 调用
+                    self.handle_super_constructor_call_with_context(args, this_obj, constructor_env, context_class);
+                } else {
+                    // 其他函数调用正常执行
+                    self.evaluate_expression_with_constructor_context(expr, this_obj, constructor_env);
+                }
+            },
+            Statement::FieldAssignment(obj_expr, field_name, value_expr) => {
+                // 字段赋值
+                if let Expression::This = **obj_expr {
+                    let value = self.evaluate_expression_with_constructor_context(value_expr, this_obj, constructor_env);
+                    this_obj.fields.insert(field_name.clone(), value);
+                }
+            },
+            Statement::VariableDeclaration(var_name, var_type, init_expr) => {
+                // 局部变量声明（在构造函数中通常不需要处理）
+                self.evaluate_expression_with_constructor_context(init_expr, this_obj, constructor_env);
+            },
+            Statement::VariableAssignment(var_name, value_expr) => {
+                // 变量赋值（在构造函数中通常不需要处理）
+                self.evaluate_expression_with_constructor_context(value_expr, this_obj, constructor_env);
+            },
+            _ => {
+                // 其他语句类型暂时忽略或按需处理
+            }
+        }
+    }
+
 
 
 
