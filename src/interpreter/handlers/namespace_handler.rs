@@ -11,9 +11,39 @@ pub fn handle_import_namespace(interpreter: &mut Interpreter, ns_type: Namespace
             // 导入代码命名空间
             let namespace_path = path.join("::");
             debug_println(&format!("导入代码命名空间: {}", namespace_path));
-            
-            // 遍历命名空间中的所有函数
+
             let mut found = false;
+
+            // 首先检查是否是库命名空间（如 std）
+            if path.len() == 1 {
+                let ns_name = &path[0];
+
+                // 检查是否有对应的库命名空间
+                for (lib_name, lib_functions) in &interpreter.imported_libraries {
+                    debug_println(&format!("检查库 '{}' 中的命名空间函数", lib_name));
+
+                    // 查找以 namespace:: 开头的函数
+                    let ns_prefix = format!("{}::", ns_name);
+                    for (func_full_path, _) in lib_functions.iter() {
+                        if func_full_path.starts_with(&ns_prefix) {
+                            // 获取函数名（路径的最后一部分）
+                            let parts: Vec<&str> = func_full_path.split("::").collect();
+                            if let Some(func_name) = parts.last() {
+                                // 将函数添加到导入的命名空间列表
+                                interpreter.imported_namespaces
+                                    .entry(func_name.to_string())
+                                    .or_insert_with(Vec::new)
+                                    .push(func_full_path.clone());
+
+                                found = true;
+                                debug_println(&format!("  导入库函数: {}", func_full_path));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 然后检查代码命名空间中的函数
             for (full_path, _) in &interpreter.namespaced_functions {
                 // 检查函数是否属于指定的命名空间
                 if full_path.starts_with(&namespace_path) {
@@ -25,13 +55,13 @@ pub fn handle_import_namespace(interpreter: &mut Interpreter, ns_type: Namespace
                             .entry(func_name.to_string())
                             .or_insert_with(Vec::new)
                             .push(full_path.clone());
-                        
+
                         found = true;
-                        debug_println(&format!("  导入函数: {}", full_path));
+                        debug_println(&format!("  导入代码函数: {}", full_path));
                     }
                 }
             }
-            
+
             if !found {
                 debug_println(&format!("警告: 命名空间 '{}' 中没有找到函数", namespace_path));
             }
