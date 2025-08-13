@@ -1743,10 +1743,8 @@ impl<'a> Interpreter<'a> {
             }
         }
 
-        // 执行父类构造函数体，允许其中的 super() 调用以支持多层继承
-        for statement in &parent_constructor.body {
-            self.execute_constructor_statement(statement, this_obj, &parent_constructor_env);
-        }
+        // 递归调用父类构造函数，但使用父类的类名作为上下文
+        self.call_constructor_recursively(&parent_class_name, this_obj, &parent_constructor_env);
 
         Value::None // super() 调用不返回值
     }
