@@ -1,0 +1,71 @@
+// CodeNothing 继承系统当前状态测试
+// 测试现有的继承功能和发现缺失的部分
+
+using lib<io>;
+
+// 基础父类
+class Animal {
+    public name : string;
+    public age : int;
+    
+    constructor(name : string, age : int) {
+        this.name = name;
+        this.age = age;
+    };
+    
+    public fn speak() : string {
+        return "Animal makes a sound";
+    };
+    
+    public fn getInfo() : string {
+        return "Name: " + this.name + ", Age: " + this.age;
+    };
+};
+
+// 子类继承测试
+class Dog extends Animal {
+    public breed : string;
+    
+    constructor(name : string, age : int, breed : string) {
+        // TODO: 测试 super() 调用
+        // super(name, age);
+        this.name = name;
+        this.age = age;
+        this.breed = breed;
+    };
+    
+    // 方法重写测试
+    public fn speak() : string {
+        return "Woof! Woof!";
+    };
+    
+    public fn getBreed() : string {
+        return "Breed: " + this.breed;
+    };
+};
+
+fn main() : int {
+    std::println("=== 继承系统测试 ===");
+    
+    // 测试基础类
+    std::println("1. 基础类测试:");
+    animal : Animal = new Animal("Generic Animal", 5);
+    std::println(animal.getInfo());
+    std::println(animal.speak());
+    
+    // 测试继承类
+    std::println("2. 继承类测试:");
+    dog : Dog = new Dog("Buddy", 3, "Golden Retriever");
+    std::println(dog.getInfo()); // 继承的方法
+    std::println(dog.speak());   // 重写的方法
+    std::println(dog.getBreed()); // 子类特有方法
+    
+    // 测试多态（如果支持）
+    std::println("3. 多态测试:");
+    // TODO: 测试父类引用指向子类对象
+    // Animal polymorphicAnimal = new Dog("Rex", 4, "Labrador");
+    // std::println(polymorphicAnimal.speak()); // 应该调用Dog的speak方法
+    
+    std::println("=== 继承系统测试完成 ===");
+    return 0;
+};
