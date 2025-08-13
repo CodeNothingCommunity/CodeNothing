@@ -50,7 +50,7 @@ class Puppy extends Dog {
     };
 };
 
-fn main() {
+fn main(): void {
     std::println("=== 详细的 super() 参数传递测试 ===");
 
     std::println("\n1. 测试 Animal 直接构造:");
