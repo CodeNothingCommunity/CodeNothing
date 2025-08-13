@@ -48,7 +48,7 @@ class Puppy extends Dog {
     public fn getInfo(): string {
         return "Puppy: " + this.name + ", " + this.age + ", " + this.species + ", " + this.breed + ", playfulness=" + this.playfulness;
     };
-}
+};
 
 fn main() {
     std::println("=== 详细的 super() 参数传递测试 ===");
