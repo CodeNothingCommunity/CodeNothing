@@ -1450,6 +1450,10 @@ impl<'a> Interpreter<'a> {
                     }
                 }
             },
+            Statement::ExpressionStatement(expr) => {
+                // 处理表达式语句，特别是 super() 调用
+                self.evaluate_expression_with_constructor_context(expr, this_obj, constructor_env);
+            },
             _ => {
                 // 其他语句暂时跳过
             }
@@ -1663,10 +1667,70 @@ impl<'a> Interpreter<'a> {
                 }
             },
             Expression::This => Value::Object(this_obj.clone()),
+            Expression::SuperCall(args) => {
+                // super() 构造函数调用 - 在构造函数中调用父类构造函数
+                self.handle_super_constructor_call(args, this_obj, constructor_env)
+            },
             _ => self.evaluate_expression(expr),
         }
     }
-    
+
+    // 处理 super() 构造函数调用
+    fn handle_super_constructor_call(&mut self, args: &[Expression], this_obj: &mut ObjectInstance, constructor_env: &HashMap<String, Value>) -> Value {
+        // 获取当前类的父类
+        let current_class = match self.classes.get(&this_obj.class_name) {
+            Some(class) => class,
+            None => {
+                eprintln!("错误: 未找到当前类 '{}'", this_obj.class_name);
+                return Value::None;
+            }
+        };
+
+        let parent_class_name = match &current_class.super_class {
+            Some(name) => name,
+            None => {
+                eprintln!("错误: 类 '{}' 没有父类，无法调用 super()", this_obj.class_name);
+                return Value::None;
+            }
+        };
+
+        // 获取父类定义
+        let parent_class = match self.classes.get(parent_class_name) {
+            Some(class) => class,
+            None => {
+                eprintln!("错误: 未找到父类 '{}'", parent_class_name);
+                return Value::None;
+            }
+        };
+
+        // 计算父类构造函数参数
+        let mut arg_values = Vec::new();
+        for arg in args {
+            arg_values.push(self.evaluate_expression_with_constructor_context(arg, this_obj, constructor_env));
+        }
+
+        // 查找匹配的父类构造函数
+        if let Some(parent_constructor) = parent_class.constructors.first() {
+            // 创建父类构造函数参数环境
+            let mut parent_constructor_env = HashMap::new();
+            for (i, param) in parent_constructor.parameters.iter().enumerate() {
+                if i < arg_values.len() {
+                    parent_constructor_env.insert(param.name.clone(), arg_values[i].clone());
+                }
+            }
+
+            // 执行父类构造函数体，修改当前对象的字段
+            for statement in &parent_constructor.body {
+                self.execute_constructor_statement(statement, this_obj, &parent_constructor_env);
+            }
+
+            Value::None // super() 调用不返回值
+        } else {
+            eprintln!("错误: 父类 '{}' 没有构造函数", parent_class_name);
+            Value::None
+        }
+    }
+
     fn call_method(&mut self, obj_expr: &Expression, method_name: &str, args: &[Expression]) -> Value {
         let obj_value = self.evaluate_expression(obj_expr);
 
