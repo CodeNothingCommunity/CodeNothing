@@ -196,6 +196,16 @@ pub fn perform_binary_operation(left: &Value, op: &BinaryOperator, right: &Value
             Value::String(ptr_str + r)
         },
 
+        // 处理None值的字符串拼接
+        (Value::String(l), BinaryOperator::Add, Value::None) => {
+            eprintln!("警告: 字符串拼接中遇到None值");
+            Value::String(l.clone() + "null")
+        },
+        (Value::None, BinaryOperator::Add, Value::String(r)) => {
+            eprintln!("警告: 字符串拼接中遇到None值");
+            Value::String("null".to_string() + r)
+        },
+
         // v0.7.2新增：位运算操作符支持
         // 按位与操作
         (Value::Int(l), BinaryOperator::BitwiseAnd, Value::Int(r)) => Value::Int(l & r),
