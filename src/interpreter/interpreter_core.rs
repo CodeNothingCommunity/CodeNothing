@@ -32,9 +32,9 @@ pub fn debug_println(msg: &str) {
     }
 }
 
-pub fn interpret(program: &Program) -> Value {
+pub fn interpret(program: &Program, auto_namespace: bool) -> Value {
     // 创建解释器
-    let mut interpreter = Interpreter::new(program);
+    let mut interpreter = Interpreter::new(program, auto_namespace);
 
     // v0.7.4新增：执行变量生命周期分析
     interpreter.perform_lifetime_analysis();
@@ -129,6 +129,8 @@ pub struct Interpreter<'a> {
     pub library_namespaces: HashMap<String, String>,
     // 常量环境，键是常量名，值是常量值
     pub constants: HashMap<String, Value>,
+    // 自动命名空间查找配置
+    pub auto_namespace_lookup: bool,
     // 作用域级别命名空间导入栈（每层是一个map: 函数名->完整路径）
     pub namespace_import_stack: Vec<HashMap<String, Vec<String>>>,
     // 类定义存储
@@ -153,7 +155,7 @@ pub struct Interpreter<'a> {
 }
 
 impl<'a> Interpreter<'a> {
-    pub fn new(program: &'a Program) -> Self {
+    pub fn new(program: &'a Program, auto_namespace: bool) -> Self {
         let mut functions = HashMap::new();
         let mut namespaced_functions = HashMap::new();
         let library_namespaces = HashMap::new();
@@ -182,6 +184,7 @@ impl<'a> Interpreter<'a> {
             global_namespace_imports: Vec::new(),
             library_namespaces,
             constants, // 添加常量环境
+            auto_namespace_lookup: auto_namespace, // 添加自动命名空间查找配置
             namespace_import_stack: vec![HashMap::new()], // 初始化栈，最外层一层
             classes: HashMap::new(),
             enums: HashMap::new(),
@@ -316,8 +319,8 @@ impl<'a> Interpreter<'a> {
         for path in &self.global_namespace_imports {
             let namespace_path = path.join("::");
             debug_println(&format!("应用全局命名空间导入: {}", namespace_path));
-            
-            // 遍历命名空间中的所有函数
+
+            // 检查代码命名空间中的函数
             for (full_path, _) in &self.namespaced_functions {
                 // 检查函数是否属于指定的命名空间
                 if full_path.starts_with(&namespace_path) {
@@ -329,8 +332,28 @@ impl<'a> Interpreter<'a> {
                             .entry(func_name.to_string())
                             .or_insert_with(Vec::new)
                             .push(full_path.clone());
-                        
-                        debug_println(&format!("  导入全局函数: {}", full_path));
+
+                        debug_println(&format!("  导入全局代码函数: {}", full_path));
+                    }
+                }
+            }
+
+            // 检查库命名空间中的函数（新增）
+            if path.len() == 1 {
+                let ns_name = &path[0];
+                for (lib_name, lib_functions) in &self.imported_libraries {
+                    let ns_prefix = format!("{}::", ns_name);
+                    for (func_full_path, _) in lib_functions.iter() {
+                        if func_full_path.starts_with(&ns_prefix) {
+                            let parts: Vec<&str> = func_full_path.split("::").collect();
+                            if let Some(func_name) = parts.last() {
+                                self.imported_namespaces
+                                    .entry(func_name.to_string())
+                                    .or_insert_with(Vec::new)
+                                    .push(func_full_path.clone());
+                                debug_println(&format!("  导入全局库函数: {}", func_full_path));
+                            }
+                        }
                     }
                 }
             }
