@@ -33,7 +33,7 @@ class Dog extends Animal {
     public fn getInfo(): string {
         return "Dog: " + this.name + ", " + this.age + ", " + this.species + ", " + this.breed;
     };
-}
+};
 
 class Puppy extends Dog {
     public playfulness: int;
