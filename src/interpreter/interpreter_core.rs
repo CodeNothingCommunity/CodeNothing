@@ -33,8 +33,15 @@ pub fn debug_println(msg: &str) {
 }
 
 pub fn interpret(program: &Program, auto_namespace: bool) -> Value {
+    interpret_with_timeout(program, auto_namespace, false)
+}
+
+pub fn interpret_with_timeout(program: &Program, auto_namespace: bool, check_timeout: bool) -> Value {
     // 创建解释器
     let mut interpreter = Interpreter::new(program, auto_namespace);
+
+    // 设置是否启用超时检查
+    interpreter.set_timeout_enabled(check_timeout);
 
     // v0.7.4新增：执行变量生命周期分析
     interpreter.perform_lifetime_analysis();
