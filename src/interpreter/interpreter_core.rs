@@ -208,6 +208,7 @@ impl<'a> Interpreter<'a> {
             timeout_duration: std::time::Duration::from_secs(30), // 默认30秒超时
             operation_count: 0,
             max_operations: 1_000_000, // 默认最大100万次操作
+            timeout_enabled: false, // 默认禁用超时检查
         };
         
         // 初始化常量
