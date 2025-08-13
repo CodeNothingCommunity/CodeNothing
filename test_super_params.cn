@@ -14,7 +14,7 @@ class Animal {
     
     fn getInfo() -> string {
         return "Animal: " + this.name + ", " + this.age + ", " + this.species;
-    }
+    };
 }
 
 class Dog extends Animal {
