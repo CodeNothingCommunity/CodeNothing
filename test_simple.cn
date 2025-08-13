@@ -1,0 +1,15 @@
+// 简单的测试程序
+
+using lib<io>;
+
+fn main(): void {
+    std::println("Hello, World!");
+    
+    i : int = 0;
+    while (i < 10) {
+        std::println("循环次数: " + i);
+        i = i + 1;
+    };
+    
+    std::println("程序执行完成！");
+};
