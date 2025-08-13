@@ -1460,7 +1460,7 @@ impl<'a> Interpreter<'a> {
         }
     }
     
-    fn evaluate_expression_with_constructor_context(&mut self, expr: &Expression, this_obj: &mut ObjectInstance, constructor_env: &HashMap<String, Value>) -> Value {
+    fn evaluate_expression_with_constructor_context(&mut self, expr: &Expression, this_obj: &ObjectInstance, constructor_env: &HashMap<String, Value>) -> Value {
         match expr {
             Expression::Variable(var_name) => {
                 // 首先检查构造函数参数
