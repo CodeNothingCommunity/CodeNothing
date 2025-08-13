@@ -1,0 +1,107 @@
+// CodeNothing 泛型符号冲突测试程序
+// 测试泛型语法中的 < > 符号与比较操作符的冲突
+
+using lib<io>;
+
+// 测试泛型函数定义
+fn compare<T>(a : T, b : T) : bool {
+    // 这里应该测试泛型参数的使用
+    return true;
+};
+
+// 测试泛型类定义（暂时注释掉，因为类的泛型解析尚未完全实现）
+// class Container<T> {
+//     public value : T;
+//
+//     constructor(value : T) {
+//         this.value = value;
+//     };
+//
+//     public fn getValue() : T {
+//         return this.value;
+//     };
+// };
+
+fn main() : int {
+    std::println("=== 泛型符号冲突测试 ===");
+    
+    // 1. 测试基础比较操作符（确保没有被泛型语法影响）
+    a : int = 5;
+    b : int = 3;
+    
+    if (a > b) {
+        std::println("基础比较 a > b 正常");
+    };
+    
+    if (a < b) {
+        std::println("基础比较 a < b 正常");
+    } else {
+        std::println("基础比较 a < b 为假");
+    };
+    
+    // 2. 测试连续的比较操作符
+    c : int = 7;
+    
+    if (a < b && b < c) {
+        std::println("连续比较 a < b < c 正常");
+    } else {
+        std::println("连续比较 a < b < c 为假");
+    };
+    
+    // 3. 测试可能与泛型冲突的表达式
+    // 这些表达式可能被误解为泛型语法
+    
+    // 测试 a<b 和 b>c 的组合
+    if (a < b || b > c) {
+        std::println("组合比较 (a < b || b > c) 正常");
+    } else {
+        std::println("组合比较 (a < b || b > c) 为假");
+    };
+    
+    // 4. 测试泛型函数调用（如果支持）
+    // result : bool = compare<int>(a, b);
+    // std::println("泛型函数调用正常");
+
+    // 5. 测试泛型类实例化（如果支持）
+    // container : Container<int> = new Container<int>(42);
+    // std::println("泛型类实例化正常");
+    
+    // 6. 测试复杂的比较表达式
+    x : int = 1;
+    y : int = 2;
+    z : int = 3;
+    
+    // 测试多个 < > 符号的组合
+    if (x < y && y < z) {
+        std::println("多重比较 x < y < z 正常");
+    };
+    
+    if (z > y && y > x) {
+        std::println("多重比较 z > y > x 正常");
+    };
+    
+    // 7. 测试可能引起歧义的表达式
+    // 这些表达式在某些上下文中可能被误解为泛型
+    
+    // 测试 << 和 >> 操作符（移位 vs 嵌套泛型）
+    shift_val : int = 4;
+    left_result : int = shift_val << 2;
+    right_result : int = shift_val >> 1;
+    
+    std::println("移位操作符正常工作");
+    
+    // 8. 测试边界情况
+    // 测试紧挨着的 < > 符号
+    if (a<b) {  // 没有空格
+        std::println("紧挨着的 < 符号正常");
+    } else {
+        std::println("紧挨着的 < 符号为假");
+    };
+    
+    if (a>b) {  // 没有空格
+        std::println("紧挨着的 > 符号正常");
+    };
+    
+    std::println("=== 泛型符号冲突测试完成 ===");
+    return 0;
+};

@@ -1,0 +1,162 @@
+// CodeNothing 符号冲突测试程序
+// 测试多字符操作符和潜在的符号冲突
+
+using lib<io>;
+
+fn main() : int {
+    std::println("=== CodeNothing 符号冲突测试 ===");
+    
+    // 1. 测试比较操作符
+    std::println("1. 比较操作符测试:");
+    a : int = 5;
+    b : int = 3;
+    
+    // 基础比较操作符
+    if (a > b) {
+        std::println("a > b: true");
+    };
+    
+    if (a < b) {
+        std::println("a < b: true");
+    } else {
+        std::println("a < b: false");
+    };
+    
+    // 多字符比较操作符
+    if (a >= b) {
+        std::println("a >= b: true");
+    };
+    
+    if (a <= b) {
+        std::println("a <= b: true");
+    } else {
+        std::println("a <= b: false");
+    };
+    
+    if (a == b) {
+        std::println("a == b: true");
+    } else {
+        std::println("a == b: false");
+    };
+    
+    if (a != b) {
+        std::println("a != b: true");
+    };
+    
+    // 2. 测试逻辑操作符
+    std::println("2. 逻辑操作符测试:");
+    x : bool = true;
+    y : bool = false;
+    
+    if (x && y) {
+        std::println("x && y: true");
+    } else {
+        std::println("x && y: false");
+    };
+    
+    if (x || y) {
+        std::println("x || y: true");
+    };
+    
+    // 3. 测试位运算操作符
+    std::println("3. 位运算操作符测试:");
+    num1 : int = 12;  // 1100 in binary
+    num2 : int = 10;  // 1010 in binary
+    
+    // 位与
+    result1 : int = num1 & num2;  // 应该是 8 (1000)
+    std::println("12 & 10 = " + result1);
+    
+    // 位或
+    result2 : int = num1 | num2;  // 应该是 14 (1110)
+    std::println("12 | 10 = " + result2);
+    
+    // 位异或
+    result3 : int = num1 ^ num2;  // 应该是 6 (0110)
+    std::println("12 ^ 10 = " + result3);
+    
+    // 4. 测试移位操作符
+    std::println("4. 移位操作符测试:");
+    val : int = 4;  // 100 in binary
+    
+    // 左移
+    left_shift : int = val << 2;  // 应该是 16 (10000)
+    std::println("4 << 2 = " + left_shift);
+    
+    // 右移
+    right_shift : int = val >> 1;  // 应该是 2 (10)
+    std::println("4 >> 1 = " + right_shift);
+    
+    // 5. 测试复合赋值操作符
+    std::println("5. 复合赋值操作符测试:");
+    counter : int = 10;
+    
+    counter += 5;
+    std::println("counter += 5: " + counter);
+    
+    counter -= 3;
+    std::println("counter -= 3: " + counter);
+    
+    counter *= 2;
+    std::println("counter *= 2: " + counter);
+    
+    counter /= 4;
+    std::println("counter /= 4: " + counter);
+    
+    counter %= 3;
+    std::println("counter %= 3: " + counter);
+    
+    // 6. 测试自增自减操作符
+    std::println("6. 自增自减操作符测试:");
+    count : int = 5;
+    
+    count++;
+    std::println("count++: " + count);
+    
+    count--;
+    std::println("count--: " + count);
+    
+    ++count;
+    std::println("++count: " + count);
+    
+    --count;
+    std::println("--count: " + count);
+    
+    // 7. 测试命名空间操作符
+    std::println("7. 命名空间操作符测试:");
+    std::println("使用 std::println 成功");
+    
+    // 8. 测试范围操作符
+    std::println("8. 范围操作符测试:");
+    // 注意：这里可能会有冲突，因为 .. 和 . 都存在
+    // 测试 CodeNothing 的 for 循环语法
+    std::println("范围 1 到 5:");
+    for (i : 1..5) {
+        std::println("i = " + i);
+    };
+    
+    // 9. 测试箭头操作符（如果支持）
+    std::println("9. 箭头操作符测试:");
+    // -> 通常用于函数返回类型或指针解引用
+    std::println("箭头操作符在函数签名中使用");
+    
+    // 10. 测试潜在冲突场景
+    std::println("10. 潜在冲突场景测试:");
+    
+    // 测试 < 和 <= 的区分
+    if (a < 10) {
+        std::println("a < 10: true");
+    };
+    
+    if (a <= 10) {
+        std::println("a <= 10: true");
+    };
+    
+    // 测试 : 和 :: 的区分
+    // : 用于类型声明，:: 用于命名空间
+    var_with_type : int = 42;
+    std::println("变量类型声明和命名空间调用都正常");
+    
+    std::println("=== 符号冲突测试完成 ===");
+    return 0;
+};

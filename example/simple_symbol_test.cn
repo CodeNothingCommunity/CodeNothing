@@ -1,0 +1,122 @@
+// CodeNothing 简单符号测试程序
+// 专门测试多字符操作符的解析
+
+using lib<io>;
+
+fn main() : int {
+    std::println("=== 简单符号测试 ===");
+    
+    // 1. 测试比较操作符
+    a : int = 5;
+    b : int = 3;
+    
+    // 单字符 vs 多字符符号冲突测试
+    if (a > b) {
+        std::println("a > b 正常");
+    };
+    
+    if (a >= b) {
+        std::println("a >= b 正常");
+    };
+    
+    if (a < b) {
+        std::println("a < b 正常");
+    } else {
+        std::println("a < b 为假");
+    };
+    
+    if (a <= b) {
+        std::println("a <= b 正常");
+    } else {
+        std::println("a <= b 为假");
+    };
+    
+    if (a == b) {
+        std::println("a == b 正常");
+    } else {
+        std::println("a == b 为假");
+    };
+    
+    if (a != b) {
+        std::println("a != b 正常");
+    };
+    
+    // 2. 测试逻辑操作符
+    x : bool = true;
+    y : bool = false;
+    
+    if (x && y) {
+        std::println("x && y 正常");
+    } else {
+        std::println("x && y 为假");
+    };
+    
+    if (x || y) {
+        std::println("x || y 正常");
+    };
+    
+    // 3. 测试位运算操作符
+    num1 : int = 12;
+    num2 : int = 10;
+    
+    result1 : int = num1 & num2;
+    std::println("位与运算正常");
+    
+    result2 : int = num1 | num2;
+    std::println("位或运算正常");
+    
+    result3 : int = num1 ^ num2;
+    std::println("位异或运算正常");
+    
+    // 4. 测试移位操作符
+    val : int = 4;
+    
+    left_shift : int = val << 2;
+    std::println("左移运算正常");
+    
+    right_shift : int = val >> 1;
+    std::println("右移运算正常");
+    
+    // 5. 测试复合赋值操作符
+    counter : int = 10;
+    
+    counter += 5;
+    std::println("复合赋值 += 正常");
+    
+    counter -= 3;
+    std::println("复合赋值 -= 正常");
+    
+    counter *= 2;
+    std::println("复合赋值 *= 正常");
+    
+    counter /= 4;
+    std::println("复合赋值 /= 正常");
+    
+    counter %= 3;
+    std::println("复合赋值 %= 正常");
+    
+    // 6. 测试自增自减操作符
+    count : int = 5;
+    
+    count++;
+    std::println("后置自增 ++ 正常");
+    
+    count--;
+    std::println("后置自减 -- 正常");
+    
+    ++count;
+    std::println("前置自增 ++ 正常");
+    
+    --count;
+    std::println("前置自减 -- 正常");
+    
+    // 7. 测试命名空间操作符
+    std::println("命名空间操作符 :: 正常");
+    
+    // 8. 测试类型声明中的冒号
+    var_with_type : int = 42;
+    std::println("类型声明冒号 : 正常");
+    
+    std::println("=== 符号测试完成 ===");
+    return 0;
+};

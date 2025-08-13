@@ -1,0 +1,257 @@
+// CodeNothing 完整面向对象编程演示
+// 展示类定义、对象创建、方法调用、属性访问等核心 OOP 特性
+
+using lib<io>;
+using ns std;
+
+// 基础 Person 类
+class Person {
+    public name : string;
+    public age : int;
+    private id : string;
+    
+    // 构造函数
+    constructor(name : string, age : int) {
+        this.name = name;
+        this.age = age;
+        this.id = "P" + name;
+    };
+    
+    // 公共方法：获取姓名
+    public fn getName() : string {
+        return this.name;
+    };
+    
+    // 公共方法：获取年龄
+    public fn getAge() : int {
+        return this.age;
+    };
+    
+    // 公共方法：设置年龄
+    public fn setAge(newAge : int) : void {
+        this.age = newAge;
+    };
+    
+    // 公共方法：获取个人信息
+    public fn getInfo() : string {
+        return this.name + " (年龄: " + this.age + ")";
+    };
+    
+    // 公共方法：庆祝生日
+    public fn celebrateBirthday() : int {
+        this.age = this.age + 1;
+        return this.age;
+    };
+    
+    // 私有方法：获取ID（仅内部使用）
+    private fn getId() : string {
+        return this.id;
+    };
+};
+
+// 学生类（暂时不使用继承，直接定义所有字段）
+class Student {
+    public name : string;
+    public age : int;
+    public studentId : string;
+    public grade : int;
+    public gpa : float;
+
+    // 构造函数
+    constructor(name : string, age : int, studentId : string) {
+        this.name = name;
+        this.age = age;
+        this.studentId = studentId;
+        this.grade = 1;
+        this.gpa = 0.0;
+    };
+    
+    // 公共方法：获取学生ID
+    public fn getStudentId() : string {
+        return this.studentId;
+    };
+    
+    // 公共方法：设置年级
+    public fn setGrade(newGrade : int) : void {
+        this.grade = newGrade;
+    };
+    
+    // 公共方法：设置GPA
+    public fn setGpa(newGpa : float) : void {
+        this.gpa = newGpa;
+    };
+
+    // 公共方法：获取GPA
+    public fn getGpa() : float {
+        return this.gpa;
+    };
+
+    // 公共方法：获取学生信息
+    public fn getStudentInfo() : string {
+        info : string = this.name + " (学号: " + this.studentId;
+        info = info + ", 年级: " + this.grade;
+        info = info + ", GPA: " + this.gpa + ")";
+        return info;
+    };
+    
+    // 公共方法：学习（提高GPA）
+    public fn study(hours : int) : float {
+        improvement : float = hours * 0.1;
+        this.gpa = this.gpa + improvement;
+        if (this.gpa > 4.0) {
+            this.gpa = 4.0;
+        };
+        return this.gpa;
+    };
+};
+
+// 教师类
+class Teacher {
+    public name : string;
+    public subject : string;
+    public experience : int;
+    
+    // 构造函数
+    constructor(name : string, subject : string) {
+        this.name = name;
+        this.subject = subject;
+        this.experience = 0;
+    };
+    
+    // 公共方法：获取教师信息
+    public fn getTeacherInfo() : string {
+        return "教师 " + this.name + " 教授 " + this.subject + " (经验: " + this.experience + " 年)";
+    };
+    
+    // 公共方法：增加经验
+    public fn addExperience(years : int) : int {
+        this.experience = this.experience + years;
+        return this.experience;
+    };
+    
+    // 公共方法：教学（返回教学效果）
+    public fn teach() : string {
+        // 简化教学方法，不传递学生对象参数
+        return this.name + " 正在教授 " + this.subject;
+    };
+};
+
+// 课程类
+class Course {
+    public courseName : string;
+    public teacher : Teacher;
+    public maxStudents : int;
+    public enrolledCount : int;
+    
+    // 构造函数
+    constructor(courseName : string, teacher : Teacher, maxStudents : int) {
+        this.courseName = courseName;
+        this.teacher = teacher;
+        this.maxStudents = maxStudents;
+        this.enrolledCount = 0;
+    };
+    
+    // 公共方法：获取课程信息
+    public fn getCourseInfo() : string {
+        info : string = "课程: " + this.courseName;
+        info = info + " (教师: " + this.teacher.name;
+        info = info + ", 已注册: " + this.enrolledCount;
+        info = info + "/" + this.maxStudents + ")";
+        return info;
+    };
+    
+    // 公共方法：注册学生
+    public fn enrollStudent() : bool {
+        if (this.enrolledCount < this.maxStudents) {
+            this.enrolledCount = this.enrolledCount + 1;
+            return true;
+        };
+        return false;
+    };
+};
+
+// 主函数：演示所有 OOP 特性
+fn main() : int {
+    std::println("=== CodeNothing 面向对象编程完整演示 ===");
+
+    // 1. 基础对象创建和方法调用
+    std::println("\n1. 基础 Person 类演示:");
+    person1 : Person = new Person("张三", 25);
+    std::println("创建人员: " + person1.getInfo());
+
+    // 字段访问
+    std::println("直接访问姓名字段: " + person1.name);
+    std::println("直接访问年龄字段: " + person1.age);
+
+    // 方法调用
+    person1.celebrateBirthday();
+    std::println("生日后: " + person1.getInfo());
+
+    // 2. Student 类演示（无继承版本）
+    std::println("\n2. Student 类演示:");
+    student1 : Student = new Student("李四", 20, "S001");
+    std::println("创建学生: " + student1.getStudentInfo());
+
+    // 调用方法
+    std::println("学生姓名: " + student1.name);
+    std::println("学生年龄: " + student1.age);
+
+    // 调用学生特有的方法
+    student1.setGrade(2);
+    student1.setGpa(3.5);
+    std::println("设置年级和GPA后: " + student1.getStudentInfo());
+
+    // 学习提高GPA
+    newGpa : float = student1.study(10);
+    std::println("学习10小时后，GPA: " + newGpa);
+    
+    // 3. 多个对象交互
+    std::println("\n3. 教师和学生交互演示:");
+    teacher1 : Teacher = new Teacher("王老师", "数学");
+    teacher1.addExperience(5);
+    std::println(teacher1.getTeacherInfo());
+
+    // 教师教学演示
+    teachResult : string = teacher1.teach();
+    std::println(teachResult);
+
+    // 4. 复杂对象组合
+    std::println("\n4. 课程管理演示:");
+    course1 : Course = new Course("高等数学", teacher1, 30);
+    std::println(course1.getCourseInfo());
+
+    // 注册学生
+    enrolled : bool = course1.enrollStudent();
+    if (enrolled) {
+        std::println("学生注册成功");
+    } else {
+        std::println("课程已满，注册失败");
+    };
+    std::println("注册后: " + course1.getCourseInfo());
+    
+    // 5. 多对象演示
+    std::println("\n5. 多对象管理演示:");
+    student2 : Student = new Student("赵五", 19, "S002");
+    student3 : Student = new Student("钱六", 21, "S003");
+
+    student2.setGpa(3.2);
+    student3.setGpa(3.8);
+
+    std::println("所有学生信息:");
+    std::println("- " + student1.getStudentInfo());
+    std::println("- " + student2.getStudentInfo());
+    std::println("- " + student3.getStudentInfo());
+
+    // 批量操作
+    std::println("\n批量学习效果:");
+    student2.study(8);
+    student3.study(6);
+
+    std::println("学习后的学生信息:");
+    std::println("- " + student1.getStudentInfo());
+    std::println("- " + student2.getStudentInfo());
+    std::println("- " + student3.getStudentInfo());
+
+    std::println("\n=== OOP 演示完成 ===");
+    return 0;
+};

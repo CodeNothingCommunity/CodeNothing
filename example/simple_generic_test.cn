@@ -1,0 +1,30 @@
+// CodeNothing 简单泛型测试程序
+// 测试最基础的泛型语法
+
+using lib<io>;
+
+// 测试简单的泛型函数
+fn simple<T>(x : T) : T {
+    return x;
+};
+
+fn main() : int {
+    std::println("=== 简单泛型测试 ===");
+    
+    // 测试基础比较操作符（确保没有被泛型语法影响）
+    a : int = 5;
+    b : int = 3;
+    
+    if (a > b) {
+        std::println("基础比较 a > b 正常");
+    };
+    
+    if (a < b) {
+        std::println("基础比较 a < b 正常");
+    } else {
+        std::println("基础比较 a < b 为假");
+    };
+    
+    std::println("=== 简单泛型测试完成 ===");
+    return 0;
+};
