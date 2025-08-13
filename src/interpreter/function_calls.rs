@@ -210,11 +210,34 @@ impl<'a> FunctionCallHandler for Interpreter<'a> {
             if paths.len() == 1 {
                 // 只有一个匹配的函数，直接调用
                 let full_path = &paths[0];
+
+                // 首先检查是否是代码命名空间函数
                 if let Some(function) = self.namespaced_functions.get(full_path) {
                     return self.call_function_impl(function, arg_values);
-                } else {
-                    panic!("未找到函数: {}", full_path);
                 }
+
+                // 然后检查是否是库函数
+                for (lib_name, lib_functions) in &self.imported_libraries {
+                    if let Some(func) = lib_functions.get(full_path) {
+                        debug_println(&format!("调用导入的库函数: {} 来自库 '{}'", full_path, lib_name));
+                        let string_args = convert_values_to_string_args(&arg_values);
+                        let result = func(string_args);
+                        // 尝试将结果转换为适当的值类型
+                        if let Ok(int_val) = result.parse::<i32>() {
+                            return Value::Int(int_val);
+                        } else if let Ok(float_val) = result.parse::<f64>() {
+                            return Value::Float(float_val);
+                        } else if result == "true" {
+                            return Value::Bool(true);
+                        } else if result == "false" {
+                            return Value::Bool(false);
+                        } else {
+                            return Value::String(result);
+                        }
+                    }
+                }
+
+                panic!("未找到函数: {}", full_path);
             } else {
                 // 有多个匹配的函数，需要解决歧义
                 panic!("函数名 '{}' 有多个匹配: {:?}", name, paths);
@@ -243,26 +266,29 @@ impl<'a> FunctionCallHandler for Interpreter<'a> {
                     return Value::String(result);
                 }
             }
-            
-            // 尝试查找命名空间函数
-            for ns_name in self.library_namespaces.keys() {
-                let ns_func_name = format!("{}::{}", ns_name, name);
-                debug_println(&format!("尝试在库 '{}' 中查找命名空间函数 '{}'", lib_name, ns_func_name));
-                
-                if let Some(func) = lib_functions.get(&ns_func_name) {
-                    debug_println(&format!("在库 '{}' 中找到命名空间函数 '{}'", lib_name, ns_func_name));
-                    let result = func(string_args.clone());
-                    // 尝试将结果转换为适当的值类型
-                    if let Ok(int_val) = result.parse::<i32>() {
-                        return Value::Int(int_val);
-                    } else if let Ok(float_val) = result.parse::<f64>() {
-                        return Value::Float(float_val);
-                    } else if result == "true" {
-                        return Value::Bool(true);
-                    } else if result == "false" {
-                        return Value::Bool(false);
-                    } else {
-                        return Value::String(result);
+
+            // 只有在启用自动命名空间查找时才尝试查找命名空间函数
+            if self.auto_namespace_lookup {
+                // 尝试查找命名空间函数
+                for ns_name in self.library_namespaces.keys() {
+                    let ns_func_name = format!("{}::{}", ns_name, name);
+                    debug_println(&format!("尝试在库 '{}' 中查找命名空间函数 '{}'", lib_name, ns_func_name));
+
+                    if let Some(func) = lib_functions.get(&ns_func_name) {
+                        debug_println(&format!("在库 '{}' 中找到命名空间函数 '{}'", lib_name, ns_func_name));
+                        let result = func(string_args.clone());
+                        // 尝试将结果转换为适当的值类型
+                        if let Ok(int_val) = result.parse::<i32>() {
+                            return Value::Int(int_val);
+                        } else if let Ok(float_val) = result.parse::<f64>() {
+                            return Value::Float(float_val);
+                        } else if result == "true" {
+                            return Value::Bool(true);
+                        } else if result == "false" {
+                            return Value::Bool(false);
+                        } else {
+                            return Value::String(result);
+                        }
                     }
                 }
             }
