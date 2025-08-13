@@ -1751,6 +1751,41 @@ impl<'a> Interpreter<'a> {
         Value::None // super() 调用不返回值
     }
 
+    // 执行构造函数语句，但跳过 super() 调用以避免无限递归
+    fn execute_constructor_statement_skip_super(&mut self, statement: &Statement, this_obj: &mut ObjectInstance, constructor_env: &HashMap<String, Value>) {
+        match statement {
+            Statement::FunctionCallStatement(expr) => {
+                // 检查是否是 super() 调用，如果是则跳过
+                if let Expression::SuperCall(_) = expr {
+                    // 跳过 super() 调用以避免无限递归
+                    return;
+                }
+                // 其他函数调用正常执行
+                self.evaluate_expression_with_constructor_context(expr, this_obj, constructor_env);
+            },
+            Statement::FieldAssignment(obj_expr, field_name, value_expr) => {
+                // 字段赋值
+                if let Expression::This = **obj_expr {
+                    let value = self.evaluate_expression_with_constructor_context(value_expr, this_obj, constructor_env);
+                    this_obj.fields.insert(field_name.clone(), value);
+                }
+            },
+            Statement::VariableDeclaration(var_name, var_type, init_expr) => {
+                // 局部变量声明（在构造函数中通常不需要处理）
+                if let Some(expr) = init_expr {
+                    self.evaluate_expression_with_constructor_context(expr, this_obj, constructor_env);
+                }
+            },
+            Statement::Assignment(var_name, value_expr) => {
+                // 变量赋值（在构造函数中通常不需要处理）
+                self.evaluate_expression_with_constructor_context(value_expr, this_obj, constructor_env);
+            },
+            _ => {
+                // 其他语句类型暂时忽略或按需处理
+            }
+        }
+    }
+
     fn call_method(&mut self, obj_expr: &Expression, method_name: &str, args: &[Expression]) -> Value {
         let obj_value = self.evaluate_expression(obj_expr);
 
