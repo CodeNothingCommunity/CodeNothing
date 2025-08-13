@@ -9,7 +9,8 @@ class Animal {
     public species: string;
 
     constructor(name: string, age: int, species: string) {
-        std::println("Animal 构造函数: name=" + name + ", age=" + age + ", species=" + species);
+        std::println("Animal 构造函数被调用");
+        std::println("参数: name, age, species");
         this.name = name;
         this.age = age;
         this.species = species;
