@@ -8,3 +8,10 @@ fn fib(n : int) : int{
         return fib(n - 1) + fib(n - 2);
     };
 };
+
+fn main() : int{
+    println("=== 斐波那契数列 ===");
+    result : int = fib(30);
+    println("F(30) = " + result);
+    return 0;
+};
