@@ -30,8 +30,23 @@ impl<'a> ClassParser for ParserBase<'a> {
         // 获取类名
         let class_name = self.consume().ok_or_else(|| "期望类名".to_string())?;
 
-        // 解析泛型参数 (可选)
-        let generic_parameters = self.parse_generic_parameters()?;
+        // 解析泛型参数 (可选) - 使用试探性解析
+        let generic_parameters = if self.peek() == Some(&"<".to_string()) {
+            // 保存当前位置
+            let saved_position = self.position;
+
+            // 尝试解析泛型参数
+            match self.parse_generic_parameters() {
+                Ok(params) => params,
+                Err(_) => {
+                    // 泛型解析失败，恢复位置
+                    self.position = saved_position;
+                    Vec::new()
+                }
+            }
+        } else {
+            Vec::new()
+        };
         
         // 检查是否有继承
         let super_class = if self.peek() == Some(&"extends".to_string()) {
@@ -267,8 +282,23 @@ impl<'a> ClassParser for ParserBase<'a> {
         // 方法名
         let method_name = self.consume().ok_or_else(|| "期望方法名".to_string())?;
 
-        // 解析泛型参数 (可选)
-        let generic_parameters = self.parse_generic_parameters()?;
+        // 解析泛型参数 (可选) - 使用试探性解析
+        let generic_parameters = if self.peek() == Some(&"<".to_string()) {
+            // 保存当前位置
+            let saved_position = self.position;
+
+            // 尝试解析泛型参数
+            match self.parse_generic_parameters() {
+                Ok(params) => params,
+                Err(_) => {
+                    // 泛型解析失败，恢复位置
+                    self.position = saved_position;
+                    Vec::new()
+                }
+            }
+        } else {
+            Vec::new()
+        };
         
         // 解析参数列表
         self.expect("(")?;
@@ -340,8 +370,23 @@ impl<'a> ClassParser for ParserBase<'a> {
     fn parse_constructor(&mut self) -> Result<Constructor, String> {
         self.consume(); // 消费 "constructor"
 
-        // 解析泛型参数 (可选)
-        let generic_parameters = self.parse_generic_parameters()?;
+        // 解析泛型参数 (可选) - 使用试探性解析
+        let generic_parameters = if self.peek() == Some(&"<".to_string()) {
+            // 保存当前位置
+            let saved_position = self.position;
+
+            // 尝试解析泛型参数
+            match self.parse_generic_parameters() {
+                Ok(params) => params,
+                Err(_) => {
+                    // 泛型解析失败，恢复位置
+                    self.position = saved_position;
+                    Vec::new()
+                }
+            }
+        } else {
+            Vec::new()
+        };
 
         // 解析参数列表
         self.expect("(")?;
