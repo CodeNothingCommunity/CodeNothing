@@ -1,0 +1,66 @@
+// 测试 super() 构造函数参数传递的详细测试
+
+class Animal {
+    name: string;
+    age: int;
+    species: string;
+    
+    constructor(name: string, age: int, species: string) {
+        println("Animal 构造函数: name=" + name + ", age=" + age + ", species=" + species);
+        this.name = name;
+        this.age = age;
+        this.species = species;
+    }
+    
+    fn getInfo() -> string {
+        return "Animal: " + this.name + ", " + this.age + ", " + this.species;
+    }
+}
+
+class Dog extends Animal {
+    breed: string;
+    
+    constructor(name: string, age: int, breed: string) {
+        println("Dog 构造函数: name=" + name + ", age=" + age + ", breed=" + breed);
+        super(name, age, "Canine");
+        this.breed = breed;
+        println("Dog 构造函数完成: breed=" + this.breed);
+    }
+    
+    fn getInfo() -> string {
+        return "Dog: " + this.name + ", " + this.age + ", " + this.species + ", " + this.breed;
+    }
+}
+
+class Puppy extends Dog {
+    playfulness: int;
+    
+    constructor(name: string, age: int, breed: string, playfulness: int) {
+        println("Puppy 构造函数: name=" + name + ", age=" + age + ", breed=" + breed + ", playfulness=" + playfulness);
+        super(name, age, breed);
+        this.playfulness = playfulness;
+        println("Puppy 构造函数完成: playfulness=" + this.playfulness);
+    }
+    
+    fn getInfo() -> string {
+        return "Puppy: " + this.name + ", " + this.age + ", " + this.species + ", " + this.breed + ", playfulness=" + this.playfulness;
+    }
+}
+
+fn main() {
+    println("=== 详细的 super() 参数传递测试 ===");
+    
+    println("\n1. 测试 Animal 直接构造:");
+    let animal = Animal("Generic", 5, "Unknown");
+    println(animal.getInfo());
+    
+    println("\n2. 测试 Dog 构造 (调用 super 传递固定参数):");
+    let dog = Dog("Buddy", 3, "Golden Retriever");
+    println(dog.getInfo());
+    
+    println("\n3. 测试 Puppy 构造 (多层参数传递):");
+    let puppy = Puppy("Max", 1, "Labrador", 10);
+    println(puppy.getInfo());
+    
+    println("\n=== 测试完成 ===");
+}
