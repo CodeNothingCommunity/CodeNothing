@@ -22,4 +22,4 @@ fn main() : int {
     std::println("年龄: " + person.age);
 
     return 0;
-}
+};
