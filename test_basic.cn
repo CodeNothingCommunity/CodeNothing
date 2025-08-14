@@ -6,5 +6,5 @@ fn identity(value: int): int {
 
 fn main(): void {
     result : int = identity(42);
-    std::println("result = " + result);
+    // 简单输出，不使用标准库
 };
