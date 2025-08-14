@@ -432,8 +432,9 @@ impl<'a> StatementExecutor for Interpreter<'a> {
             Statement::ClassDeclaration(_) => {
                 ExecutionResult::Continue // 临时跳过，后续实现
             },
-            Statement::FieldAssignment(_, _, _) => {
-                ExecutionResult::Continue // 临时跳过，后续实现
+            Statement::FieldAssignment(obj_expr, field_name, value_expr) => {
+                // 处理字段赋值
+                self.handle_field_assignment(obj_expr, field_name, value_expr)
             },
             Statement::InterfaceDeclaration(_interface) => {
                 // 接口声明在解释器初始化时已经处理，这里不需要额外操作
@@ -769,6 +770,35 @@ impl<'a> Interpreter<'a> {
                 }
             },
             _ => false
+        }
+    }
+
+    /// 处理字段赋值
+    fn handle_field_assignment(&mut self, obj_expr: &Box<Expression>, field_name: &String, value_expr: &Expression) -> ExecutionResult {
+        // 计算新值
+        let new_value = self.evaluate_expression(value_expr);
+
+        // 处理对象表达式
+        match obj_expr.as_ref() {
+            Expression::Variable(var_name) => {
+                // 获取对象
+                if let Value::Object(mut obj) = self.get_variable_fast(var_name) {
+                    // 更新字段
+                    obj.fields.insert(field_name.clone(), new_value);
+
+                    // 更新变量
+                    self.set_variable(var_name, Value::Object(obj));
+
+                    ExecutionResult::Continue
+                } else {
+                    // 对象不存在或类型错误
+                    ExecutionResult::Continue
+                }
+            },
+            _ => {
+                // 暂时不支持复杂的对象表达式
+                ExecutionResult::Continue
+            }
         }
     }
 }
