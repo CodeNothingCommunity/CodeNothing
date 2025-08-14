@@ -46,14 +46,17 @@ impl<'a> Interpreter<'a> {
 
     /// 创建新的作用域
     pub fn push_scope(&mut self) {
-        // 当前实现简化：不实际创建新作用域，后续可以扩展
-        // 在完整实现中，这里应该保存当前的local_env并创建新的
+        // 保存当前的local_env到作用域栈
+        let current_env = self.local_env.clone();
+        self.scope_stack.push(current_env);
     }
 
     /// 恢复作用域
     pub fn pop_scope(&mut self) {
-        // 当前实现简化：不实际恢复作用域，后续可以扩展
-        // 在完整实现中，这里应该恢复之前保存的local_env
+        // 从作用域栈恢复之前的local_env
+        if let Some(previous_env) = self.scope_stack.pop() {
+            self.local_env = previous_env;
+        }
     }
 
     /// 检查是否应该尝试数学表达式JIT优化
