@@ -1,18 +1,25 @@
 // 简单的字段赋值测试
 
 class Person {
-    name: String;
-    age: int;
-}
+    public name : string;
+    public age : int;
 
-fn main() {
-    let person = new Person();
-    
+    constructor(name : string, age : int) {
+        this.name = name;
+        this.age = age;
+    };
+};
+
+fn main() : int {
+    let person = new Person("Alice", 25);
+
     // 测试字段赋值
-    person.name = "Alice";
-    person.age = 25;
-    
+    person.name = "Bob";
+    person.age = 30;
+
     // 测试字段访问
     println("姓名: " + person.name);
     println("年龄: " + person.age);
+
+    return 0;
 }
