@@ -820,6 +820,42 @@ impl TypeChecker {
                     Type::Auto
                 }
             },
+            Type::GenericClass(class_name, type_args) => {
+                // 检查泛型类的方法
+                if let Some(class_methods) = self.class_methods.get(class_name).cloned() {
+                    if let Some((param_types, return_type)) = class_methods.get(method_name) {
+                        // 检查参数数量
+                        if args.len() != param_types.len() {
+                            self.errors.push(TypeCheckError::new(
+                                format!("方法 '{}' 期望 {} 个参数，但得到 {} 个",
+                                    method_name, param_types.len(), args.len())
+                            ));
+                            return Type::Auto;
+                        }
+
+                        // 对于泛型类，需要实例化返回类型
+                        let instantiated_return_type = self.instantiate_generic_type(return_type, type_args);
+
+                        // 检查参数类型（简化版本，暂时跳过详细的类型检查）
+                        for (i, arg) in args.iter().enumerate() {
+                            let _actual_type = self.infer_expression_type(arg);
+                            // 这里可以添加更详细的泛型类型检查
+                        }
+
+                        instantiated_return_type
+                    } else {
+                        self.errors.push(TypeCheckError::new(
+                            format!("泛型类 '{}' 没有方法 '{}'", class_name, method_name)
+                        ));
+                        Type::Auto
+                    }
+                } else {
+                    self.errors.push(TypeCheckError::new(
+                        format!("未定义的泛型类: '{}'", class_name)
+                    ));
+                    Type::Auto
+                }
+            },
             _ => {
                 self.errors.push(TypeCheckError::new(
                     format!("类型 {:?} 没有方法 '{}'", obj_type, method_name)
