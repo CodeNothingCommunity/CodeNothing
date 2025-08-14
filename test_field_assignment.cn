@@ -1,0 +1,40 @@
+// 测试字段赋值功能
+
+class Person {
+    public name: String;
+    public age: int;
+    
+    constructor(name: String, age: int) {
+        this.name = name;
+        this.age = age;
+    }
+    
+    public getName(): String {
+        return this.name;
+    }
+    
+    public getAge(): int {
+        return this.age;
+    }
+}
+
+fn main() {
+    // 创建一个Person对象
+    let person = new Person("Alice", 25);
+    
+    // 测试字段访问
+    println("初始姓名: " + person.name);
+    println("初始年龄: " + person.age);
+    
+    // 测试字段赋值
+    person.name = "Bob";
+    person.age = 30;
+    
+    // 验证字段赋值是否成功
+    println("修改后姓名: " + person.name);
+    println("修改后年龄: " + person.age);
+    
+    // 通过方法验证
+    println("通过方法获取姓名: " + person.getName());
+    println("通过方法获取年龄: " + person.getAge());
+}
