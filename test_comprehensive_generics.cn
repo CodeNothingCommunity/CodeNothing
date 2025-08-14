@@ -1,0 +1,109 @@
+// 全面的泛型系统测试
+
+// 泛型函数测试
+fn identity<T>(value: T): T {
+    return value;
+};
+
+fn swap<T>(a: T, b: T): T {
+    // 简化的swap，只返回第二个参数
+    return b;
+};
+
+fn max<T>(a: T, b: T): T {
+    // 简化的max，总是返回第一个参数
+    return a;
+};
+
+// 多个泛型参数的函数
+fn pair<T, U>(first: T, second: U): T {
+    // 简化版本，只返回第一个参数
+    return first;
+};
+
+// 泛型类测试
+class Container<T> {
+    value: T;
+    
+    constructor(initial_value: T) {
+        this.value = initial_value;
+    };
+    
+    fn get(): T {
+        return this.value;
+    };
+    
+    fn set(new_value: T): void {
+        this.value = new_value;
+    };
+};
+
+// 多个泛型参数的类
+class Pair<T, U> {
+    first: T;
+    second: U;
+    
+    constructor(f: T, s: U) {
+        this.first = f;
+        this.second = s;
+    };
+    
+    fn getFirst(): T {
+        return this.first;
+    };
+    
+    fn getSecond(): U {
+        return this.second;
+    };
+};
+
+fn main(): void {
+    // 测试泛型函数
+    
+    // 单个类型参数
+    int_result : int = identity<int>(42);
+    string_result : string = identity<string>("hello");
+    bool_result : bool = identity<bool>(true);
+    
+    // 测试swap函数
+    swapped_int : int = swap<int>(10, 20);
+    swapped_string : string = swap<string>("first", "second");
+    
+    // 测试max函数
+    max_int : int = max<int>(100, 50);
+    max_string : string = max<string>("apple", "banana");
+    
+    // 测试多个泛型参数的函数
+    pair_result : int = pair<int, string>(123, "test");
+    
+    // 测试泛型类
+    
+    // 单个类型参数的类
+    int_container : Container<int> = Container<int>(999);
+    retrieved_int : int = int_container.get();
+    int_container.set(888);
+    
+    string_container : Container<string> = Container<string>("initial");
+    retrieved_string : string = string_container.get();
+    string_container.set("updated");
+    
+    bool_container : Container<bool> = Container<bool>(false);
+    retrieved_bool : bool = bool_container.get();
+    bool_container.set(true);
+    
+    // 多个类型参数的类
+    int_string_pair : Pair<int, string> = Pair<int, string>(456, "world");
+    first_value : int = int_string_pair.getFirst();
+    second_value : string = int_string_pair.getSecond();
+    
+    string_bool_pair : Pair<string, bool> = Pair<string, bool>("test", true);
+    first_string : string = string_bool_pair.getFirst();
+    second_bool : bool = string_bool_pair.getSecond();
+    
+    // 嵌套泛型测试
+    container_of_containers : Container<Container<int>> = Container<Container<int>>(Container<int>(777));
+    inner_container : Container<int> = container_of_containers.get();
+    inner_value : int = inner_container.get();
+    
+    // 测试完成
+};
