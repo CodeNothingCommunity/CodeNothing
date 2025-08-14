@@ -1,5 +1,4 @@
-using lib <io>;
-using ns std;
+using lib<io>;
 
 fn fib(n : int) : int{
     if (n <= 1){
@@ -10,8 +9,8 @@ fn fib(n : int) : int{
 };
 
 fn main() : int{
-    println("=== 斐波那契数列 ===");
+    std::println("=== 斐波那契数列 ===");
     result : int = fib(30);
-    println("F(30) = " + result);
+    std::println("F(30) = " + result);
     return 0;
 };
