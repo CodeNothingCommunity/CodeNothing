@@ -1,0 +1,28 @@
+// 简单的泛型类测试
+
+class Container<T> {
+    value: T;
+    
+    constructor(initial_value: T) {
+        this.value = initial_value;
+    };
+    
+    fn get(): T {
+        return this.value;
+    };
+};
+
+fn main(): void {
+    println("=== 简单泛型类测试 ===");
+
+    // 测试泛型类创建
+    int_container : Container<int> = new Container<int>(42);
+    println("创建 new Container<int>(42) 成功");
+
+    // 测试方法调用
+    value : int = int_container.get();
+    println("调用 get() 方法，返回值: ");
+    println(value);
+
+    println("=== 测试完成 ===");
+};
