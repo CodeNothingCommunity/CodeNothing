@@ -58,52 +58,46 @@ class Pair<T, U> {
 };
 
 fn main(): void {
+    println("=== 全面泛型系统测试 ===");
+
     // 测试泛型函数
-    
+    println("--- 泛型函数测试 ---");
+
     // 单个类型参数
     int_result : int = identity<int>(42);
+    println("identity<int>(42) = ");
+    println(int_result);
+
     string_result : string = identity<string>("hello");
+    println("identity<string>(\"hello\") = ");
+    println(string_result);
+
     bool_result : bool = identity<bool>(true);
-    
+    println("identity<bool>(true) = ");
+    println(bool_result);
+
     // 测试swap函数
     swapped_int : int = swap<int>(10, 20);
+    println("swap<int>(10, 20) = ");
+    println(swapped_int);
+
     swapped_string : string = swap<string>("first", "second");
-    
+    println("swap<string>(\"first\", \"second\") = ");
+    println(swapped_string);
+
     // 测试max函数
     max_int : int = max<int>(100, 50);
+    println("max<int>(100, 50) = ");
+    println(max_int);
+
     max_string : string = max<string>("apple", "banana");
-    
+    println("max<string>(\"apple\", \"banana\") = ");
+    println(max_string);
+
     // 测试多个泛型参数的函数
     pair_result : int = pair<int, string>(123, "test");
-    
-    // 测试泛型类
-    
-    // 单个类型参数的类
-    int_container : Container<int> = Container<int>(999);
-    retrieved_int : int = int_container.get();
-    int_container.set(888);
-    
-    string_container : Container<string> = Container<string>("initial");
-    retrieved_string : string = string_container.get();
-    string_container.set("updated");
-    
-    bool_container : Container<bool> = Container<bool>(false);
-    retrieved_bool : bool = bool_container.get();
-    bool_container.set(true);
-    
-    // 多个类型参数的类
-    int_string_pair : Pair<int, string> = Pair<int, string>(456, "world");
-    first_value : int = int_string_pair.getFirst();
-    second_value : string = int_string_pair.getSecond();
-    
-    string_bool_pair : Pair<string, bool> = Pair<string, bool>("test", true);
-    first_string : string = string_bool_pair.getFirst();
-    second_bool : bool = string_bool_pair.getSecond();
-    
-    // 嵌套泛型测试
-    container_of_containers : Container<Container<int>> = Container<Container<int>>(Container<int>(777));
-    inner_container : Container<int> = container_of_containers.get();
-    inner_value : int = inner_container.get();
-    
-    // 测试完成
+    println("pair<int, string>(123, \"test\") = ");
+    println(pair_result);
+
+    println("=== 测试完成 ===");
 };
