@@ -1,0 +1,10 @@
+// 基本功能测试
+
+fn identity(value: int): int {
+    return value;
+};
+
+fn main(): void {
+    result : int = identity(42);
+    std::println("result = " + result);
+};
