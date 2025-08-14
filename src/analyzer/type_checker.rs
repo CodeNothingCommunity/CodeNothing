@@ -595,6 +595,34 @@ impl TypeChecker {
                 }
             },
 
+            Expression::GenericObjectCreation(class_name, type_args, _args) => {
+                // 处理泛型对象创建
+                Type::GenericClass(class_name.clone(), type_args.clone())
+            },
+
+            Expression::GenericFunctionCall(func_name, type_args, args) => {
+                // 处理泛型函数调用
+                // 查找函数定义并推断返回类型
+                if let Some((param_types, return_type)) = self.function_signatures.get(func_name) {
+                    // 检查参数数量
+                    if args.len() != param_types.len() {
+                        self.errors.push(TypeCheckError::new(
+                            format!("泛型函数 '{}' 期望 {} 个参数，但得到 {} 个",
+                                func_name, param_types.len(), args.len())
+                        ));
+                        return Type::Auto;
+                    }
+
+                    // 实例化返回类型
+                    self.instantiate_generic_type(return_type, type_args)
+                } else {
+                    self.errors.push(TypeCheckError::new(
+                        format!("未找到泛型函数: '{}'", func_name)
+                    ));
+                    Type::Auto
+                }
+            },
+
             _ => {
                 // 其他表达式类型的处理
                 Type::Auto
