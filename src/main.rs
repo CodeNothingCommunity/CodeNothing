@@ -12,7 +12,9 @@ mod analyzer;
 mod debug_config;
 mod memory_pool;
 mod loop_memory;
+mod vm;
 use interpreter::jit;
+use vm::{Compiler, VM};
 
 use ast::Program;
 use interpreter::value::Value;
@@ -212,6 +214,8 @@ fn main() {
         println!("");
         println!("🔧 执行控制选项:");
         println!("  --cn-check-timeout  启用超时检查（默认禁用）");
+        println!("  --cn-vm             使用字节码虚拟机执行（实验性）");
+        println!("  --cn-vm-debug       启用VM调试输出");
         println!("");
         println!("示例:");
         println!("  {} hello.cn", args[0]);
@@ -242,6 +246,8 @@ fn main() {
     let loop_debug = args.iter().any(|arg| arg == "--cn-loop-debug");
     let auto_namespace = args.iter().any(|arg| arg == "--cn-auto-ns");
     let check_timeout = args.iter().any(|arg| arg == "--cn-check-timeout");
+    let use_vm = args.iter().any(|arg| arg == "--cn-vm");
+    let vm_debug = args.iter().any(|arg| arg == "--cn-vm-debug");
 
     // v0.7.5新增：初始化内存池
     if memory_debug {
@@ -348,7 +354,13 @@ fn main() {
                     }
 
                     // 执行程序
-                    let result = interpreter::interpret_with_timeout(&program, auto_namespace, check_timeout);
+                    let result = if use_vm {
+                        // 使用字节码虚拟机执行
+                        execute_with_vm(&program, vm_debug)
+                    } else {
+                        // 使用传统解释器执行
+                        interpreter::interpret_with_timeout(&program, auto_namespace, check_timeout)
+                    };
 
                     // 只有当结果不是None且启用了--cn-return参数时才打印
                     if show_return && !matches!(result, Value::None) {
@@ -416,5 +428,48 @@ fn main() {
             }
         },
         Err(err) => println!("预处理文件错误: {}", err),
+    }
+}
+
+/// 使用字节码虚拟机执行程序
+fn execute_with_vm(program: &ast::Program, debug: bool) -> Value {
+    println!("🚀 使用字节码虚拟机执行...");
+
+    // 创建编译器
+    let mut compiler = Compiler::new();
+
+    // 编译程序
+    let compiled_program = match compiler.compile_program(program) {
+        Ok(compiled) => compiled,
+        Err(err) => {
+            println!("❌ 编译错误: {}", err);
+            return Value::None;
+        }
+    };
+
+    if debug {
+        println!("📋 编译完成，函数数量: {}", compiled_program.functions.len());
+        for (name, func) in &compiled_program.functions {
+            println!("  函数 {}: {} 条指令", name, func.bytecode.len());
+        }
+    }
+
+    // 创建虚拟机
+    let mut vm = VM::new();
+    vm.set_debug_mode(debug);
+    vm.load_program(compiled_program);
+
+    // 执行程序
+    match vm.run() {
+        Ok(result) => {
+            if debug {
+                println!("✅ VM执行完成: {:?}", result);
+            }
+            result
+        },
+        Err(err) => {
+            println!("❌ VM执行错误: {}", err);
+            Value::None
+        }
     }
 }
