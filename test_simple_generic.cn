@@ -1,0 +1,9 @@
+// 简单的泛型测试
+
+fn identity<T>(value: T): T {
+    return value;
+};
+
+fn main(): void {
+    result : int = identity<int>(42);
+};
