@@ -1,0 +1,49 @@
+// 综合字段赋值测试
+
+using lib<io>;
+
+class Student {
+    public name : string;
+    public age : int;
+    public grade : string;
+    public score : int;
+    
+    constructor(name : string, age : int, grade : string, score : int) {
+        this.name = name;
+        this.age = age;
+        this.grade = grade;
+        this.score = score;
+    };
+    
+    public fn getInfo() : string {
+        return this.name + " (" + this.age + "岁, " + this.grade + "年级, 分数: " + this.score + ")";
+    };
+};
+
+fn main() : int {
+    std::println("=== 综合字段赋值测试 ===");
+    
+    // 创建学生对象
+    student : Student = new Student("小明", 15, "高一", 85);
+    
+    std::println("初始信息: " + student.getInfo());
+    
+    // 测试多个字段赋值
+    student.name = "小红";
+    student.age = 16;
+    student.grade = "高二";
+    student.score = 92;
+    
+    std::println("修改后信息: " + student.getInfo());
+    
+    // 测试单独字段修改
+    student.score = 95;
+    std::println("提高分数后: " + student.getInfo());
+    
+    // 测试字段访问和赋值混合
+    old_score : int = student.score;
+    student.score = old_score + 3;
+    std::println("再次提高分数: " + student.getInfo());
+    
+    return 0;
+};
