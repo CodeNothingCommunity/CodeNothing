@@ -434,7 +434,7 @@ impl<'a> StatementExecutor for Interpreter<'a> {
             },
             Statement::FieldAssignment(obj_expr, field_name, value_expr) => {
                 // 处理字段赋值
-                self.handle_field_assignment(obj_expr, field_name, value_expr)
+                self.handle_field_assignment(&obj_expr, &field_name, &value_expr)
             },
             Statement::InterfaceDeclaration(_interface) => {
                 // 接口声明在解释器初始化时已经处理，这里不需要额外操作
