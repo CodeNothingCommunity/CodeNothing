@@ -163,6 +163,8 @@ pub struct Interpreter<'a> {
     pub timeout_enabled: bool,
     // 泛型类型管理器
     pub generic_manager: GenericTypeManager,
+    // 作用域栈，用于管理局部变量环境
+    pub scope_stack: Vec<HashMap<String, Value>>,
 }
 
 impl<'a> Interpreter<'a> {
