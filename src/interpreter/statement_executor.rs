@@ -789,15 +789,15 @@ impl<'a> Interpreter<'a> {
                     // 更新变量
                     self.set_variable(var_name, Value::Object(obj));
 
-                    ExecutionResult::Continue
+                    ExecutionResult::None
                 } else {
                     // 对象不存在或类型错误
-                    ExecutionResult::Continue
+                    ExecutionResult::None
                 }
             },
             _ => {
                 // 暂时不支持复杂的对象表达式
-                ExecutionResult::Continue
+                ExecutionResult::None
             }
         }
     }
