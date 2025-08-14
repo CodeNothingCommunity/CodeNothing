@@ -1,0 +1,21 @@
+// 简单字段赋值测试
+
+class Person {
+    public name : string;
+    public age : int;
+    
+    constructor(name : string, age : int) {
+        this.name = name;
+        this.age = age;
+    };
+};
+
+fn main() : int {
+    person : Person = new Person("Alice", 25);
+    
+    // 测试字段赋值
+    person.name = "Bob";
+    person.age = 30;
+    
+    return 0;
+};
