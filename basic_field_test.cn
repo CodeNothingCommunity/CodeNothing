@@ -1,5 +1,7 @@
 // 基础字段赋值测试
 
+using lib<io>;
+
 class Person {
     public name : string;
     public age : int;
