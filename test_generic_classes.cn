@@ -1,0 +1,94 @@
+// 泛型类测试
+
+// 简单的泛型容器类
+class Container<T> {
+    value: T;
+    
+    constructor(initial_value: T) {
+        this.value = initial_value;
+    };
+    
+    fn get(): T {
+        return this.value;
+    };
+    
+    fn set(new_value: T): void {
+        this.value = new_value;
+    };
+};
+
+// 多个泛型参数的类
+class Pair<T, U> {
+    first: T;
+    second: U;
+    
+    constructor(f: T, s: U) {
+        this.first = f;
+        this.second = s;
+    };
+    
+    fn getFirst(): T {
+        return this.first;
+    };
+    
+    fn getSecond(): U {
+        return this.second;
+    };
+    
+    fn setFirst(new_first: T): void {
+        this.first = new_first;
+    };
+    
+    fn setSecond(new_second: U): void {
+        this.second = new_second;
+    };
+};
+
+fn main(): void {
+    println("=== 泛型类测试 ===");
+    
+    // 测试单个类型参数的类
+    println("--- Container<int> 测试 ---");
+    int_container : Container<int> = Container<int>(999);
+    retrieved_int : int = int_container.get();
+    println("Container<int>(999).get() = ");
+    println(retrieved_int);
+    
+    int_container.set(888);
+    updated_int : int = int_container.get();
+    println("设置为888后，get() = ");
+    println(updated_int);
+    
+    println("--- Container<string> 测试 ---");
+    string_container : Container<string> = Container<string>("initial");
+    retrieved_string : string = string_container.get();
+    println("Container<string>(\"initial\").get() = ");
+    println(retrieved_string);
+    
+    string_container.set("updated");
+    updated_string : string = string_container.get();
+    println("设置为\"updated\"后，get() = ");
+    println(updated_string);
+    
+    // 测试多个类型参数的类
+    println("--- Pair<int, string> 测试 ---");
+    int_string_pair : Pair<int, string> = Pair<int, string>(456, "world");
+    first_value : int = int_string_pair.getFirst();
+    second_value : string = int_string_pair.getSecond();
+    println("Pair<int, string>(456, \"world\").getFirst() = ");
+    println(first_value);
+    println("Pair<int, string>(456, \"world\").getSecond() = ");
+    println(second_value);
+    
+    // 修改值
+    int_string_pair.setFirst(123);
+    int_string_pair.setSecond("hello");
+    new_first : int = int_string_pair.getFirst();
+    new_second : string = int_string_pair.getSecond();
+    println("修改后，getFirst() = ");
+    println(new_first);
+    println("修改后，getSecond() = ");
+    println(new_second);
+    
+    println("=== 测试完成 ===");
+};
