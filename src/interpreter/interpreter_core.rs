@@ -215,6 +215,8 @@ impl<'a> Interpreter<'a> {
             timeout_enabled: false, // 默认禁用超时检查
             // 泛型管理器初始化
             generic_manager: GenericTypeManager::new(),
+            // 作用域栈初始化
+            scope_stack: Vec::new(),
         };
         
         // 初始化常量
