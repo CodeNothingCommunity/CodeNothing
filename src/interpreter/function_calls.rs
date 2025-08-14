@@ -14,6 +14,45 @@ pub trait FunctionCallHandler {
 
 impl<'a> FunctionCallHandler for Interpreter<'a> {
     fn handle_function_call(&mut self, name: &str, args: &[Expression]) -> Value {
+        // 检查是否是内置函数
+        match name {
+            "print" => {
+                if !args.is_empty() {
+                    let value = self.evaluate_expression(&args[0]);
+                    let output = match value {
+                        Value::Int(i) => i.to_string(),
+                        Value::Long(l) => l.to_string(),
+                        Value::Float(f) => f.to_string(),
+                        Value::String(s) => s,
+                        Value::Bool(b) => b.to_string(),
+                        Value::None => "None".to_string(),
+                        _ => format!("{:?}", value),
+                    };
+                    print!("{}", output);
+                }
+                return Value::None;
+            },
+            "println" => {
+                if !args.is_empty() {
+                    let value = self.evaluate_expression(&args[0]);
+                    let output = match value {
+                        Value::Int(i) => i.to_string(),
+                        Value::Long(l) => l.to_string(),
+                        Value::Float(f) => f.to_string(),
+                        Value::String(s) => s,
+                        Value::Bool(b) => b.to_string(),
+                        Value::None => "None".to_string(),
+                        _ => format!("{:?}", value),
+                    };
+                    println!("{}", output);
+                } else {
+                    println!();
+                }
+                return Value::None;
+            },
+            _ => {}
+        }
+
         // 检查是否是命名空间函数调用（包含::）
         if name.contains("::") {
             debug_println(&format!("检测到命名空间函数调用: {}", name));
