@@ -38,6 +38,24 @@ impl<'a> Interpreter<'a> {
         Value::None
     }
 
+    /// 设置变量值
+    pub fn set_variable(&mut self, name: &str, value: Value) {
+        // 优先在本地环境中设置
+        self.local_env.insert(name.to_string(), value);
+    }
+
+    /// 创建新的作用域
+    pub fn push_scope(&mut self) {
+        // 当前实现简化：不实际创建新作用域，后续可以扩展
+        // 在完整实现中，这里应该保存当前的local_env并创建新的
+    }
+
+    /// 恢复作用域
+    pub fn pop_scope(&mut self) {
+        // 当前实现简化：不实际恢复作用域，后续可以扩展
+        // 在完整实现中，这里应该恢复之前保存的local_env
+    }
+
     /// 检查是否应该尝试数学表达式JIT优化
     fn should_try_math_jit_optimization(&self, expr: &Expression) -> bool {
         match expr {
@@ -4122,14 +4140,62 @@ impl<'a> Interpreter<'a> {
 
     /// 处理泛型函数调用
     fn handle_generic_function_call(&mut self, func_name: &str, type_args: &[Type], args: &[Expression]) -> Result<Value, String> {
-        // 记录泛型类型参数用于调试
-        if !type_args.is_empty() {
-            // 在实际应用中，这里可以用于类型检查和优化
-            // 当前版本主要用于语法验证
+        // 查找基础函数定义
+        let base_function = if let Some(func) = self.functions.get(func_name) {
+            func.clone()
+        } else {
+            return Err(format!("未找到泛型函数: {}", func_name));
+        };
+
+        // 检查泛型参数数量
+        if base_function.generic_parameters.len() != type_args.len() {
+            return Err(format!(
+                "泛型函数 {} 期望 {} 个类型参数，但提供了 {} 个",
+                func_name,
+                base_function.generic_parameters.len(),
+                type_args.len()
+            ));
         }
 
-        // 调用普通函数处理逻辑
-        Ok(self.handle_function_call(func_name, args))
+        // 使用泛型管理器实例化函数
+        let instantiated_function = self.generic_manager.instantiate_function(&base_function, type_args)
+            .map_err(|e| format!("泛型函数实例化失败: {}", e))?;
+
+        // 执行实例化后的函数
+        self.execute_instantiated_function(&instantiated_function, args)
+    }
+
+    /// 执行实例化后的泛型函数
+    fn execute_instantiated_function(&mut self, instantiated_function: &super::generic_manager::GenericFunctionInstance, args: &[Expression]) -> Result<Value, String> {
+        // 创建新的作用域
+        self.push_scope();
+
+        // 设置函数参数
+        for (i, param) in instantiated_function.base_function.parameters.iter().enumerate() {
+            if i < args.len() {
+                let arg_value = self.evaluate_expression(&args[i]);
+                self.set_variable(&param.name, arg_value);
+            }
+        }
+
+        // 执行函数体
+        let mut result = Value::None;
+        for statement in &instantiated_function.specialized_body {
+            match self.execute_statement(statement) {
+                super::executor::ExecutionResult::Continue => {},
+                super::executor::ExecutionResult::Return(value) => {
+                    result = value;
+                    break;
+                },
+                super::executor::ExecutionResult::Break => break,
+                super::executor::ExecutionResult::Next => continue,
+            }
+        }
+
+        // 恢复作用域
+        self.pop_scope();
+
+        Ok(result)
     }
 
     /// 处理泛型方法调用
@@ -4145,14 +4211,104 @@ impl<'a> Interpreter<'a> {
 
     /// 处理泛型对象创建
     fn handle_generic_object_creation(&mut self, class_name: &str, type_args: &[Type], args: &[Expression]) -> Result<Value, String> {
-        // 记录泛型类型参数
-        if !type_args.is_empty() {
-            // 泛型对象创建的类型信息处理
-            // 可以用于运行时类型检查和优化
+        // 查找基础类定义
+        let base_class = if let Some(class) = self.classes.get(class_name) {
+            (*class).clone()
+        } else {
+            return Err(format!("未找到泛型类: {}", class_name));
+        };
+
+        // 检查泛型参数数量
+        if base_class.generic_parameters.len() != type_args.len() {
+            return Err(format!(
+                "泛型类 {} 期望 {} 个类型参数，但提供了 {} 个",
+                class_name,
+                base_class.generic_parameters.len(),
+                type_args.len()
+            ));
         }
 
-        // 调用普通对象创建逻辑
-        Ok(self.create_object(class_name, args))
+        // 使用泛型管理器实例化类
+        let instantiated_class = self.generic_manager.instantiate_class(&base_class, type_args)
+            .map_err(|e| format!("泛型类实例化失败: {}", e))?;
+
+        // 创建对象实例
+        self.create_instantiated_object(&instantiated_class, args)
+    }
+
+    /// 创建实例化后的泛型对象
+    fn create_instantiated_object(&mut self, instantiated_class: &super::generic_manager::GenericClassInstance, args: &[Expression]) -> Result<Value, String> {
+        // 创建对象实例
+        let mut fields = std::collections::HashMap::new();
+
+        // 初始化字段为默认值
+        for (field_name, field_type) in &instantiated_class.instantiated_fields {
+            let default_value = self.get_default_value_for_type(field_type);
+            fields.insert(field_name.clone(), default_value);
+        }
+
+        // 创建对象实例
+        let object_instance = super::value::ObjectInstance {
+            class_name: instantiated_class.base_class.name.clone(),
+            fields,
+        };
+
+        // 如果有构造函数参数，执行构造函数
+        if !args.is_empty() {
+            // 查找构造函数（使用第一个构造函数）
+            if let Some(constructor) = instantiated_class.base_class.constructors.first() {
+                // 创建新的作用域
+                self.push_scope();
+
+                // 设置构造函数参数
+                for (i, param) in constructor.parameters.iter().enumerate() {
+                    if i < args.len() {
+                        let arg_value = self.evaluate_expression(&args[i]);
+                        self.set_variable(&param.name, arg_value);
+                    }
+                }
+
+                // 设置 this 引用
+                self.set_variable("this", Value::Object(object_instance.clone()));
+
+                // 执行构造函数体
+                for statement in &constructor.body {
+                    match self.execute_statement(statement) {
+                        super::executor::ExecutionResult::Continue => {},
+                        _ => break,
+                    }
+                }
+
+                // 获取可能被修改的对象
+                let updated_object = if let Value::Object(obj) = self.get_variable("this") {
+                    obj
+                } else {
+                    object_instance
+                };
+
+                // 恢复作用域
+                self.pop_scope();
+
+                Ok(Value::Object(updated_object))
+            } else {
+                Ok(Value::Object(object_instance))
+            }
+        } else {
+            Ok(Value::Object(object_instance))
+        }
+    }
+
+    /// 获取类型的默认值
+    fn get_default_value_for_type(&self, type_: &Type) -> Value {
+        match type_ {
+            Type::Int => Value::Int(0),
+            Type::Long => Value::Long(0),
+            Type::Float => Value::Float(0.0),
+            Type::Bool => Value::Bool(false),
+            Type::String => Value::String("".to_string()),
+            Type::Array(_) => Value::Array(Vec::new()),
+            _ => Value::None,
+        }
     }
 
     /// 处理显式类型转换 (强类型语言)
