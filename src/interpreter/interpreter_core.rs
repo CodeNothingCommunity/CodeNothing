@@ -19,6 +19,7 @@ use std::env;
 use super::function_calls::FunctionCallHandler;
 use super::expression_evaluator::ExpressionEvaluator;
 use super::statement_executor::StatementExecutor;
+use super::generic_manager::GenericTypeManager;
 
 // 添加调试模式检查函数
 fn is_debug_mode() -> bool {
@@ -160,6 +161,8 @@ pub struct Interpreter<'a> {
     pub operation_count: usize,
     pub max_operations: usize,
     pub timeout_enabled: bool,
+    // 泛型类型管理器
+    pub generic_manager: GenericTypeManager,
 }
 
 impl<'a> Interpreter<'a> {
@@ -208,6 +211,8 @@ impl<'a> Interpreter<'a> {
             operation_count: 0,
             max_operations: 1_000_000, // 默认最大100万次操作
             timeout_enabled: false, // 默认禁用超时检查
+            // 泛型管理器初始化
+            generic_manager: GenericTypeManager::new(),
         };
         
         // 初始化常量
