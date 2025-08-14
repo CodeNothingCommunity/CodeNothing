@@ -125,6 +125,12 @@ impl<'a> StatementExecutor for Interpreter<'a> {
                             };
                             (matches, value.clone())
                         },
+                        // 泛型类类型匹配
+                        (Type::GenericClass(expected_class_name, _expected_type_args), Value::Object(obj)) => {
+                            // 检查类名是否匹配
+                            let matches = obj.class_name == *expected_class_name;
+                            (matches, value.clone())
+                        },
                         _ => (false, value.clone())
                     };
 
@@ -272,6 +278,12 @@ impl<'a> StatementExecutor for Interpreter<'a> {
                                         self.value_matches_type(element, expected_element_type)
                                     })
                                 };
+                                (matches, value.clone())
+                            },
+                            // 泛型类类型匹配（赋值检查）
+                            (Type::GenericClass(expected_class_name, _expected_type_args), Value::Object(obj)) => {
+                                // 检查类名是否匹配
+                                let matches = obj.class_name == *expected_class_name;
                                 (matches, value.clone())
                             },
                             _ => (false, value.clone())
@@ -708,6 +720,10 @@ impl<'a> Interpreter<'a> {
             (crate::ast::Type::Class(expected_name), PointerType::Class(actual_name)) => expected_name == actual_name,
             (crate::ast::Type::Pointer(expected_inner), PointerType::Pointer(actual_inner)) => {
                 self.pointer_target_type_matches(expected_inner, actual_inner)
+            },
+            // 泛型类类型匹配
+            (Type::GenericClass(expected_class_name, _expected_type_args), Value::Object(obj)) => {
+                obj.class_name == *expected_class_name
             },
             _ => false,
         }
