@@ -11,6 +11,7 @@ pub mod handlers;
 pub mod memory_manager;
 pub mod pattern_matcher;
 pub mod pattern_jit;
+pub mod generic_manager;
 
 // Re-export main types and functions
 pub use interpreter_core::{interpret, interpret_with_timeout, Interpreter, debug_println};
@@ -24,3 +25,4 @@ pub use library_loader::{load_library, call_library_function, convert_values_to_
 pub use jit::{jit_eval_const_expr, should_compile_array_operation, compile_array_operation};
 pub use pattern_matcher::PatternMatcher;
 pub use pattern_jit::{get_pattern_jit_compiler, should_use_pattern_jit, jit_match_pattern, get_pattern_jit_stats, reset_pattern_jit_stats};
+pub use generic_manager::{GenericTypeManager, GenericTypeInstance, GenericFunctionInstance, GenericClassInstance, GenericManagerStats};
