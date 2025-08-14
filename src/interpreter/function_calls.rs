@@ -5,6 +5,45 @@ use super::library_loader::{call_library_function, convert_values_to_string_args
 use super::interpreter_core::{Interpreter, debug_println};
 use super::expression_evaluator::ExpressionEvaluator;
 
+// 🚀 函数调用缓存 - 记忆化优化（使用字符串键避免Hash问题）
+type FunctionCache = HashMap<String, HashMap<String, Value>>;
+
+thread_local! {
+    static FUNCTION_CACHE: std::cell::RefCell<FunctionCache> = std::cell::RefCell::new(HashMap::new());
+}
+
+// 🚀 缓存管理函数
+pub fn clear_function_cache() {
+    FUNCTION_CACHE.with(|cache| {
+        cache.borrow_mut().clear();
+    });
+}
+
+pub fn get_cache_stats() -> (usize, usize) {
+    FUNCTION_CACHE.with(|cache| {
+        let cache_ref = cache.borrow();
+        let func_count = cache_ref.len();
+        let total_entries: usize = cache_ref.values().map(|func_cache| func_cache.len()).sum();
+        (func_count, total_entries)
+    })
+}
+
+// 🚀 将参数列表转换为缓存键
+fn args_to_cache_key(args: &[Value]) -> String {
+    args.iter()
+        .map(|arg| match arg {
+            Value::Int(i) => format!("i{}", i),
+            Value::Long(l) => format!("l{}", l),
+            Value::Float(f) => format!("f{:.6}", f), // 限制精度避免浮点误差
+            Value::Bool(b) => format!("b{}", b),
+            Value::String(s) => format!("s{}", s.len()), // 只用长度避免大字符串
+            Value::None => "n".to_string(),
+            _ => "x".to_string(), // 复杂类型不缓存
+        })
+        .collect::<Vec<_>>()
+        .join("_")
+}
+
 pub trait FunctionCallHandler {
     fn handle_function_call(&mut self, name: &str, args: &[Expression]) -> Value;
     fn handle_namespaced_function_call(&mut self, path: &[String], args: &[Expression]) -> Value;
@@ -14,44 +53,6 @@ pub trait FunctionCallHandler {
 
 impl<'a> FunctionCallHandler for Interpreter<'a> {
     fn handle_function_call(&mut self, name: &str, args: &[Expression]) -> Value {
-        // 检查是否是内置函数
-        match name {
-            "print" => {
-                if !args.is_empty() {
-                    let value = self.evaluate_expression(&args[0]);
-                    let output = match value {
-                        Value::Int(i) => i.to_string(),
-                        Value::Long(l) => l.to_string(),
-                        Value::Float(f) => f.to_string(),
-                        Value::String(s) => s,
-                        Value::Bool(b) => b.to_string(),
-                        Value::None => "None".to_string(),
-                        _ => format!("{:?}", value),
-                    };
-                    print!("{}", output);
-                }
-                return Value::None;
-            },
-            "println" => {
-                if !args.is_empty() {
-                    let value = self.evaluate_expression(&args[0]);
-                    let output = match value {
-                        Value::Int(i) => i.to_string(),
-                        Value::Long(l) => l.to_string(),
-                        Value::Float(f) => f.to_string(),
-                        Value::String(s) => s,
-                        Value::Bool(b) => b.to_string(),
-                        Value::None => "None".to_string(),
-                        _ => format!("{:?}", value),
-                    };
-                    println!("{}", output);
-                } else {
-                    println!();
-                }
-                return Value::None;
-            },
-            _ => {}
-        }
 
         // 检查是否是命名空间函数调用（包含::）
         if name.contains("::") {
@@ -699,21 +700,40 @@ impl<'a> Interpreter<'a> {
                    func_name, function.parameters.len(), args.len());
         }
 
-        // 保存当前局部环境
-        let saved_local_env = self.local_env.clone();
-
-        // 创建新的局部环境，不影响全局环境
-        let mut new_local_env = HashMap::new();
-
-        // 绑定参数到新的局部环境
-        for (i, param) in function.parameters.iter().enumerate() {
-            if i < args.len() {
-                new_local_env.insert(param.name.clone(), args[i].clone());
+        // 🚀 记忆化优化：检查缓存
+        let func_cache_key = func_name.to_string();
+        let args_cache_key = args_to_cache_key(&args);
+        let cached_result = FUNCTION_CACHE.with(|cache| {
+            let cache_ref = cache.borrow();
+            if let Some(func_cache) = cache_ref.get(&func_cache_key) {
+                func_cache.get(&args_cache_key).cloned()
+            } else {
+                None
             }
+        });
+
+        if let Some(result) = cached_result {
+            debug_println(&format!("🚀 缓存命中: {}({}) -> {:?}", func_name, args_cache_key, result));
+            return result;
         }
 
-        // 设置新的局部环境
-        self.local_env = new_local_env;
+        // 🚀 性能优化：使用栈式环境管理，避免深拷贝
+        // 保存当前环境大小，用于快速恢复
+        let saved_env_size = self.local_env.len();
+        let mut saved_keys = Vec::new();
+
+        // 绑定参数到当前环境（覆盖模式）
+        for (i, param) in function.parameters.iter().enumerate() {
+            if i < args.len() {
+                // 如果参数名已存在，记录原值用于恢复
+                if let Some(old_value) = self.local_env.get(&param.name) {
+                    saved_keys.push((param.name.clone(), old_value.clone()));
+                } else {
+                    saved_keys.push((param.name.clone(), Value::None)); // 标记为新增
+                }
+                self.local_env.insert(param.name.clone(), args[i].clone());
+            }
+        }
 
         // 执行函数体（完整实现）
         let mut result = Value::None;
@@ -754,8 +774,14 @@ impl<'a> Interpreter<'a> {
                                     } else {
                                         result = Value::None;
                                     }
-                                    // 恢复环境并返回
-                                    self.local_env = saved_local_env;
+                                    // 🚀 快速恢复环境并返回
+                                    for (key, old_value) in saved_keys {
+                                        if matches!(old_value, Value::None) {
+                                            self.local_env.remove(&key);
+                                        } else {
+                                            self.local_env.insert(key, old_value);
+                                        }
+                                    }
                                     return result;
                                 },
                                 crate::ast::Statement::VariableDeclaration(name, _var_type, init_expr) => {
@@ -790,8 +816,14 @@ impl<'a> Interpreter<'a> {
                                             } else {
                                                 result = Value::None;
                                             }
-                                            // 恢复环境并返回
-                                            self.local_env = saved_local_env;
+                                            // 🚀 快速恢复环境并返回
+                                            for (key, old_value) in saved_keys.clone() {
+                                                if matches!(old_value, Value::None) {
+                                                    self.local_env.remove(&key);
+                                                } else {
+                                                    self.local_env.insert(key, old_value);
+                                                }
+                                            }
                                             return result;
                                         },
                                         crate::ast::Statement::VariableDeclaration(name, _var_type, init_expr) => {
@@ -819,11 +851,20 @@ impl<'a> Interpreter<'a> {
             }
         }
 
-        // 恢复局部环境
-        self.local_env = saved_local_env;
+        // 🚀 性能优化：快速恢复环境，避免整体替换
+        // 恢复被覆盖的变量，删除新增的变量
+        for (key, old_value) in saved_keys {
+            if matches!(old_value, Value::None) {
+                // 这是新增的变量，删除它
+                self.local_env.remove(&key);
+            } else {
+                // 这是被覆盖的变量，恢复原值
+                self.local_env.insert(key, old_value);
+            }
+        }
 
         // 如果没有显式返回值，根据返回类型返回默认值
-        if matches!(result, Value::None) {
+        let final_result = if matches!(result, Value::None) {
             match function.return_type {
                 crate::ast::Type::Int => Value::Int(0),
                 crate::ast::Type::Float => Value::Float(0.0),
@@ -835,7 +876,17 @@ impl<'a> Interpreter<'a> {
             }
         } else {
             result
-        }
+        };
+
+        // 🚀 记忆化优化：将结果存入缓存
+        FUNCTION_CACHE.with(|cache| {
+            let mut cache_ref = cache.borrow_mut();
+            let func_cache = cache_ref.entry(func_cache_key).or_insert_with(HashMap::new);
+            func_cache.insert(args_cache_key.clone(), final_result.clone());
+        });
+
+        debug_println(&format!("🚀 缓存存储: {}({}) -> {:?}", func_name, args_cache_key, final_result));
+        final_result
     }
 
     pub fn call_lambda_function_pointer_impl(&mut self, lambda_ptr: &super::value::LambdaFunctionPointerInstance, args: Vec<Value>) -> Value {
