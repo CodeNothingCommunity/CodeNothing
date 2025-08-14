@@ -11,15 +11,15 @@ class Person {
 };
 
 fn main() : int {
-    let person = new Person("Alice", 25);
+    person : Person = new Person("Alice", 25);
 
     // 测试字段赋值
     person.name = "Bob";
     person.age = 30;
 
     // 测试字段访问
-    println("姓名: " + person.name);
-    println("年龄: " + person.age);
+    std::println("姓名: " + person.name);
+    std::println("年龄: " + person.age);
 
     return 0;
 }
