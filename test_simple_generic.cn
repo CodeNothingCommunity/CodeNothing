@@ -5,6 +5,19 @@ fn identity<T>(value: T): T {
 };
 
 fn main(): void {
+    println("=== 简单泛型测试 ===");
+
     result : int = identity<int>(42);
-    // 测试完成，result 应该是 42
+    println("identity<int>(42) = ");
+    println(result);
+
+    string_result : string = identity<string>("Hello");
+    println("identity<string>(\"Hello\") = ");
+    println(string_result);
+
+    bool_result : bool = identity<bool>(true);
+    println("identity<bool>(true) = ");
+    println(bool_result);
+
+    println("=== 测试完成 ===");
 };
