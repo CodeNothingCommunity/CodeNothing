@@ -721,10 +721,6 @@ impl<'a> Interpreter<'a> {
             (crate::ast::Type::Pointer(expected_inner), PointerType::Pointer(actual_inner)) => {
                 self.pointer_target_type_matches(expected_inner, actual_inner)
             },
-            // 泛型类类型匹配
-            (Type::GenericClass(expected_class_name, _expected_type_args), Value::Object(obj)) => {
-                obj.class_name == *expected_class_name
-            },
             _ => false,
         }
     }
