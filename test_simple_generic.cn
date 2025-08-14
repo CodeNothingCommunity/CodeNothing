@@ -6,4 +6,5 @@ fn identity<T>(value: T): T {
 
 fn main(): void {
     result : int = identity<int>(42);
+    // 测试完成，result 应该是 42
 };
