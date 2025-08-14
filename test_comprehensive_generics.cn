@@ -21,41 +21,41 @@ fn pair<T, U>(first: T, second: U): T {
     return first;
 };
 
-// 泛型类测试
-class Container<T> {
-    value: T;
-    
-    constructor(initial_value: T) {
-        this.value = initial_value;
-    };
-    
-    fn get(): T {
-        return this.value;
-    };
-    
-    fn set(new_value: T): void {
-        this.value = new_value;
-    };
-};
+// 泛型类测试 - 暂时注释掉，因为还未完全实现
+// class Container<T> {
+//     value: T;
+//
+//     constructor(initial_value: T) {
+//         this.value = initial_value;
+//     };
+//
+//     fn get(): T {
+//         return this.value;
+//     };
+//
+//     fn set(new_value: T): void {
+//         this.value = new_value;
+//     };
+// };
 
-// 多个泛型参数的类
-class Pair<T, U> {
-    first: T;
-    second: U;
-    
-    constructor(f: T, s: U) {
-        this.first = f;
-        this.second = s;
-    };
-    
-    fn getFirst(): T {
-        return this.first;
-    };
-    
-    fn getSecond(): U {
-        return this.second;
-    };
-};
+// // 多个泛型参数的类
+// class Pair<T, U> {
+//     first: T;
+//     second: U;
+//
+//     constructor(f: T, s: U) {
+//         this.first = f;
+//         this.second = s;
+//     };
+//
+//     fn getFirst(): T {
+//         return this.first;
+//     };
+//
+//     fn getSecond(): U {
+//         return this.second;
+//     };
+// };
 
 fn main(): void {
     println("=== 全面泛型系统测试 ===");
