@@ -1,0 +1,71 @@
+// 测试泛型系统的基本功能
+
+using lib<io>;
+
+// 泛型函数测试
+fn identity<T>(value: T): T {
+    return value;
+};
+
+fn swap<T>(a: T, b: T): void {
+    std::println("交换前: a = " + a + ", b = " + b);
+    temp : T = a;
+    a = b;
+    b = temp;
+    std::println("交换后: a = " + a + ", b = " + b);
+};
+
+// 泛型类测试
+class Container<T> {
+    value: T;
+    
+    constructor(initial_value: T) {
+        this.value = initial_value;
+    };
+    
+    fn get(): T {
+        return this.value;
+    };
+    
+    fn set(new_value: T): void {
+        this.value = new_value;
+    };
+};
+
+fn main(): void {
+    std::println("=== 泛型系统测试 ===");
+    
+    // 测试泛型函数
+    std::println("\n--- 泛型函数测试 ---");
+    
+    // 测试 identity 函数
+    int_result : int = identity<int>(42);
+    std::println("identity<int>(42) = " + int_result);
+    
+    string_result : string = identity<string>("Hello");
+    std::println("identity<string>(\"Hello\") = " + string_result);
+    
+    // 测试 swap 函数
+    std::println("\n--- swap 函数测试 ---");
+    swap<int>(10, 20);
+    swap<string>("first", "second");
+    
+    // 测试泛型类
+    std::println("\n--- 泛型类测试 ---");
+    
+    // 创建 int 容器
+    int_container : Container<int> = Container<int>(100);
+    std::println("int_container.get() = " + int_container.get());
+    
+    int_container.set(200);
+    std::println("设置后 int_container.get() = " + int_container.get());
+    
+    // 创建 string 容器
+    string_container : Container<string> = Container<string>("初始值");
+    std::println("string_container.get() = " + string_container.get());
+    
+    string_container.set("新值");
+    std::println("设置后 string_container.get() = " + string_container.get());
+    
+    std::println("\n=== 泛型测试完成 ===");
+};
