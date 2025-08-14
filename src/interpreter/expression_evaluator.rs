@@ -4181,14 +4181,16 @@ impl<'a> Interpreter<'a> {
         // 执行函数体
         let mut result = Value::None;
         for statement in &instantiated_function.specialized_body {
-            match self.execute_statement(statement) {
-                super::executor::ExecutionResult::Continue => {},
+            match self.execute_statement(statement.clone()) {
+                super::executor::ExecutionResult::None => {},
                 super::executor::ExecutionResult::Return(value) => {
                     result = value;
                     break;
                 },
                 super::executor::ExecutionResult::Break => break,
-                super::executor::ExecutionResult::Next => continue,
+                super::executor::ExecutionResult::Continue => continue,
+                super::executor::ExecutionResult::Throw(_) => break,
+                super::executor::ExecutionResult::Error(_) => break,
             }
         }
 
@@ -4273,14 +4275,15 @@ impl<'a> Interpreter<'a> {
 
                 // 执行构造函数体
                 for statement in &constructor.body {
-                    match self.execute_statement(statement) {
+                    match self.execute_statement(statement.clone()) {
+                        super::executor::ExecutionResult::None => {},
                         super::executor::ExecutionResult::Continue => {},
                         _ => break,
                     }
                 }
 
                 // 获取可能被修改的对象
-                let updated_object = if let Value::Object(obj) = self.get_variable("this") {
+                let updated_object = if let Value::Object(obj) = self.get_variable_fast("this") {
                     obj
                 } else {
                     object_instance
