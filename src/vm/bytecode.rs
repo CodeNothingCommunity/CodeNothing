@@ -126,6 +126,9 @@ pub struct CompiledProgram {
 
     /// 导入的库映射
     pub imported_libraries: HashMap<String, std::sync::Arc<HashMap<String, crate::interpreter::library_loader::LibraryFunction>>>,
+
+    /// 函数索引映射 (函数名 -> 索引)
+    pub function_indices: HashMap<String, u16>,
 }
 
 /// 类信息
