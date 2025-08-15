@@ -65,7 +65,10 @@ pub enum ByteCode {
     
     /// 函数调用 (函数索引, 参数数量)
     Call(u16, u8),
-    
+
+    /// 库函数调用 (库名, 函数名, 参数数量)
+    CallLibrary(String, String, u8),
+
     /// 函数返回（返回值在栈顶）
     Return,
     
@@ -111,15 +114,18 @@ pub struct CompiledFunction {
 pub struct CompiledProgram {
     /// 所有函数
     pub functions: HashMap<String, CompiledFunction>,
-    
+
     /// 主函数入口
     pub main_function: String,
-    
+
     /// 全局常量
     pub global_constants: Vec<Value>,
-    
+
     /// 类定义信息
     pub classes: HashMap<String, ClassInfo>,
+
+    /// 导入的库映射
+    pub imported_libraries: HashMap<String, std::sync::Arc<HashMap<String, crate::interpreter::library_loader::LibraryFunction>>>,
 }
 
 /// 类信息
@@ -158,7 +164,8 @@ impl ByteCode {
             ByteCode::JumpIfFalse(_) => 0x31,
             ByteCode::JumpIfTrue(_) => 0x32,
             ByteCode::Call(_, _) => 0x40,
-            ByteCode::Return => 0x41,
+            ByteCode::CallLibrary(_, _, _) => 0x41,
+            ByteCode::Return => 0x42,
             ByteCode::NewObject(_) => 0x50,
             ByteCode::LoadField(_) => 0x51,
             ByteCode::StoreField(_) => 0x52,
@@ -179,6 +186,7 @@ impl ByteCode {
             ByteCode::JumpIfFalse(_) |
             ByteCode::JumpIfTrue(_) |
             ByteCode::Call(_, _) |
+            ByteCode::CallLibrary(_, _, _) |
             ByteCode::NewObject(_) |
             ByteCode::LoadField(_) |
             ByteCode::StoreField(_)
@@ -207,6 +215,7 @@ impl ByteCode {
             ByteCode::JumpIfFalse(addr) => format!("JumpIfFalse({})", addr),
             ByteCode::JumpIfTrue(addr) => format!("JumpIfTrue({})", addr),
             ByteCode::Call(func_idx, argc) => format!("Call({}, {})", func_idx, argc),
+            ByteCode::CallLibrary(lib_name, func_name, argc) => format!("CallLibrary({}, {}, {})", lib_name, func_name, argc),
             ByteCode::Return => "Return".to_string(),
             ByteCode::NewObject(class) => format!("NewObject({})", class),
             ByteCode::LoadField(field) => format!("LoadField({})", field),
