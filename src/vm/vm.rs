@@ -169,8 +169,26 @@ impl VM {
                 ByteCode::Add => {
                     let b = self.stack.pop().ok_or("栈为空，无法执行加法")?;
                     let a = self.stack.pop().ok_or("栈为空，无法执行加法")?;
-                    
+
                     let result = self.add_values(a, b)?;
+                    self.stack.push(result);
+                    self.ip += 1;
+                },
+
+                ByteCode::Mul => {
+                    let b = self.stack.pop().ok_or("栈为空，无法执行乘法")?;
+                    let a = self.stack.pop().ok_or("栈为空，无法执行乘法")?;
+
+                    let result = self.mul_values(a, b)?;
+                    self.stack.push(result);
+                    self.ip += 1;
+                },
+
+                ByteCode::Div => {
+                    let b = self.stack.pop().ok_or("栈为空，无法执行除法")?;
+                    let a = self.stack.pop().ok_or("栈为空，无法执行除法")?;
+
+                    let result = self.div_values(a, b)?;
                     self.stack.push(result);
                     self.ip += 1;
                 },
@@ -187,8 +205,53 @@ impl VM {
                 ByteCode::LessEqual => {
                     let b = self.stack.pop().ok_or("栈为空，无法执行比较")?;
                     let a = self.stack.pop().ok_or("栈为空，无法执行比较")?;
-                    
+
                     let result = self.less_equal_values(a, b)?;
+                    self.stack.push(result);
+                    self.ip += 1;
+                },
+
+                ByteCode::Greater => {
+                    let b = self.stack.pop().ok_or("栈为空，无法执行比较")?;
+                    let a = self.stack.pop().ok_or("栈为空，无法执行比较")?;
+
+                    let result = self.greater_values(a, b)?;
+                    self.stack.push(result);
+                    self.ip += 1;
+                },
+
+                ByteCode::GreaterEqual => {
+                    let b = self.stack.pop().ok_or("栈为空，无法执行比较")?;
+                    let a = self.stack.pop().ok_or("栈为空，无法执行比较")?;
+
+                    let result = self.greater_equal_values(a, b)?;
+                    self.stack.push(result);
+                    self.ip += 1;
+                },
+
+                ByteCode::Equal => {
+                    let b = self.stack.pop().ok_or("栈为空，无法执行比较")?;
+                    let a = self.stack.pop().ok_or("栈为空，无法执行比较")?;
+
+                    let result = self.equal_values(a, b)?;
+                    self.stack.push(result);
+                    self.ip += 1;
+                },
+
+                ByteCode::NotEqual => {
+                    let b = self.stack.pop().ok_or("栈为空，无法执行比较")?;
+                    let a = self.stack.pop().ok_or("栈为空，无法执行比较")?;
+
+                    let result = self.not_equal_values(a, b)?;
+                    self.stack.push(result);
+                    self.ip += 1;
+                },
+
+                ByteCode::Less => {
+                    let b = self.stack.pop().ok_or("栈为空，无法执行比较")?;
+                    let a = self.stack.pop().ok_or("栈为空，无法执行比较")?;
+
+                    let result = self.less_values(a, b)?;
                     self.stack.push(result);
                     self.ip += 1;
                 },
@@ -218,11 +281,24 @@ impl VM {
 
                     // 根据函数索引查找函数
                     let program = self.program.as_ref().ok_or("没有加载程序")?;
-                    let function_name = match func_index {
-                        0 => "main",
-                        1 => "fib",
-                        _ => return Err(format!("未知函数索引: {}", func_index)),
-                    };
+
+                    // 通过索引查找函数名
+                    let function_name = program.functions.iter()
+                        .find(|(_, func)| {
+                            // 简单的索引映射：main=0, 其他按字母顺序
+                            if func.name == "main" {
+                                *func_index == 0
+                            } else {
+                                // 为其他函数分配索引（这里简化处理）
+                                match func.name.as_str() {
+                                    "fibonacci" => *func_index == 1,
+                                    "fib" => *func_index == 1,
+                                    _ => false,
+                                }
+                            }
+                        })
+                        .map(|(name, _)| name.as_str())
+                        .ok_or(format!("未知函数索引: {}", func_index))?;
 
                     let function = program.functions.get(function_name)
                         .ok_or(format!("找不到函数: {}", function_name))?
@@ -251,6 +327,49 @@ impl VM {
                     // 更新当前函数和指令指针
                     self.current_function = Some(function);
                     self.ip = 0;
+                },
+
+                ByteCode::CallLibrary(lib_name, func_name, argc) => {
+                    // 从栈中获取参数
+                    let mut args = Vec::new();
+                    for _ in 0..*argc {
+                        args.push(self.stack.pop().ok_or("栈为空，无法获取库函数参数")?);
+                    }
+                    args.reverse(); // 恢复参数顺序
+
+                    // 将参数转换为字符串
+                    let string_args: Vec<String> = args.iter()
+                        .map(|v| self.value_to_string(v))
+                        .collect();
+
+                    if self.debug_mode {
+                        println!("🚀 VM: 调用库函数 {}::{} 参数: {:?}", lib_name, func_name, string_args);
+                    }
+
+                    // 调用库函数
+                    match crate::interpreter::library_loader::call_library_function(lib_name, func_name, string_args) {
+                        Ok(result_str) => {
+                            // 尝试将结果转换为适当的值类型
+                            let result_value = if let Ok(int_val) = result_str.parse::<i32>() {
+                                Value::Int(int_val)
+                            } else if let Ok(float_val) = result_str.parse::<f64>() {
+                                Value::Float(float_val)
+                            } else if result_str == "true" {
+                                Value::Bool(true)
+                            } else if result_str == "false" {
+                                Value::Bool(false)
+                            } else {
+                                Value::String(result_str)
+                            };
+
+                            // 将结果压入栈
+                            self.stack.push(result_value);
+                            self.ip += 1;
+                        },
+                        Err(err) => {
+                            return Err(format!("库函数调用失败: {}", err));
+                        }
+                    }
                 },
 
                 ByteCode::Return => {
@@ -328,6 +447,52 @@ impl VM {
         }
     }
 
+    /// 值相乘
+    fn mul_values(&self, a: Value, b: Value) -> Result<Value, String> {
+        match (&a, &b) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a * b)),
+            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a * b)),
+            (Value::Int(a), Value::Float(b)) => Ok(Value::Float(*a as f64 * b)),
+            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a * *b as f64)),
+            _ => Err(format!("无法对 {:?} 和 {:?} 执行乘法", a, b)),
+        }
+    }
+
+    /// 值相除
+    fn div_values(&self, a: Value, b: Value) -> Result<Value, String> {
+        match (&a, &b) {
+            (Value::Int(a), Value::Int(b)) => {
+                if *b == 0 {
+                    Err("除零错误".to_string())
+                } else {
+                    Ok(Value::Int(a / b))
+                }
+            },
+            (Value::Float(a), Value::Float(b)) => {
+                if *b == 0.0 {
+                    Err("除零错误".to_string())
+                } else {
+                    Ok(Value::Float(a / b))
+                }
+            },
+            (Value::Int(a), Value::Float(b)) => {
+                if *b == 0.0 {
+                    Err("除零错误".to_string())
+                } else {
+                    Ok(Value::Float(*a as f64 / b))
+                }
+            },
+            (Value::Float(a), Value::Int(b)) => {
+                if *b == 0 {
+                    Err("除零错误".to_string())
+                } else {
+                    Ok(Value::Float(a / *b as f64))
+                }
+            },
+            _ => Err(format!("无法对 {:?} 和 {:?} 执行除法", a, b)),
+        }
+    }
+
     /// 小于等于比较
     fn less_equal_values(&self, a: Value, b: Value) -> Result<Value, String> {
         match (&a, &b) {
@@ -335,6 +500,61 @@ impl VM {
             (Value::Float(a), Value::Float(b)) => Ok(Value::Bool(a <= b)),
             (Value::Int(a), Value::Float(b)) => Ok(Value::Bool((*a as f64) <= *b)),
             (Value::Float(a), Value::Int(b)) => Ok(Value::Bool(*a <= (*b as f64))),
+            _ => Err(format!("无法对 {:?} 和 {:?} 执行比较", a, b)),
+        }
+    }
+
+    /// 大于比较
+    fn greater_values(&self, a: Value, b: Value) -> Result<Value, String> {
+        match (&a, &b) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Bool(a > b)),
+            (Value::Float(a), Value::Float(b)) => Ok(Value::Bool(a > b)),
+            (Value::Int(a), Value::Float(b)) => Ok(Value::Bool((*a as f64) > *b)),
+            (Value::Float(a), Value::Int(b)) => Ok(Value::Bool(*a > (*b as f64))),
+            _ => Err(format!("无法对 {:?} 和 {:?} 执行比较", a, b)),
+        }
+    }
+
+    /// 大于等于比较
+    fn greater_equal_values(&self, a: Value, b: Value) -> Result<Value, String> {
+        match (&a, &b) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Bool(a >= b)),
+            (Value::Float(a), Value::Float(b)) => Ok(Value::Bool(a >= b)),
+            (Value::Int(a), Value::Float(b)) => Ok(Value::Bool((*a as f64) >= *b)),
+            (Value::Float(a), Value::Int(b)) => Ok(Value::Bool(*a >= (*b as f64))),
+            _ => Err(format!("无法对 {:?} 和 {:?} 执行比较", a, b)),
+        }
+    }
+
+    /// 等于比较
+    fn equal_values(&self, a: Value, b: Value) -> Result<Value, String> {
+        match (&a, &b) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Bool(a == b)),
+            (Value::Float(a), Value::Float(b)) => Ok(Value::Bool(a == b)),
+            (Value::Int(a), Value::Float(b)) => Ok(Value::Bool((*a as f64) == *b)),
+            (Value::Float(a), Value::Int(b)) => Ok(Value::Bool(*a == (*b as f64))),
+            (Value::Bool(a), Value::Bool(b)) => Ok(Value::Bool(a == b)),
+            (Value::String(a), Value::String(b)) => Ok(Value::Bool(a == b)),
+            _ => Ok(Value::Bool(false)), // 不同类型默认不相等
+        }
+    }
+
+    /// 不等于比较
+    fn not_equal_values(&self, a: Value, b: Value) -> Result<Value, String> {
+        let equal_result = self.equal_values(a, b)?;
+        match equal_result {
+            Value::Bool(b) => Ok(Value::Bool(!b)),
+            _ => Err("等于比较返回了非布尔值".to_string()),
+        }
+    }
+
+    /// 小于比较
+    fn less_values(&self, a: Value, b: Value) -> Result<Value, String> {
+        match (&a, &b) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Bool(a < b)),
+            (Value::Float(a), Value::Float(b)) => Ok(Value::Bool(a < b)),
+            (Value::Int(a), Value::Float(b)) => Ok(Value::Bool((*a as f64) < *b)),
+            (Value::Float(a), Value::Int(b)) => Ok(Value::Bool(*a < (*b as f64))),
             _ => Err(format!("无法对 {:?} 和 {:?} 执行比较", a, b)),
         }
     }
