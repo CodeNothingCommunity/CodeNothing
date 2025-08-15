@@ -282,21 +282,9 @@ impl VM {
                     // 根据函数索引查找函数
                     let program = self.program.as_ref().ok_or("没有加载程序")?;
 
-                    // 通过索引查找函数名
-                    let function_name = program.functions.iter()
-                        .find(|(_, func)| {
-                            // 简单的索引映射：main=0, 其他按字母顺序
-                            if func.name == "main" {
-                                *func_index == 0
-                            } else {
-                                // 为其他函数分配索引（这里简化处理）
-                                match func.name.as_str() {
-                                    "fibonacci" => *func_index == 1,
-                                    "fib" => *func_index == 1,
-                                    _ => false,
-                                }
-                            }
-                        })
+                    // 通过索引查找函数名（使用编译器生成的索引映射）
+                    let function_name = program.function_indices.iter()
+                        .find(|(_, &index)| index == *func_index)
                         .map(|(name, _)| name.as_str())
                         .ok_or(format!("未知函数索引: {}", func_index))?;
 
