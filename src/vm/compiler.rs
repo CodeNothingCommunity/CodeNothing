@@ -1,27 +1,38 @@
-use crate::ast::{Program, Function, Statement, Expression, BinaryOperator, CompareOperator};
+use crate::ast::{Program, Function, Statement, Expression, BinaryOperator, CompareOperator, NamespaceType};
 use crate::vm::bytecode::{ByteCode, CompiledProgram, CompiledFunction, ClassInfo};
 use crate::interpreter::value::Value;
+use crate::interpreter::library_loader::{load_library, call_library_function};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// 编译器 - 将AST编译为字节码
 pub struct Compiler {
     /// 当前编译的函数的字节码
     bytecode: Vec<ByteCode>,
-    
+
     /// 常量池
     constants: Vec<Value>,
-    
+
     /// 局部变量映射 (变量名 -> 索引)
     locals: HashMap<String, u16>,
-    
+
     /// 当前局部变量计数
     local_count: u16,
-    
+
     /// 跳转标签映射
     labels: HashMap<String, u32>,
-    
+
     /// 待回填的跳转地址
     pending_jumps: Vec<(usize, String)>,
+
+    /// 导入的库映射 (库名 -> 函数映射)
+    imported_libraries: HashMap<String, Arc<HashMap<String, crate::interpreter::library_loader::LibraryFunction>>>,
+
+    /// 函数索引映射 (函数名 -> 索引)
+    function_indices: HashMap<String, u16>,
+
+    /// 下一个可用的函数索引
+    next_function_index: u16,
 }
 
 impl Compiler {
@@ -34,6 +45,9 @@ impl Compiler {
             local_count: 0,
             labels: HashMap::new(),
             pending_jumps: Vec::new(),
+            imported_libraries: HashMap::new(),
+            function_indices: HashMap::new(),
+            next_function_index: 0,
         }
     }
     
@@ -41,13 +55,44 @@ impl Compiler {
     pub fn compile_program(&mut self, program: &Program) -> Result<CompiledProgram, String> {
         let mut compiled_functions = HashMap::new();
         let mut classes = HashMap::new();
-        
+
+        // 处理库导入
+        for (ns_type, path) in &program.imported_namespaces {
+            match ns_type {
+                NamespaceType::Library => {
+                    if path.len() != 1 {
+                        return Err("库名称应该是单个标识符".to_string());
+                    }
+
+                    let lib_name = &path[0];
+                    println!("🚀 VM: 加载库 {}", lib_name);
+
+                    // 加载库
+                    match crate::interpreter::library_loader::load_library(lib_name) {
+                        Ok(functions) => {
+                            self.imported_libraries.insert(lib_name.clone(), functions);
+                        },
+                        Err(err) => {
+                            return Err(format!("无法加载库 '{}': {}", lib_name, err));
+                        }
+                    }
+                },
+                NamespaceType::Code => {
+                    // 代码命名空间暂时跳过
+                    println!("🚀 VM: 跳过代码命名空间 {:?}", path);
+                }
+            }
+        }
+
+        // 为所有函数分配索引
+        self.assign_function_indices(program);
+
         // 编译所有函数
         for function in &program.functions {
             let compiled_func = self.compile_function(function)?;
             compiled_functions.insert(function.name.clone(), compiled_func);
         }
-        
+
         // 编译所有类
         for class in &program.classes {
             let class_info = ClassInfo {
@@ -57,12 +102,13 @@ impl Compiler {
             };
             classes.insert(class.name.clone(), class_info);
         }
-        
+
         Ok(CompiledProgram {
             functions: compiled_functions,
             main_function: "main".to_string(),
             global_constants: self.constants.clone(),
             classes,
+            imported_libraries: self.imported_libraries.clone(),
         })
     }
     
@@ -270,7 +316,29 @@ impl Compiler {
                     // 生成打印指令
                     self.emit(ByteCode::Print);
                 } else {
-                    return Err(format!("暂不支持静态方法调用: {}::{}", class_name, method_name));
+                    // 检查是否是库函数调用
+                    let full_func_name = format!("{}::{}", class_name, method_name);
+                    let mut found_lib_name = None;
+
+                    // 先查找库函数
+                    for (lib_name, lib_functions) in &self.imported_libraries {
+                        if lib_functions.contains_key(&full_func_name) {
+                            found_lib_name = Some(lib_name.clone());
+                            break;
+                        }
+                    }
+
+                    if let Some(lib_name) = found_lib_name {
+                        // 编译参数
+                        for arg in args {
+                            self.compile_expression(arg)?;
+                        }
+
+                        // 生成库函数调用指令
+                        self.emit(ByteCode::CallLibrary(lib_name, full_func_name, args.len() as u8));
+                    } else {
+                        return Err(format!("暂不支持静态方法调用: {}::{}", class_name, method_name));
+                    }
                 }
             },
             
@@ -287,13 +355,21 @@ impl Compiler {
         self.bytecode.push(instruction);
     }
 
-    /// 获取函数索引（简化版本）
-    fn get_function_index(&self, name: &str) -> u16 {
-        // 简单的哈希映射，实际应该有完整的函数表
-        match name {
-            "fib" => 1,
-            "main" => 0,
-            _ => 999, // 未知函数
+    /// 为所有函数分配索引
+    fn assign_function_indices(&mut self, program: &Program) {
+        self.function_indices.insert("main".to_string(), 0);
+        self.next_function_index = 1;
+
+        for function in &program.functions {
+            if function.name != "main" {
+                self.function_indices.insert(function.name.clone(), self.next_function_index);
+                self.next_function_index += 1;
+            }
         }
+    }
+
+    /// 获取函数索引
+    fn get_function_index(&self, name: &str) -> u16 {
+        self.function_indices.get(name).copied().unwrap_or(999)
     }
 }
