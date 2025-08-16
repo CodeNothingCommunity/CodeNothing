@@ -381,6 +381,21 @@ impl<'a> StatementParser for ParserBase<'a> {
                             // 返回函数调用语句
                             Ok(Statement::FunctionCallStatement(func_call_expr))
                         }
+                    } else if next_token == "[" {
+                        // 数组元素赋值: arr[index] = value
+                        self.consume(); // 消费 "["
+                        let index_expr = self.parse_expression()?;
+                        self.expect("]")?;
+                        self.expect("=")?;
+                        let value_expr = self.parse_expression()?;
+                        self.expect(";")?;
+
+                        let array_expr = Expression::Variable(var_name);
+                        Ok(Statement::ArrayElementAssignment(
+                            Box::new(array_expr),
+                            Box::new(index_expr),
+                            value_expr
+                        ))
                     } else if next_token == "." {
                         // 处理对象方法调用或字段访问
                         self.consume(); // 消费 "."
