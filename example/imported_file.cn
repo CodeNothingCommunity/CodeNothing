@@ -1,0 +1,9 @@
+// 被导入的文件
+
+fn imported_function() : int {
+    return 100;
+};
+
+fn another_helper() : string {
+    return "来自导入文件的字符串";
+};

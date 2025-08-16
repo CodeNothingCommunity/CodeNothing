@@ -1,0 +1,22 @@
+// 简单递归测试
+using lib <io>;
+using ns std;
+
+fn repeat_string(s : string, times : int) : string {
+    if (times <= 0) {
+        return "";
+    } else if (times == 1) {
+        return s;
+    } else {
+        return s + repeat_string(s, times - 1);
+    };
+};
+
+fn main() : void {
+    println("测试 repeat_string:");
+    result1 : string = repeat_string("A", 3);
+    println("repeat_string('A', 3) = " + result1);
+    
+    result2 : string = repeat_string("*", 5);
+    println("repeat_string('*', 5) = " + result2);
+};

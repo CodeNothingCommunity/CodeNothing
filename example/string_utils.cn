@@ -1,0 +1,15 @@
+// 字符串工具函数
+
+fn concat_with_separator(a : string, b : string, sep : string) : string {
+    return a + sep + b;
+};
+
+fn repeat_string(s : string, times : int) : string {
+    if (times <= 0) {
+        return "";
+    } else if (times == 1) {
+        return s;
+    } else {
+        return s + repeat_string(s, times - 1);
+    };
+};

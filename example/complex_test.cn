@@ -1,0 +1,36 @@
+// 复杂测试程序，使用多个文件导入
+
+using file "math_utils.cn";
+using file "string_utils.cn";
+using lib <io>;
+using ns std;
+
+fn main() : void {
+    println("=== 复杂字节码测试 ===");
+
+    // 测试数学函数
+    println("数学函数测试:");
+    result1 : int = add(10, 20);
+    println("add(10, 20) = " + result1);
+
+    result2 : int = multiply(6, 7);
+    println("multiply(6, 7) = " + result2);
+
+    result3 : int = factorial(5);
+    println("factorial(5) = " + result3);
+
+    // 测试字符串函数
+    println("\n字符串函数测试:");
+    str1 : string = concat_with_separator("Hello", "World", " ");
+    println("concat_with_separator('Hello', 'World', ' ') = " + str1);
+
+    str2 : string = repeat_string("Ha", 3);
+    println("repeat_string('Ha', 3) = " + str2);
+
+    // 组合测试
+    println("\n组合测试:");
+    combined : string = repeat_string("*", add(3, 2));
+    println("repeat_string('*', add(3, 2)) = " + combined);
+
+    println("=== 测试完成 ===");
+};
