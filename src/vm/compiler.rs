@@ -36,6 +36,18 @@ pub struct Compiler {
 
     /// 命名空间函数映射 (完整路径 -> 函数)
     namespaced_functions: HashMap<String, Function>,
+
+    /// 循环控制：当前循环ID
+    current_loop_id: u32,
+
+    /// 循环控制：循环栈 (循环ID, 开始地址, 结束地址占位符)
+    loop_stack: Vec<(u32, u32, Vec<usize>)>,
+
+    /// 循环控制：break语句地址列表 (需要回填的地址)
+    break_addresses: Vec<usize>,
+
+    /// 循环控制：continue语句地址列表 (需要回填的地址)
+    continue_addresses: Vec<usize>,
 }
 
 impl Compiler {
@@ -52,6 +64,10 @@ impl Compiler {
             function_indices: HashMap::new(),
             next_function_index: 0,
             namespaced_functions: HashMap::new(),
+            current_loop_id: 0,
+            loop_stack: Vec::new(),
+            break_addresses: Vec::new(),
+            continue_addresses: Vec::new(),
         }
     }
     
@@ -59,6 +75,8 @@ impl Compiler {
     pub fn compile_program(&mut self, program: &Program) -> Result<CompiledProgram, String> {
         let mut compiled_functions = HashMap::new();
         let mut classes = HashMap::new();
+
+        // 注意：println 等内置函数现在通过特殊处理实现，不需要加载标准库
 
         // 处理库导入
         for (ns_type, path) in &program.imported_namespaces {
@@ -154,6 +172,10 @@ impl Compiler {
         self.local_count = 0;
         self.labels.clear();
         self.pending_jumps.clear();
+        self.current_loop_id = 0;
+        self.loop_stack.clear();
+        self.break_addresses.clear();
+        self.continue_addresses.clear();
         
         // 为参数分配局部变量索引
         for param in &function.parameters {
@@ -249,10 +271,91 @@ impl Compiler {
             
             Statement::FunctionCallStatement(expr) => {
                 self.compile_expression(expr)?;
-                // 表达式语句的结果不需要保留在栈上
-                // TODO: 添加Pop指令来清理栈
+                // 函数调用语句的结果不需要保留在栈上
+                self.emit(ByteCode::Pop);
             },
-            
+
+            Statement::WhileLoop(condition, body) => {
+                self.compile_while_loop(condition, body)?;
+            },
+
+            Statement::ForLoop(var_name, start_expr, end_expr, body) => {
+                self.compile_for_loop(var_name, start_expr, end_expr, body)?;
+            },
+
+            Statement::ForEachLoop(var_name, collection_expr, body) => {
+                self.compile_foreach_loop(var_name, collection_expr, body)?;
+            },
+
+            Statement::Break => {
+                if self.loop_stack.is_empty() {
+                    return Err("break语句只能在循环内使用".to_string());
+                }
+                // 记录需要回填的break地址
+                self.emit(ByteCode::Break(0)); // 地址稍后回填
+                self.break_addresses.push(self.bytecode.len() - 1);
+            },
+
+            Statement::Continue => {
+                if self.loop_stack.is_empty() {
+                    return Err("continue语句只能在循环内使用".to_string());
+                }
+                // 记录需要回填的continue地址
+                self.emit(ByteCode::Continue(0)); // 地址稍后回填
+                self.continue_addresses.push(self.bytecode.len() - 1);
+            },
+
+            Statement::VariableDeclaration(var_name, _var_type, init_expr) => {
+                // 编译初始化表达式
+                self.compile_expression(init_expr)?;
+
+                // 分配局部变量索引
+                let var_index = self.local_count;
+                self.locals.insert(var_name.clone(), var_index);
+                self.local_count += 1;
+
+                // 存储到局部变量
+                self.emit(ByteCode::StoreLocal(var_index));
+            },
+
+            Statement::VariableAssignment(var_name, value_expr) => {
+                // 编译赋值表达式
+                self.compile_expression(value_expr)?;
+
+                // 查找变量索引
+                if let Some(&var_index) = self.locals.get(var_name) {
+                    self.emit(ByteCode::StoreLocal(var_index));
+                } else {
+                    // 如果不是局部变量，则作为全局变量处理
+                    self.emit(ByteCode::StoreGlobal(var_name.clone()));
+                }
+            },
+
+            Statement::FieldAssignment(object_expr, field_name, value_expr) => {
+                // 编译对象表达式
+                self.compile_expression(object_expr)?;
+
+                // 编译值表达式
+                self.compile_expression(value_expr)?;
+
+                // 存储字段
+                self.emit(ByteCode::StoreField(field_name.clone()));
+            },
+
+            Statement::ArrayElementAssignment(array_expr, index_expr, value_expr) => {
+                // 编译数组表达式
+                self.compile_expression(array_expr)?;
+
+                // 编译索引表达式
+                self.compile_expression(index_expr)?;
+
+                // 编译值表达式
+                self.compile_expression(value_expr)?;
+
+                // 存储数组元素
+                self.emit(ByteCode::StoreArrayElement);
+            },
+
             _ => {
                 return Err(format!("暂不支持编译语句: {:?}", statement));
             }
@@ -382,7 +485,7 @@ impl Compiler {
                 let full_func_name = path.join("::");
                 let mut found_library_call = None;
 
-                // 查找库函数
+                // 首先查找库函数
                 for (lib_name, lib_functions) in &self.imported_libraries {
                     if lib_functions.contains_key(&full_func_name) {
                         found_library_call = Some((lib_name.clone(), full_func_name.clone()));
@@ -393,8 +496,71 @@ impl Compiler {
                 if let Some((lib_name, func_name)) = found_library_call {
                     self.emit(ByteCode::CallLibrary(lib_name, func_name, args.len() as u8));
                 } else {
-                    return Err(format!("未找到静态方法: {}", full_func_name));
+                    // 查找代码定义的命名空间函数
+                    if self.namespaced_functions.contains_key(&full_func_name) {
+                        // 获取函数索引
+                        let func_index = self.get_function_index(&full_func_name);
+                        self.emit(ByteCode::Call(func_index, args.len() as u8));
+                    } else {
+                        return Err(format!("未找到静态方法: {}", full_func_name));
+                    }
                 }
+            },
+
+            Expression::ArrayLiteral(elements) => {
+                // 创建数组
+                self.emit(ByteCode::NewArray(elements.len() as u32));
+
+                // 填充数组元素
+                for (index, element) in elements.iter().enumerate() {
+                    self.emit(ByteCode::Dup); // 复制数组引用
+                    self.emit(ByteCode::LoadConst(Value::Int(index as i32))); // 索引
+                    self.compile_expression(element)?; // 值
+                    self.emit(ByteCode::StoreArrayElementKeep); // 使用保留数组的版本
+                }
+                // 注意：最后栈顶应该还有数组引用
+            },
+
+            Expression::ArrayAccess(array, index) => {
+                self.compile_expression(array)?;   // 数组
+                self.compile_expression(index)?;   // 索引
+                self.emit(ByteCode::LoadArrayElement);
+            },
+
+            Expression::ObjectCreation(class_name, args) => {
+                // 编译构造函数参数
+                for arg in args {
+                    self.compile_expression(arg)?;
+                }
+
+                // 创建对象实例
+                self.emit(ByteCode::NewObject(class_name.clone()));
+
+                // 调用构造函数（如果有参数）
+                if !args.is_empty() {
+                    let constructor_name = format!("{}::constructor", class_name);
+                    if let Some(&func_index) = self.function_indices.get(&constructor_name) {
+                        self.emit(ByteCode::Call(func_index, args.len() as u8));
+                    }
+                }
+            },
+
+            Expression::FieldAccess(object, field_name) => {
+                self.compile_expression(object)?;
+                self.emit(ByteCode::LoadField(field_name.clone()));
+            },
+
+            Expression::MethodCall(object, method_name, args) => {
+                // 编译对象表达式
+                self.compile_expression(object)?;
+
+                // 编译参数
+                for arg in args {
+                    self.compile_expression(arg)?;
+                }
+
+                // 调用方法
+                self.emit(ByteCode::CallMethod(method_name.clone(), args.len() as u8));
             },
 
             Expression::NamespacedFunctionCall(path, args) => {
@@ -485,12 +651,10 @@ impl Compiler {
         self.function_indices.insert("main".to_string(), 0);
         self.next_function_index = 1;
 
-        // 为普通函数分配索引
+        // 为普通函数分配索引（包括main函数）
         for function in &program.functions {
-            if function.name != "main" {
-                self.function_indices.insert(function.name.clone(), self.next_function_index);
-                self.next_function_index += 1;
-            }
+            self.function_indices.insert(function.name.clone(), self.next_function_index);
+            self.next_function_index += 1;
         }
 
         // 为命名空间函数分配索引
@@ -504,5 +668,236 @@ impl Compiler {
     /// 获取函数索引
     fn get_function_index(&self, name: &str) -> u16 {
         self.function_indices.get(name).copied().unwrap_or(999)
+    }
+
+    /// 编译while循环
+    fn compile_while_loop(&mut self, condition: &Expression, body: &[Statement]) -> Result<(), String> {
+        let loop_id = self.current_loop_id;
+        self.current_loop_id += 1;
+
+        // 循环开始
+        let loop_start = self.bytecode.len() as u32;
+        self.emit(ByteCode::LoopStart(loop_id));
+
+        // 编译条件
+        self.compile_expression(condition)?;
+
+        // 条件为假时跳出循环
+        self.emit(ByteCode::JumpIfFalse(0)); // 地址稍后回填
+        let exit_jump = self.bytecode.len() - 1;
+
+        // 保存当前循环信息
+        self.loop_stack.push((loop_id, loop_start, vec![exit_jump]));
+        let old_break_len = self.break_addresses.len();
+        let old_continue_len = self.continue_addresses.len();
+
+        // 编译循环体
+        for stmt in body {
+            self.compile_statement(stmt)?;
+        }
+
+        // 跳回循环开始
+        self.emit(ByteCode::Continue(loop_start));
+
+        // 循环结束
+        let loop_end = self.bytecode.len() as u32;
+        self.emit(ByteCode::LoopEnd(loop_id));
+
+        // 回填退出地址
+        if let ByteCode::JumpIfFalse(_) = &mut self.bytecode[exit_jump] {
+            self.bytecode[exit_jump] = ByteCode::JumpIfFalse(loop_end);
+        }
+
+        // 回填break和continue地址
+        self.backfill_loop_jumps(old_break_len, old_continue_len, loop_start, loop_end)?;
+
+        // 恢复循环栈
+        self.loop_stack.pop();
+
+        Ok(())
+    }
+
+    /// 编译for循环
+    fn compile_for_loop(&mut self, var_name: &str, start_expr: &Expression, end_expr: &Expression, body: &[Statement]) -> Result<(), String> {
+        let loop_id = self.current_loop_id;
+        self.current_loop_id += 1;
+
+        // 分配循环变量
+        let var_index = self.local_count;
+        self.locals.insert(var_name.to_string(), var_index);
+        self.local_count += 1;
+
+        // 初始化循环变量
+        self.compile_expression(start_expr)?;
+        self.emit(ByteCode::StoreLocal(var_index));
+
+        // 编译结束值并存储到临时变量
+        let end_var_index = self.local_count;
+        self.local_count += 1;
+        self.compile_expression(end_expr)?;
+        self.emit(ByteCode::StoreLocal(end_var_index));
+
+        // 循环开始
+        let loop_start = self.bytecode.len() as u32;
+        self.emit(ByteCode::LoopStart(loop_id));
+
+        // 检查循环条件 (var <= end)
+        self.emit(ByteCode::LoadLocal(var_index));
+        self.emit(ByteCode::LoadLocal(end_var_index));
+        self.emit(ByteCode::LessEqual);
+
+        // 条件为假时跳出循环
+        self.emit(ByteCode::JumpIfFalse(0)); // 地址稍后回填
+        let exit_jump = self.bytecode.len() - 1;
+
+        // 保存当前循环信息
+        // continue应该跳转到递增部分，而不是循环开始
+        let continue_target = 0; // 稍后设置
+        self.loop_stack.push((loop_id, loop_start, vec![exit_jump]));
+        let old_break_len = self.break_addresses.len();
+        let old_continue_len = self.continue_addresses.len();
+
+        // 编译循环体
+        for stmt in body {
+            self.compile_statement(stmt)?;
+        }
+
+        // 递增部分开始（continue应该跳转到这里）
+        let increment_start = self.bytecode.len() as u32;
+
+        // 递增循环变量
+        self.emit(ByteCode::LoadLocal(var_index));
+        self.emit(ByteCode::LoadConst(Value::Int(1)));
+        self.emit(ByteCode::Add);
+        self.emit(ByteCode::StoreLocal(var_index));
+
+        // 跳回循环开始
+        self.emit(ByteCode::Continue(loop_start));
+
+        // 循环结束
+        let loop_end = self.bytecode.len() as u32;
+        self.emit(ByteCode::LoopEnd(loop_id));
+
+        // 回填退出地址
+        if let ByteCode::JumpIfFalse(_) = &mut self.bytecode[exit_jump] {
+            self.bytecode[exit_jump] = ByteCode::JumpIfFalse(loop_end);
+        }
+
+        // 回填break和continue地址（continue跳转到递增部分）
+        self.backfill_loop_jumps_for(old_break_len, old_continue_len, increment_start, loop_end)?;
+
+        // 恢复循环栈
+        self.loop_stack.pop();
+
+        Ok(())
+    }
+
+    /// 编译foreach循环
+    fn compile_foreach_loop(&mut self, var_name: &str, collection_expr: &Expression, body: &[Statement]) -> Result<(), String> {
+        let loop_id = self.current_loop_id;
+        self.current_loop_id += 1;
+
+        // 分配循环变量
+        let var_index = self.local_count;
+        self.locals.insert(var_name.to_string(), var_index);
+        self.local_count += 1;
+
+        // 分配迭代器变量
+        let iter_index = self.local_count;
+        self.local_count += 1;
+
+        // 获取集合的迭代器
+        self.compile_expression(collection_expr)?;
+        self.emit(ByteCode::GetIterator);
+        self.emit(ByteCode::StoreLocal(iter_index));
+
+        // 循环开始
+        let loop_start = self.bytecode.len() as u32;
+        self.emit(ByteCode::LoopStart(loop_id));
+
+        // 检查迭代器是否有下一个元素
+        self.emit(ByteCode::LoadLocal(iter_index));
+        self.emit(ByteCode::IteratorHasNext);
+
+        // 没有下一个元素时跳出循环
+        self.emit(ByteCode::JumpIfFalse(0)); // 地址稍后回填
+        let exit_jump = self.bytecode.len() - 1;
+
+        // 获取下一个元素
+        self.emit(ByteCode::LoadLocal(iter_index));
+        self.emit(ByteCode::IteratorNext);
+        self.emit(ByteCode::StoreLocal(var_index));
+
+        // 保存当前循环信息
+        self.loop_stack.push((loop_id, loop_start, vec![exit_jump]));
+        let old_break_len = self.break_addresses.len();
+        let old_continue_len = self.continue_addresses.len();
+
+        // 编译循环体
+        for stmt in body {
+            self.compile_statement(stmt)?;
+        }
+
+        // 跳回循环开始
+        self.emit(ByteCode::Continue(loop_start));
+
+        // 循环结束
+        let loop_end = self.bytecode.len() as u32;
+        self.emit(ByteCode::LoopEnd(loop_id));
+
+        // 回填退出地址
+        if let ByteCode::JumpIfFalse(_) = &mut self.bytecode[exit_jump] {
+            self.bytecode[exit_jump] = ByteCode::JumpIfFalse(loop_end);
+        }
+
+        // 回填break和continue地址
+        self.backfill_loop_jumps(old_break_len, old_continue_len, loop_start, loop_end)?;
+
+        // 恢复循环栈
+        self.loop_stack.pop();
+
+        Ok(())
+    }
+
+    /// 回填循环跳转地址
+    fn backfill_loop_jumps(&mut self, old_break_len: usize, old_continue_len: usize, loop_start: u32, loop_end: u32) -> Result<(), String> {
+        // 回填break地址
+        for &addr in &self.break_addresses[old_break_len..] {
+            if let ByteCode::Break(_) = &mut self.bytecode[addr] {
+                self.bytecode[addr] = ByteCode::Break(loop_end);
+            }
+        }
+        self.break_addresses.truncate(old_break_len);
+
+        // 回填continue地址
+        for &addr in &self.continue_addresses[old_continue_len..] {
+            if let ByteCode::Continue(_) = &mut self.bytecode[addr] {
+                self.bytecode[addr] = ByteCode::Continue(loop_start);
+            }
+        }
+        self.continue_addresses.truncate(old_continue_len);
+
+        Ok(())
+    }
+
+    /// 回填for循环跳转地址（continue跳转到递增部分）
+    fn backfill_loop_jumps_for(&mut self, old_break_len: usize, old_continue_len: usize, continue_target: u32, loop_end: u32) -> Result<(), String> {
+        // 回填break地址
+        for &addr in &self.break_addresses[old_break_len..] {
+            if let ByteCode::Break(_) = &mut self.bytecode[addr] {
+                self.bytecode[addr] = ByteCode::Break(loop_end);
+            }
+        }
+        self.break_addresses.truncate(old_break_len);
+
+        // 回填continue地址（跳转到递增部分）
+        for &addr in &self.continue_addresses[old_continue_len..] {
+            if let ByteCode::Continue(_) = &mut self.bytecode[addr] {
+                self.bytecode[addr] = ByteCode::Continue(continue_target);
+            }
+        }
+        self.continue_addresses.truncate(old_continue_len);
+
+        Ok(())
     }
 }
