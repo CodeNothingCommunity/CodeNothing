@@ -260,6 +260,7 @@ pub enum Statement {
     ClassDeclaration(Class), // 类声明
     InterfaceDeclaration(Interface), // 接口声明
     FieldAssignment(Box<Expression>, String, Expression), // 字段赋值 (obj.field = value)
+    ArrayElementAssignment(Box<Expression>, Box<Expression>, Expression), // 数组元素赋值 (arr[index] = value)
     // Enum相关语句
     EnumDeclaration(Enum), // 枚举声明
     // 模式匹配语句
