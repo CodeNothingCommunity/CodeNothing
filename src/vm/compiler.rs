@@ -48,6 +48,9 @@ pub struct Compiler {
 
     /// 循环控制：continue语句地址列表 (需要回填的地址)
     continue_addresses: Vec<usize>,
+
+    /// 是否显示提示信息
+    show_tips: bool,
 }
 
 impl Compiler {
@@ -68,7 +71,18 @@ impl Compiler {
             loop_stack: Vec::new(),
             break_addresses: Vec::new(),
             continue_addresses: Vec::new(),
+            show_tips: false,
         }
+    }
+
+    /// 设置是否显示提示信息
+    pub fn set_show_tips(&mut self, show_tips: bool) {
+        self.show_tips = show_tips;
+    }
+
+    /// 获取导入的库信息
+    pub fn get_imported_libraries(&self) -> &HashMap<String, Arc<HashMap<String, crate::interpreter::library_loader::LibraryFunction>>> {
+        &self.imported_libraries
     }
     
     /// 编译整个程序
@@ -87,7 +101,9 @@ impl Compiler {
                     }
 
                     let lib_name = &path[0];
-                    println!("🚀 VM: 加载库 {}", lib_name);
+                    if self.show_tips {
+                        println!("🚀 VM: 加载库 {}", lib_name);
+                    }
 
                     // 加载库
                     match crate::interpreter::library_loader::load_library(lib_name) {
@@ -102,21 +118,27 @@ impl Compiler {
                 NamespaceType::Code => {
                     // 处理代码命名空间（支持多层级）
                     let namespace_path = path.join("::");
-                    println!("🚀 VM: 处理代码命名空间 {}", namespace_path);
+                    if self.show_tips {
+                        println!("🚀 VM: 处理代码命名空间 {}", namespace_path);
+                    }
 
                     // 查找所有库中以该命名空间开头的函数
                     for (lib_name, lib_functions) in &self.imported_libraries {
                         let ns_prefix = format!("{}::", namespace_path);
                         for (func_full_path, _) in lib_functions.iter() {
                             if func_full_path.starts_with(&ns_prefix) {
-                                println!("🚀 VM: 发现命名空间函数 {} 在库 {}", func_full_path, lib_name);
+                                if self.show_tips {
+                                    println!("🚀 VM: 发现命名空间函数 {} 在库 {}", func_full_path, lib_name);
+                                }
 
                                 // 获取函数名（路径的最后一部分）
                                 let parts: Vec<&str> = func_full_path.split("::").collect();
                                 if let Some(func_name) = parts.last() {
                                     // 将函数添加到导入的命名空间映射
                                     // 这样可以通过简单的函数名调用命名空间函数
-                                    println!("🚀 VM: 映射函数 {} -> {}", func_name, func_full_path);
+                                    if self.show_tips {
+                                        println!("🚀 VM: 映射函数 {} -> {}", func_name, func_full_path);
+                                    }
                                 }
                             }
                         }
@@ -626,7 +648,9 @@ impl Compiler {
         // 收集当前命名空间的函数
         for function in &namespace.functions {
             let full_path = format!("{}::{}", current_path, function.name);
-            println!("🚀 VM: 收集命名空间函数 {}", full_path);
+            if self.show_tips {
+                println!("🚀 VM: 收集命名空间函数 {}", full_path);
+            }
             self.namespaced_functions.insert(full_path, function.clone());
         }
 
@@ -639,7 +663,9 @@ impl Compiler {
     /// 编译所有命名空间函数
     fn compile_namespaced_functions(&mut self, compiled_functions: &mut HashMap<String, CompiledFunction>) -> Result<(), String> {
         for (full_path, function) in &self.namespaced_functions.clone() {
-            println!("🚀 VM: 编译命名空间函数 {}", full_path);
+            if self.show_tips {
+                println!("🚀 VM: 编译命名空间函数 {}", full_path);
+            }
             let compiled_func = self.compile_function(function)?;
             compiled_functions.insert(full_path.clone(), compiled_func);
         }
@@ -661,7 +687,9 @@ impl Compiler {
         for (full_path, _) in &self.namespaced_functions {
             self.function_indices.insert(full_path.clone(), self.next_function_index);
             self.next_function_index += 1;
-            println!("🚀 VM: 为命名空间函数 {} 分配索引 {}", full_path, self.next_function_index - 1);
+            if self.show_tips {
+                println!("🚀 VM: 为命名空间函数 {} 分配索引 {}", full_path, self.next_function_index - 1);
+            }
         }
     }
 
