@@ -436,6 +436,11 @@ impl<'a> StatementExecutor for Interpreter<'a> {
                 // 处理字段赋值
                 self.handle_field_assignment(&obj_expr, &field_name, &value_expr)
             },
+
+            Statement::ArrayElementAssignment(array_expr, index_expr, value_expr) => {
+                // 处理数组元素赋值
+                self.handle_array_element_assignment(&array_expr, &index_expr, &value_expr)
+            },
             Statement::InterfaceDeclaration(_interface) => {
                 // 接口声明在解释器初始化时已经处理，这里不需要额外操作
                 ExecutionResult::Continue
@@ -797,6 +802,46 @@ impl<'a> Interpreter<'a> {
             },
             _ => {
                 // 暂时不支持复杂的对象表达式
+                ExecutionResult::None
+            }
+        }
+    }
+
+    /// 处理数组元素赋值
+    fn handle_array_element_assignment(&mut self, array_expr: &Box<Expression>, index_expr: &Box<Expression>, value_expr: &Expression) -> ExecutionResult {
+        // 计算新值
+        let new_value = self.evaluate_expression(value_expr);
+
+        // 计算索引
+        let index_value = self.evaluate_expression(index_expr);
+
+        // 处理数组表达式
+        match array_expr.as_ref() {
+            Expression::Variable(var_name) => {
+                // 获取数组
+                if let Value::Array(mut arr) = self.get_variable_fast(var_name) {
+                    // 检查索引类型
+                    if let Value::Int(index) = index_value {
+                        if index >= 0 && (index as usize) < arr.len() {
+                            // 更新数组元素
+                            arr[index as usize] = new_value;
+
+                            // 更新变量
+                            self.set_variable(var_name, Value::Array(arr));
+
+                            ExecutionResult::None
+                        } else {
+                            panic!("数组索引越界: 索引 {} 超出数组长度 {}", index, arr.len());
+                        }
+                    } else {
+                        panic!("数组索引必须是整数类型");
+                    }
+                } else {
+                    panic!("只能对数组进行元素赋值");
+                }
+            },
+            _ => {
+                // 暂时不支持复杂的数组表达式
                 ExecutionResult::None
             }
         }
