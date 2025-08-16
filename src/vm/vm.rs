@@ -43,6 +43,9 @@ pub struct VM {
     
     /// 是否处于调试模式
     debug_mode: bool,
+
+    /// 是否显示提示信息
+    tip_mode: bool,
 }
 
 impl VM {
@@ -56,12 +59,18 @@ impl VM {
             current_function: None,
             ip: 0,
             debug_mode: false,
+            tip_mode: false,
         }
     }
     
     /// 设置调试模式
     pub fn set_debug_mode(&mut self, debug: bool) {
         self.debug_mode = debug;
+    }
+
+    /// 设置提示模式
+    pub fn set_tip_mode(&mut self, tip: bool) {
+        self.tip_mode = tip;
     }
     
     /// 加载编译后的程序
@@ -288,6 +297,10 @@ impl VM {
                         .map(|(name, _)| name.as_str())
                         .ok_or(format!("未知函数索引: {}", func_index))?;
 
+                    if self.tip_mode {
+                        println!("🔍 VM: 执行函数调用 {} (索引 {}) 参数数量 {}", function_name, func_index, argc);
+                    }
+
                     let function = program.functions.get(function_name)
                         .ok_or(format!("找不到函数: {}", function_name))?
                         .clone();
@@ -367,6 +380,10 @@ impl VM {
                         Value::None
                     };
 
+                    if self.tip_mode {
+                        println!("🔍 VM: 函数返回，返回值: {:?}", return_value);
+                    }
+
                     // 恢复调用栈
                     if let Some(frame) = self.call_frames.pop() {
                         // 如果还有调用栈，恢复上一个函数
@@ -376,6 +393,10 @@ impl VM {
                             if let Some(parent_function) = program.functions.get(&parent_frame.function_name) {
                                 self.current_function = Some(parent_function.clone());
                                 self.ip = frame.return_ip;
+
+                                if self.tip_mode {
+                                    println!("🔍 VM: 恢复到父函数 {} IP: {}", parent_frame.function_name, frame.return_ip);
+                                }
 
                                 // 将返回值压入栈
                                 self.stack.push(return_value);
