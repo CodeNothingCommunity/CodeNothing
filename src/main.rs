@@ -728,6 +728,7 @@ fn execute_with_vm(program: &ast::Program, debug: bool, tip: bool) -> Value {
     // 创建虚拟机
     let mut vm = VM::new();
     vm.set_debug_mode(debug);
+    vm.set_tip_mode(tip);
     vm.load_program(compiled_program);
 
     // 执行程序
