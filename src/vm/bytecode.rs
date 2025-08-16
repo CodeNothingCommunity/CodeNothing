@@ -1,5 +1,59 @@
 use crate::interpreter::value::Value;
 use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
+
+/// 可序列化的Value类型，用于字节码序列化
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SerializableValue {
+    Int(i32),
+    Float(f64),
+    Bool(bool),
+    String(String),
+    Long(i64),
+    Array(Vec<SerializableValue>),
+    Map(HashMap<String, SerializableValue>),
+    None,
+}
+
+impl From<&Value> for SerializableValue {
+    fn from(value: &Value) -> Self {
+        match value {
+            Value::Int(i) => SerializableValue::Int(*i),
+            Value::Float(f) => SerializableValue::Float(*f),
+            Value::Bool(b) => SerializableValue::Bool(*b),
+            Value::String(s) => SerializableValue::String(s.clone()),
+            Value::Long(l) => SerializableValue::Long(*l),
+            Value::Array(arr) => {
+                SerializableValue::Array(arr.iter().map(|v| v.into()).collect())
+            },
+            Value::Map(map) => {
+                SerializableValue::Map(map.iter().map(|(k, v)| (k.clone(), v.into())).collect())
+            },
+            Value::None => SerializableValue::None,
+            // 对于复杂类型，暂时转换为None
+            _ => SerializableValue::None,
+        }
+    }
+}
+
+impl Into<Value> for SerializableValue {
+    fn into(self) -> Value {
+        match self {
+            SerializableValue::Int(i) => Value::Int(i),
+            SerializableValue::Float(f) => Value::Float(f),
+            SerializableValue::Bool(b) => Value::Bool(b),
+            SerializableValue::String(s) => Value::String(s),
+            SerializableValue::Long(l) => Value::Long(l),
+            SerializableValue::Array(arr) => {
+                Value::Array(arr.into_iter().map(|v| v.into()).collect())
+            },
+            SerializableValue::Map(map) => {
+                Value::Map(map.into_iter().map(|(k, v)| (k, v.into())).collect())
+            },
+            SerializableValue::None => Value::None,
+        }
+    }
+}
 
 /// 字节码指令集 - 最小可行版本
 /// 专注于解决递归函数性能问题
