@@ -72,20 +72,72 @@ pub enum ByteCode {
     /// 函数返回（返回值在栈顶）
     Return,
     
-    // === 对象操作指令（基础版本）===
+    // === 数组操作指令 ===
+    /// 创建新数组 (大小)
+    NewArray(u32),
+
+    /// 加载数组元素：pop index, pop array, push array[index]
+    LoadArrayElement,
+
+    /// 存储数组元素：pop value, pop index, pop array, array[index] = value
+    StoreArrayElement,
+
+    /// 存储数组元素并保留数组：pop value, pop index, pop array, array[index] = value, push array
+    StoreArrayElementKeep,
+
+    /// 获取数组长度：pop array, push length
+    ArrayLength,
+
+    // === 栈操作指令 ===
+    /// 弹出栈顶元素
+    Pop,
+
+    /// 复制栈顶元素
+    Dup,
+
+    /// 交换栈顶两个元素
+    Swap,
+
+    // === 循环控制指令 ===
+    /// 循环开始标记 (循环ID)
+    LoopStart(u32),
+
+    /// 循环结束标记 (循环ID)
+    LoopEnd(u32),
+
+    /// 跳出循环 (循环结束地址)
+    Break(u32),
+
+    /// 继续循环 (循环开始地址)
+    Continue(u32),
+
+    // === 迭代器指令 ===
+    /// 获取迭代器：pop collection, push iterator
+    GetIterator,
+
+    /// 迭代器下一个元素：pop iterator, push (hasNext, value)
+    IteratorNext,
+
+    /// 检查迭代器是否有下一个元素：pop iterator, push hasNext, push iterator
+    IteratorHasNext,
+
+    // === 对象操作指令（扩展版本）===
     /// 创建新对象 (类名)
     NewObject(String),
-    
-    /// 加载对象字段 (字段名)
+
+    /// 加载对象字段：pop object, push object.field
     LoadField(String),
-    
-    /// 存储对象字段 (字段名)
+
+    /// 存储对象字段：pop value, pop object, object.field = value
     StoreField(String),
-    
+
+    /// 方法调用：pop args..., pop object, call object.method(args)
+    CallMethod(String, u8),
+
     // === 调试和工具指令 ===
     /// 打印栈顶值（调试用）
     Print,
-    
+
     /// 程序结束
     Halt,
 }
@@ -169,9 +221,30 @@ impl ByteCode {
             ByteCode::Call(_, _) => 0x40,
             ByteCode::CallLibrary(_, _, _) => 0x41,
             ByteCode::Return => 0x42,
-            ByteCode::NewObject(_) => 0x50,
-            ByteCode::LoadField(_) => 0x51,
-            ByteCode::StoreField(_) => 0x52,
+            ByteCode::CallMethod(_, _) => 0x43,
+            // 数组操作指令 0x50-0x5F
+            ByteCode::NewArray(_) => 0x50,
+            ByteCode::LoadArrayElement => 0x51,
+            ByteCode::StoreArrayElement => 0x52,
+            ByteCode::StoreArrayElementKeep => 0x53,
+            ByteCode::ArrayLength => 0x54,
+            // 栈操作指令 0x60-0x6F
+            ByteCode::Pop => 0x60,
+            ByteCode::Dup => 0x61,
+            ByteCode::Swap => 0x62,
+            // 循环控制指令 0x70-0x7F
+            ByteCode::LoopStart(_) => 0x70,
+            ByteCode::LoopEnd(_) => 0x71,
+            ByteCode::Break(_) => 0x72,
+            ByteCode::Continue(_) => 0x73,
+            // 迭代器指令 0x80-0x8F
+            ByteCode::GetIterator => 0x80,
+            ByteCode::IteratorNext => 0x81,
+            ByteCode::IteratorHasNext => 0x82,
+            // 对象操作指令 0x90-0x9F
+            ByteCode::NewObject(_) => 0x90,
+            ByteCode::LoadField(_) => 0x91,
+            ByteCode::StoreField(_) => 0x92,
             ByteCode::Print => 0xF0,
             ByteCode::Halt => 0xFF,
         }
@@ -190,6 +263,12 @@ impl ByteCode {
             ByteCode::JumpIfTrue(_) |
             ByteCode::Call(_, _) |
             ByteCode::CallLibrary(_, _, _) |
+            ByteCode::CallMethod(_, _) |
+            ByteCode::NewArray(_) |
+            ByteCode::LoopStart(_) |
+            ByteCode::LoopEnd(_) |
+            ByteCode::Break(_) |
+            ByteCode::Continue(_) |
             ByteCode::NewObject(_) |
             ByteCode::LoadField(_) |
             ByteCode::StoreField(_)
@@ -220,6 +299,27 @@ impl ByteCode {
             ByteCode::Call(func_idx, argc) => format!("Call({}, {})", func_idx, argc),
             ByteCode::CallLibrary(lib_name, func_name, argc) => format!("CallLibrary({}, {}, {})", lib_name, func_name, argc),
             ByteCode::Return => "Return".to_string(),
+            ByteCode::CallMethod(method, argc) => format!("CallMethod({}, {})", method, argc),
+            // 数组操作
+            ByteCode::NewArray(size) => format!("NewArray({})", size),
+            ByteCode::LoadArrayElement => "LoadArrayElement".to_string(),
+            ByteCode::StoreArrayElement => "StoreArrayElement".to_string(),
+            ByteCode::StoreArrayElementKeep => "StoreArrayElementKeep".to_string(),
+            ByteCode::ArrayLength => "ArrayLength".to_string(),
+            // 栈操作
+            ByteCode::Pop => "Pop".to_string(),
+            ByteCode::Dup => "Dup".to_string(),
+            ByteCode::Swap => "Swap".to_string(),
+            // 循环控制
+            ByteCode::LoopStart(id) => format!("LoopStart({})", id),
+            ByteCode::LoopEnd(id) => format!("LoopEnd({})", id),
+            ByteCode::Break(addr) => format!("Break({})", addr),
+            ByteCode::Continue(addr) => format!("Continue({})", addr),
+            // 迭代器
+            ByteCode::GetIterator => "GetIterator".to_string(),
+            ByteCode::IteratorNext => "IteratorNext".to_string(),
+            ByteCode::IteratorHasNext => "IteratorHasNext".to_string(),
+            // 对象操作
             ByteCode::NewObject(class) => format!("NewObject({})", class),
             ByteCode::LoadField(field) => format!("LoadField({})", field),
             ByteCode::StoreField(field) => format!("StoreField({})", field),
