@@ -244,41 +244,74 @@ impl Compiler {
             Statement::IfElse(condition, then_body, else_branches) => {
                 // 编译条件表达式
                 self.compile_expression(condition)?;
-                
+
                 // 条件跳转到else分支
-                let else_label = format!("else_{}", self.bytecode.len());
                 self.emit(ByteCode::JumpIfFalse(0)); // 地址稍后回填
                 let else_jump_addr = self.bytecode.len() - 1;
-                
+
                 // 编译then分支
                 for stmt in then_body {
                     self.compile_statement(stmt)?;
                 }
-                
+
                 // 跳转到if语句结束
-                let end_label = format!("end_if_{}", self.bytecode.len());
                 self.emit(ByteCode::Jump(0)); // 地址稍后回填
                 let end_jump_addr = self.bytecode.len() - 1;
-                
+
                 // else分支开始位置
                 let else_addr = self.bytecode.len() as u32;
-                
-                // 编译else分支 - 简化版本，只处理第一个else分支
-                if let Some((_, else_body)) = else_branches.first() {
-                    for stmt in else_body {
-                        self.compile_statement(stmt)?;
+
+                // 记录所有需要跳到结尾的地址
+                let mut end_jumps = vec![end_jump_addr];
+
+                // 编译所有else if和else分支
+                for (maybe_condition, else_body) in else_branches {
+                    match maybe_condition {
+                        Some(else_if_condition) => {
+                            // 这是else if分支，需要编译条件
+                            self.compile_expression(else_if_condition)?;
+
+                            // 条件为假时跳到下一个else if/else
+                            self.emit(ByteCode::JumpIfFalse(0)); // 地址稍后回填
+                            let next_else_jump = self.bytecode.len() - 1;
+
+                            // 编译else if分支体
+                            for stmt in else_body {
+                                self.compile_statement(stmt)?;
+                            }
+
+                            // 跳转到if语句结束
+                            self.emit(ByteCode::Jump(0)); // 地址稍后回填
+                            end_jumps.push(self.bytecode.len() - 1);
+
+                            // 回填下一个else if/else的地址
+                            let next_else_addr = self.bytecode.len() as u32;
+                            if let ByteCode::JumpIfFalse(_) = &mut self.bytecode[next_else_jump] {
+                                self.bytecode[next_else_jump] = ByteCode::JumpIfFalse(next_else_addr);
+                            }
+                        },
+                        None => {
+                            // 这是最终的else分支，无条件执行
+                            for stmt in else_body {
+                                self.compile_statement(stmt)?;
+                            }
+                        }
                     }
                 }
-                
+
                 // if语句结束位置
                 let end_addr = self.bytecode.len() as u32;
-                
-                // 回填跳转地址
+
+                // 回填第一个if的跳转地址
                 if let ByteCode::JumpIfFalse(_) = &mut self.bytecode[else_jump_addr] {
                     self.bytecode[else_jump_addr] = ByteCode::JumpIfFalse(else_addr);
                 }
-                if let ByteCode::Jump(_) = &mut self.bytecode[end_jump_addr] {
-                    self.bytecode[end_jump_addr] = ByteCode::Jump(end_addr);
+
+                // 回填所有跳到结尾的地址
+                for jump_addr in end_jumps {
+                    if let ByteCode::Jump(_) = &mut self.bytecode[jump_addr] {
+                        self.bytecode[jump_addr] = ByteCode::Jump(end_addr);
+                    }
                 }
             },
             
@@ -472,6 +505,9 @@ impl Compiler {
                 } else {
                     // 生成普通函数调用指令
                     let func_index = self.get_function_index(name);
+                    if self.show_tips {
+                        println!("🔍 VM: 编译函数调用 {} -> 索引 {}", name, func_index);
+                    }
                     self.emit(ByteCode::Call(func_index, args.len() as u8));
                 }
             },
@@ -674,21 +710,27 @@ impl Compiler {
 
     /// 为所有函数分配索引
     fn assign_function_indices(&mut self, program: &Program) {
-        self.function_indices.insert("main".to_string(), 0);
-        self.next_function_index = 1;
+        self.next_function_index = 0;
 
-        // 为普通函数分配索引（包括main函数）
+        // 为普通函数分配索引
         for function in &program.functions {
-            self.function_indices.insert(function.name.clone(), self.next_function_index);
-            self.next_function_index += 1;
+            if !self.function_indices.contains_key(&function.name) {
+                self.function_indices.insert(function.name.clone(), self.next_function_index);
+                if self.show_tips {
+                    println!("🚀 VM: 为函数 {} 分配索引 {}", function.name, self.next_function_index);
+                }
+                self.next_function_index += 1;
+            }
         }
 
         // 为命名空间函数分配索引
         for (full_path, _) in &self.namespaced_functions {
-            self.function_indices.insert(full_path.clone(), self.next_function_index);
-            self.next_function_index += 1;
-            if self.show_tips {
-                println!("🚀 VM: 为命名空间函数 {} 分配索引 {}", full_path, self.next_function_index - 1);
+            if !self.function_indices.contains_key(full_path) {
+                self.function_indices.insert(full_path.clone(), self.next_function_index);
+                if self.show_tips {
+                    println!("🚀 VM: 为命名空间函数 {} 分配索引 {}", full_path, self.next_function_index);
+                }
+                self.next_function_index += 1;
             }
         }
     }
