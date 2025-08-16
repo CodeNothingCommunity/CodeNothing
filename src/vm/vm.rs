@@ -391,17 +391,272 @@ impl VM {
                     }
                 },
                 
-                ByteCode::Print => {
-                    let value = self.stack.pop()
-                        .ok_or("栈为空，无法打印")?;
-                    println!("{}", self.value_to_string(&value));
-                    self.ip += 1;
-                },
+
                 
                 ByteCode::Halt => {
                     return Ok(Value::None);
                 },
-                
+
+                // === 数组操作指令 ===
+                ByteCode::NewArray(size) => {
+                    let array = Value::Array(vec![Value::None; *size as usize]);
+                    self.stack.push(array);
+                    self.ip += 1;
+                },
+
+                ByteCode::LoadArrayElement => {
+                    let index = self.stack.pop().ok_or("栈为空，无法获取数组索引")?;
+                    let array = self.stack.pop().ok_or("栈为空，无法获取数组")?;
+
+                    if let (Value::Array(arr), Value::Int(idx)) = (&array, &index) {
+                        if *idx >= 0 && (*idx as usize) < arr.len() {
+                            self.stack.push(arr[*idx as usize].clone());
+                        } else {
+                            return Err("数组索引越界".to_string());
+                        }
+                    } else {
+                        return Err("无效的数组访问操作".to_string());
+                    }
+                    self.ip += 1;
+                },
+
+                ByteCode::StoreArrayElement => {
+                    let value = self.stack.pop().ok_or("栈为空，无法获取存储值")?;
+                    let index = self.stack.pop().ok_or("栈为空，无法获取数组索引")?;
+                    let mut array = self.stack.pop().ok_or("栈为空，无法获取数组")?;
+
+                    if let (Value::Array(ref mut arr), Value::Int(idx)) = (&mut array, &index) {
+                        if *idx >= 0 && (*idx as usize) < arr.len() {
+                            arr[*idx as usize] = value;
+                            // 不推回数组（用于数组元素赋值语句）
+                        } else {
+                            return Err("数组索引越界".to_string());
+                        }
+                    } else {
+                        return Err("无效的数组存储操作".to_string());
+                    }
+                    self.ip += 1;
+                },
+
+                ByteCode::StoreArrayElementKeep => {
+                    let value = self.stack.pop().ok_or("栈为空，无法获取存储值")?;
+                    let index = self.stack.pop().ok_or("栈为空，无法获取数组索引")?;
+                    let mut array = self.stack.pop().ok_or("栈为空，无法获取数组")?;
+
+                    if let (Value::Array(ref mut arr), Value::Int(idx)) = (&mut array, &index) {
+                        if *idx >= 0 && (*idx as usize) < arr.len() {
+                            arr[*idx as usize] = value;
+                            // 将修改后的数组推回栈（用于数组字面量构造）
+                            self.stack.push(array);
+                        } else {
+                            return Err("数组索引越界".to_string());
+                        }
+                    } else {
+                        return Err("无效的数组存储操作".to_string());
+                    }
+                    self.ip += 1;
+                },
+
+                ByteCode::ArrayLength => {
+                    let array = self.stack.pop().ok_or("栈为空，无法获取数组")?;
+
+                    if let Value::Array(arr) = &array {
+                        self.stack.push(Value::Int(arr.len() as i32));
+                    } else {
+                        return Err("无效的数组长度操作".to_string());
+                    }
+                    self.ip += 1;
+                },
+
+                // === 栈操作指令 ===
+                ByteCode::Pop => {
+                    self.stack.pop().ok_or("栈为空，无法执行Pop操作")?;
+                    self.ip += 1;
+                },
+
+                ByteCode::Dup => {
+                    let value = self.stack.last().ok_or("栈为空，无法执行Dup操作")?.clone();
+                    self.stack.push(value);
+                    self.ip += 1;
+                },
+
+                ByteCode::Swap => {
+                    if self.stack.len() < 2 {
+                        return Err("栈中元素不足，无法执行Swap操作".to_string());
+                    }
+                    let len = self.stack.len();
+                    self.stack.swap(len - 1, len - 2);
+                    self.ip += 1;
+                },
+
+                // === 循环控制指令 ===
+                ByteCode::LoopStart(_loop_id) => {
+                    // 循环开始标记，主要用于调试
+                    self.ip += 1;
+                },
+
+                ByteCode::LoopEnd(_loop_id) => {
+                    // 循环结束标记，主要用于调试
+                    self.ip += 1;
+                },
+
+                ByteCode::Break(addr) => {
+                    // 跳出循环
+                    self.ip = *addr as usize;
+                },
+
+                ByteCode::Continue(addr) => {
+                    // 继续循环
+                    self.ip = *addr as usize;
+                },
+
+                // === 迭代器指令 ===
+                ByteCode::GetIterator => {
+                    let collection = self.stack.pop().ok_or("栈为空，无法获取集合")?;
+
+                    // 创建迭代器（简化实现）
+                    match collection {
+                        Value::Array(arr) => {
+                            // 创建数组迭代器：[当前索引, 数组]
+                            let iterator = Value::Array(vec![Value::Int(0), Value::Array(arr)]);
+                            self.stack.push(iterator);
+                        },
+                        _ => {
+                            return Err("不支持的集合类型".to_string());
+                        }
+                    }
+                    self.ip += 1;
+                },
+
+                ByteCode::IteratorHasNext => {
+                    let iterator = self.stack.pop().ok_or("栈为空，无法获取迭代器")?;
+
+                    if let Value::Array(iter_data) = &iterator {
+                        if iter_data.len() == 2 {
+                            if let (Value::Int(index), Value::Array(arr)) = (&iter_data[0], &iter_data[1]) {
+                                let has_next = (*index as usize) < arr.len();
+                                self.stack.push(Value::Bool(has_next));
+                                self.stack.push(iterator); // 将迭代器推回栈
+                            } else {
+                                return Err("无效的迭代器格式".to_string());
+                            }
+                        } else {
+                            return Err("无效的迭代器数据".to_string());
+                        }
+                    } else {
+                        return Err("无效的迭代器类型".to_string());
+                    }
+                    self.ip += 1;
+                },
+
+                ByteCode::IteratorNext => {
+                    let mut iterator = self.stack.pop().ok_or("栈为空，无法获取迭代器")?;
+
+                    if let Value::Array(ref mut iter_data) = iterator {
+                        if iter_data.len() == 2 {
+                            // 分别获取索引和数组的引用，避免借用冲突
+                            let current_index = if let Value::Int(index) = &iter_data[0] {
+                                *index
+                            } else {
+                                return Err("无效的迭代器索引格式".to_string());
+                            };
+
+                            let array_data = if let Value::Array(arr) = &iter_data[1] {
+                                arr.clone()
+                            } else {
+                                return Err("无效的迭代器数组格式".to_string());
+                            };
+
+                            if (current_index as usize) < array_data.len() {
+                                let value = array_data[current_index as usize].clone();
+                                // 更新索引
+                                iter_data[0] = Value::Int(current_index + 1);
+                                self.stack.push(value);
+                                self.stack.push(iterator); // 将更新后的迭代器推回栈
+                            } else {
+                                return Err("迭代器已到达末尾".to_string());
+                            }
+                        } else {
+                            return Err("无效的迭代器数据".to_string());
+                        }
+                    } else {
+                        return Err("无效的迭代器类型".to_string());
+                    }
+                    self.ip += 1;
+                },
+
+                // === 对象操作指令 ===
+                ByteCode::NewObject(class_name) => {
+                    // 创建新对象实例
+                    let object = Value::Object(crate::interpreter::value::ObjectInstance {
+                        class_name: class_name.clone(),
+                        fields: std::collections::HashMap::new(),
+                    });
+                    self.stack.push(object);
+                    self.ip += 1;
+                },
+
+                ByteCode::LoadField(field_name) => {
+                    let object = self.stack.pop().ok_or("栈为空，无法获取对象")?;
+
+                    if let Value::Object(obj) = &object {
+                        if let Some(field_value) = obj.fields.get(field_name) {
+                            self.stack.push(field_value.clone());
+                        } else {
+                            self.stack.push(Value::None); // 字段不存在时返回None
+                        }
+                    } else {
+                        return Err("无效的对象字段访问".to_string());
+                    }
+                    self.ip += 1;
+                },
+
+                ByteCode::StoreField(field_name) => {
+                    let value = self.stack.pop().ok_or("栈为空，无法获取字段值")?;
+                    let mut object = self.stack.pop().ok_or("栈为空，无法获取对象")?;
+
+                    if let Value::Object(ref mut obj) = object {
+                        obj.fields.insert(field_name.clone(), value);
+                        // 注意：这里不需要将对象推回栈，因为StoreField是消费性操作
+                    } else {
+                        return Err("无效的对象字段存储".to_string());
+                    }
+                    self.ip += 1;
+                },
+
+                ByteCode::CallMethod(method_name, argc) => {
+                    // 从栈中获取参数
+                    let mut args = Vec::new();
+                    for _ in 0..*argc {
+                        args.push(self.stack.pop().ok_or("栈为空，无法获取方法参数")?);
+                    }
+                    args.reverse(); // 恢复参数顺序
+
+                    let object = self.stack.pop().ok_or("栈为空，无法获取对象")?;
+
+                    if let Value::Object(obj) = &object {
+                        // 构建方法的完整名称
+                        let full_method_name = format!("{}::{}", obj.class_name, method_name);
+
+                        // 查找方法
+                        let program = self.program.as_ref().ok_or("没有加载程序")?;
+                        if let Some(method_function) = program.functions.get(&full_method_name) {
+                            // 将对象作为第一个参数（this）
+                            let mut method_args = vec![object];
+                            method_args.extend(args);
+
+                            // 调用方法
+                            let result = self.call_method_function(method_function.clone(), method_args)?;
+                            self.stack.push(result);
+                        } else {
+                            return Err(format!("找不到方法: {}", full_method_name));
+                        }
+                    } else {
+                        return Err("无效的方法调用".to_string());
+                    }
+                    self.ip += 1;
+                },
+
                 _ => {
                     return Err(format!("未实现的指令: {:?}", instruction));
                 }
@@ -574,5 +829,47 @@ impl VM {
     pub fn get_stack_info(&self) -> String {
         format!("Stack size: {}, Frames: {}",
             self.stack.len(), self.call_frames.len())
+    }
+
+    /// 调用方法函数（类似call_function但用于方法调用）
+    fn call_method_function(&mut self, function: CompiledFunction, args: Vec<Value>) -> Result<Value, String> {
+        if args.len() != function.param_count as usize {
+            return Err(format!("方法 {} 期望 {} 个参数，但得到 {} 个",
+                function.name, function.param_count, args.len()));
+        }
+
+        // 保存当前状态
+        let saved_ip = self.ip;
+        let saved_function = self.current_function.clone();
+
+        // 创建新的调用栈帧
+        let mut locals = vec![Value::None; function.local_count as usize];
+
+        // 设置参数
+        for (i, arg) in args.into_iter().enumerate() {
+            locals[i] = arg;
+        }
+
+        let frame = CallFrame {
+            function_name: function.name.clone(),
+            ip: saved_ip,
+            locals,
+            return_ip: saved_ip,
+            stack_base: self.stack.len(),
+        };
+
+        self.call_frames.push(frame);
+        self.current_function = Some(function);
+        self.ip = 0;
+
+        // 执行方法
+        let result = self.execute()?;
+
+        // 恢复状态
+        self.ip = saved_ip;
+        self.current_function = saved_function;
+        self.call_frames.pop();
+
+        Ok(result)
     }
 }
