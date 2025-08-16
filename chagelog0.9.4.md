@@ -471,3 +471,252 @@ cargo run test.comcn --cn-vm-tip --cn-time
 - **清晰边界**：模块间通过简单接口交互
 - **易于扩展**：为未来功能扩展预留空间
 - **测试友好**：模块化设计便于单元测试
+
+---
+
+## [v0.9.4 Pre5] - 2025-08-16
+
+### VM调试信息控制系统
+
+#### 调试参数重构
+- **新增参数**：`--cn-vm-tip` 专门控制VM执行过程的详细调试信息
+- **信息分离**：将VM调试信息从默认输出中分离，提供更清洁的用户体验
+- **精确控制**：用户可以选择性地查看VM内部执行细节
+
+#### VM结构体增强
+- **新增字段**：`tip_mode: bool` 控制VM调试信息的显示
+- **新增方法**：`set_tip_mode()` 动态设置调试模式
+- **参数传递**：在`execute_with_vm`函数中正确传递`tip`参数给VM
+
+### VM条件判断系统重大修复
+
+#### 核心问题诊断
+- **问题发现**：VM编译器在处理`else if`语句时存在严重bug
+- **具体表现**：只处理第一个`else`分支，完全忽略`else if`的条件判断
+- **影响范围**：导致所有递归函数在VM模式下无法正确执行
+
+#### 编译器修复 (`src/vm/compiler.rs`)
+- **修复前问题**：
+  ```rust
+  // 错误的简化处理，只取第一个else分支
+  if let Some((_, else_body)) = else_branches.first() {
+      for stmt in else_body {
+          self.compile_statement(stmt)?;
+      }
+  }
+  ```
+- **修复后逻辑**：
+  ```rust
+  // 正确处理所有else if和else分支
+  for (maybe_condition, else_body) in else_branches {
+      match maybe_condition {
+          Some(else_if_condition) => {
+              // 编译else if条件和分支体
+              self.compile_expression(else_if_condition)?;
+              // 生成正确的条件跳转指令
+          },
+          None => {
+              // 处理最终的else分支
+          }
+      }
+  }
+  ```
+
+#### 条件跳转逻辑完善
+- **跳转地址计算**：正确计算每个`else if`分支的跳转目标地址
+- **分支链处理**：实现完整的`if-else if-else`分支链编译
+- **结尾跳转统一**：所有分支执行完后统一跳转到if语句结尾
+
+### 递归函数执行修复
+
+#### 问题根因分析
+- **症状**：`repeat_string("Ha", 3)` 在VM模式下返回 `"Ha"` 而非 `"HaHaHa"`
+- **根因**：当`times > 1`时，VM错误地进入`times == 1`分支，直接返回而不递归
+- **影响**：所有包含`else if`条件判断的递归函数都无法正常工作
+
+#### 修复验证
+- **修复前测试结果**：
+  ```
+  debug_repeat_simple(2) = case2  ❌ (应该是case3)
+  debug_repeat_simple(3) = case2  ❌ (应该是case3)
+  ```
+- **修复后测试结果**：
+  ```
+  debug_repeat_simple(2) = case3  ✅ (正确)
+  debug_repeat_simple(3) = case3  ✅ (正确)
+  ```
+
+#### 功能完整性恢复
+- **数学函数**：`factorial(5) = 120` ✅
+- **字符串函数**：`repeat_string("Ha", 3) = "HaHaHa"` ✅
+- **组合调用**：`repeat_string("*", add(3, 2)) = "*****"` ✅
+
+### 调试信息分级显示
+
+#### 默认VM模式 (`--cn-vm`)
+- **编译信息**：显示函数索引分配和编译过程
+- **隐藏执行细节**：不显示每次函数调用和返回的详细信息
+- **清洁输出**：专注于程序执行结果
+
+#### 详细调试模式 (`--cn-vm --cn-vm-tip`)
+- **完整执行跟踪**：显示每次函数调用的参数和返回值
+- **栈状态监控**：显示VM栈的变化过程
+- **指令级调试**：显示每条字节码指令的执行
+
+### 技术实现细节
+
+#### VM调试控制实现
+```rust
+// VM结构体增强
+pub struct VM {
+    // ... 其他字段
+    tip_mode: bool,  // 新增调试模式控制
+}
+
+impl VM {
+    pub fn set_tip_mode(&mut self, tip_mode: bool) {
+        self.tip_mode = tip_mode;
+    }
+
+    // 在关键执行点使用tip_mode控制输出
+    if self.tip_mode {
+        println!("🔍 VM: 执行函数调用 {} (索引 {}) 参数数量 {}",
+                 function_name, func_index, arg_count);
+    }
+}
+```
+
+#### 条件编译修复实现
+```rust
+// 修复后的else if处理逻辑
+let mut end_jumps = vec![end_jump_addr];
+
+for (maybe_condition, else_body) in else_branches {
+    match maybe_condition {
+        Some(else_if_condition) => {
+            // 编译else if条件
+            self.compile_expression(else_if_condition)?;
+
+            // 条件为假时跳到下一个else if/else
+            self.emit(ByteCode::JumpIfFalse(0));
+            let next_else_jump = self.bytecode.len() - 1;
+
+            // 编译else if分支体
+            for stmt in else_body {
+                self.compile_statement(stmt)?;
+            }
+
+            // 跳转到if语句结束
+            self.emit(ByteCode::Jump(0));
+            end_jumps.push(self.bytecode.len() - 1);
+
+            // 回填下一个分支的地址
+            let next_else_addr = self.bytecode.len() as u32;
+            if let ByteCode::JumpIfFalse(_) = &mut self.bytecode[next_else_jump] {
+                self.bytecode[next_else_jump] = ByteCode::JumpIfFalse(next_else_addr);
+            }
+        },
+        None => {
+            // 最终的else分支
+            for stmt in else_body {
+                self.compile_statement(stmt)?;
+            }
+        }
+    }
+}
+```
+
+### 修复的关键问题
+
+#### VM条件判断系统缺陷
+- **问题**：VM编译器无法正确处理`else if`语句链
+- **影响**：所有包含复杂条件判断的函数无法在VM模式下正确执行
+- **修复**：实现完整的条件分支编译和跳转逻辑
+
+#### 递归函数执行失败
+- **问题**：递归函数在VM模式下提前终止，不进行递归调用
+- **根因**：错误的条件判断导致递归终止条件被误触发
+- **修复**：修复条件编译后，递归函数恢复正常执行
+
+#### 调试信息混乱
+- **问题**：VM调试信息与程序输出混合，影响用户体验
+- **修复**：通过`--cn-vm-tip`参数精确控制调试信息显示
+
+### 架构改进成果
+
+#### VM执行可靠性提升
+- **条件判断**：VM现在能够正确处理复杂的条件分支结构
+- **递归支持**：完整支持递归函数的编译和执行
+- **功能对等**：VM模式与解释器模式的功能完全一致
+
+#### 用户体验优化
+- **清洁输出**：默认模式下只显示程序结果，无多余调试信息
+- **可选调试**：通过参数控制调试信息的显示级别
+- **一致性**：VM模式和解释器模式的输出行为统一
+
+#### 开发调试便利性
+- **分级调试**：提供不同级别的调试信息
+- **精确控制**：开发者可以选择性查看VM内部状态
+- **问题诊断**：详细的执行跟踪有助于问题定位
+
+### 测试验证完善
+
+#### 条件判断测试
+- **简单条件**：`if-else`语句的正确执行
+- **复杂分支**：`if-else if-else`链的完整测试
+- **嵌套条件**：多层嵌套条件语句的验证
+
+#### 递归函数测试
+- **数学递归**：阶乘函数的正确计算
+- **字符串递归**：字符串重复函数的正确执行
+- **组合调用**：递归函数与其他函数的组合使用
+
+#### VM调试功能测试
+- **默认模式**：验证调试信息的正确隐藏
+- **调试模式**：验证详细信息的完整显示
+- **参数组合**：多个参数组合使用的正确性
+
+### 向前兼容性保证
+
+#### 现有代码兼容
+- **语法兼容**：所有现有的条件语句语法完全兼容
+- **行为一致**：修复后的VM行为与解释器完全一致
+- **性能提升**：修复的同时保持了VM的性能优势
+
+#### 调试接口稳定
+- **参数稳定**：`--cn-vm-tip`参数接口保持稳定
+- **输出格式**：调试信息格式向前兼容
+- **扩展性**：为未来的调试功能扩展预留空间
+
+### 修复验证完成
+
+#### 最终测试结果
+- **VM调试信息控制**：`--cn-vm-tip`参数完全控制调试信息显示 ✅
+- **条件判断修复**：`else if`语句在VM模式下正确执行 ✅
+- **递归函数恢复**：所有递归函数在VM模式下正常工作 ✅
+- **功能对等性**：VM模式与解释器模式完全一致 ✅
+
+#### 测试用例验证
+```
+=== 复杂字节码测试 ===
+数学函数测试:
+add(10, 20) = 30                    ✅
+multiply(6, 7) = 42                 ✅
+factorial(5) = 120                  ✅
+
+字符串函数测试:
+concat_with_separator('Hello', 'World', ' ') = Hello World  ✅
+repeat_string('Ha', 3) = HaHaHa     ✅ (修复前: Ha)
+
+组合测试:
+repeat_string('*', add(3, 2)) = ***** ✅ (修复前: *)
+=== 测试完成 ===
+```
+
+#### 关键修复点
+1. **编译器调试输出控制**：所有编译器调试信息现在都使用`show_tips`字段控制
+2. **条件分支编译逻辑**：完全重写了`else if`语句的字节码生成逻辑
+3. **跳转地址计算**：修复了条件跳转和分支跳转的地址计算错误
+4. **递归调用恢复**：修复后递归函数能够正确进行多层递归调用
+
+这次修复解决了VM系统的核心缺陷，确保了CodeNothing在VM模式下的完整功能性和可靠性。
