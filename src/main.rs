@@ -15,9 +15,34 @@ mod loop_memory;
 mod vm;
 use interpreter::jit;
 use vm::{Compiler, VM};
+use vm::bytecode_file::{BytecodeFile, LibraryDependency};
+use vm::embedded_libraries::RuntimeLibraryEnvironment;
 
 use ast::Program;
 use interpreter::value::Value;
+
+// 创建运行时库环境（用于检查库可用性）
+fn create_runtime_library_environment() -> RuntimeLibraryEnvironment {
+    // 这里应该创建实际的库加载器，暂时用一个简单的实现
+    struct SimpleLibraryLoader;
+
+    impl vm::embedded_libraries::LibraryLoader for SimpleLibraryLoader {
+        fn load_from_path(&self, _lib_path: &str) -> Result<Box<dyn vm::embedded_libraries::LibraryInterface>, String> {
+            Err("暂未实现".to_string())
+        }
+
+        fn is_valid_library(&self, lib_path: &str) -> bool {
+            // 检查常见的库文件扩展名
+            lib_path.ends_with(".dll") || lib_path.ends_with(".so") || lib_path.ends_with(".dylib")
+        }
+
+        fn get_supported_extensions(&self) -> Vec<String> {
+            vec!["dll".to_string(), "so".to_string(), "dylib".to_string()]
+        }
+    }
+
+    RuntimeLibraryEnvironment::new(Box::new(SimpleLibraryLoader))
+}
 
 // 文件预处理器，处理文件导入
 struct FilePreprocessor {
@@ -181,10 +206,195 @@ fn format_execution_time(duration_ms: f64) -> String {
     }
 }
 
+/// 构建字节码文件
+fn build_bytecode_file(program: &Program, output_path: &str, show_tips: bool) -> Result<(), String> {
+    if show_tips {
+        println!("🔨 开始编译字节码...");
+    }
+
+    // 创建编译器
+    let mut compiler = Compiler::new();
+    compiler.set_show_tips(show_tips);
+
+    // 编译程序
+    let compiled_program = compiler.compile_program(program)?;
+
+    if show_tips {
+        println!("📦 收集库依赖信息...");
+    }
+
+    // 收集库依赖信息 - 类似Java字节码的import信息
+    let mut library_dependencies = Vec::new();
+    let runtime_env = create_runtime_library_environment();
+
+    for (lib_name, lib_functions) in compiler.get_imported_libraries() {
+        let functions: Vec<String> = lib_functions.keys().cloned().collect();
+        let function_count = functions.len();
+
+        // 检查库是否在运行时环境中可用
+        let is_available = runtime_env.is_library_available(&lib_name);
+
+        library_dependencies.push(LibraryDependency {
+            name: lib_name.clone(),
+            functions,
+            version: None, // 暂时不处理版本
+        });
+
+        if show_tips {
+            if is_available {
+                println!("  📚 库 {}: {} 个函数 (✅ 运行时可用)", lib_name, function_count);
+            } else {
+                println!("  📚 库 {}: {} 个函数 (⚠️  需要在目标环境中提供)", lib_name, function_count);
+            }
+        }
+    }
+
+    if show_tips {
+        println!("💾 创建字节码文件...");
+    }
+
+    // 创建字节码文件
+    let mut bytecode_file = BytecodeFile::new(output_path.to_string());
+
+    // 转换编译后的函数
+    for (name, func) in &compiled_program.functions {
+        bytecode_file.functions.insert(name.clone(), func.into());
+    }
+
+    // 保存函数索引映射
+    for (name, &index) in &compiled_program.function_indices {
+        bytecode_file.metadata.insert(format!("func_index_{}", name), index.to_string());
+    }
+
+    // 设置库依赖
+    bytecode_file.library_dependencies = library_dependencies;
+
+    // 添加元数据
+    bytecode_file.metadata.insert("compiler_version".to_string(), "0.9.4".to_string());
+    bytecode_file.metadata.insert("target_platform".to_string(), std::env::consts::OS.to_string());
+
+    if show_tips {
+        println!("💿 保存到文件: {}", output_path);
+    }
+
+    // 保存文件
+    bytecode_file.save_to_file(output_path)?;
+
+    if show_tips {
+        println!("✨ 字节码文件构建完成！");
+        println!("  📁 文件大小: {} 字节", std::fs::metadata(output_path).unwrap().len());
+        println!("  🔧 函数数量: {}", bytecode_file.functions.len());
+        println!("  📚 库依赖: {}", bytecode_file.library_dependencies.len());
+
+        // 分析库依赖情况
+        let runtime_env = create_runtime_library_environment();
+        let available_libs: Vec<_> = bytecode_file.library_dependencies.iter()
+            .filter(|lib| runtime_env.is_library_available(&lib.name))
+            .collect();
+        let missing_libs: Vec<_> = bytecode_file.library_dependencies.iter()
+            .filter(|lib| !runtime_env.is_library_available(&lib.name))
+            .collect();
+
+        if !missing_libs.is_empty() {
+            println!("📋 库依赖分析:");
+            println!("  ✅ 运行时可用: {} 个", available_libs.len());
+            println!("  ⚠️  需要提供: {} 个", missing_libs.len());
+            for lib in missing_libs {
+                println!("    - {}", lib.name);
+            }
+            println!("💡 提示: 确保目标环境中提供了所需的库文件");
+            println!("🔍 库搜索路径:");
+            for path in runtime_env.get_library_paths() {
+                println!("    - {}", path);
+            }
+        } else {
+            println!("✅ 所有库依赖在当前环境中都可用，可直接运行");
+        }
+    }
+
+    Ok(())
+}
+
+/// 执行字节码文件
+fn execute_bytecode_file(file_path: &str, vm_debug: bool, vm_tip: bool) -> Result<Value, String> {
+    if vm_tip {
+        println!("📂 加载字节码文件: {}", file_path);
+    }
+
+    // 加载字节码文件
+    let bytecode_file = BytecodeFile::load_from_file(file_path)?;
+
+    if vm_tip {
+        println!("📋 字节码文件信息:");
+        println!("  版本: {}", bytecode_file.version);
+        println!("  编译时间: {}", bytecode_file.timestamp);
+        println!("  函数数量: {}", bytecode_file.functions.len());
+        println!("  库依赖: {}", bytecode_file.library_dependencies.len());
+    }
+
+    // 重新构建CompiledProgram
+    let mut functions = HashMap::new();
+    for (name, func) in bytecode_file.functions {
+        functions.insert(name, func.into());
+    }
+
+    // 重建函数索引映射
+    let mut function_indices = HashMap::new();
+    for (key, value) in &bytecode_file.metadata {
+        if key.starts_with("func_index_") {
+            let func_name = key.strip_prefix("func_index_").unwrap().to_string();
+            if let Ok(index) = value.parse::<u16>() {
+                function_indices.insert(func_name, index);
+            }
+        }
+    }
+
+    let compiled_program = vm::bytecode::CompiledProgram {
+        functions,
+        main_function: "main".to_string(),
+        global_constants: bytecode_file.global_constants.into_iter().map(|v| v.into()).collect(),
+        classes: HashMap::new(),
+        imported_libraries: HashMap::new(), // 暂时为空，后续可以重新加载库
+        function_indices,
+    };
+
+    if vm_tip {
+        println!("🚀 启动虚拟机执行...");
+    }
+
+    // 创建VM并执行
+    let mut vm = VM::new();
+    if vm_debug {
+        println!("🐛 VM调试模式已启用");
+    }
+
+    // 重新加载库依赖
+    for lib_info in &bytecode_file.library_dependencies {
+        if vm_tip {
+            println!("📚 重新加载库: {}", lib_info.name);
+        }
+        match interpreter::library_loader::load_library(&lib_info.name) {
+            Ok(_) => {
+                if vm_debug {
+                    println!("  ✅ 库 {} 加载成功", lib_info.name);
+                }
+            },
+            Err(err) => {
+                eprintln!("  ❌ 库 {} 加载失败: {}", lib_info.name, err);
+                return Err(format!("库依赖加载失败: {}", err));
+            }
+        }
+    }
+
+    // 加载程序并执行
+    vm.load_program(compiled_program);
+    vm.run()
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    if args.len() < 2 {
+    if args.len() < 2 || (args.len() >= 2 && (args[1] == "help" || args[1] == "--help" || args[1] == "-h")) {
         println!("用法: {} <文件路径> [选项]", args[0]);
         println!("");
         println!("传统选项:");
@@ -216,6 +426,8 @@ fn main() {
         println!("  --cn-check-timeout  启用超时检查（默认禁用）");
         println!("  --cn-vm             使用字节码虚拟机执行（实验性）");
         println!("  --cn-vm-debug       启用VM调试输出");
+        println!("  --cn-vm-tip         显示VM执行提示信息");
+        println!("  --cn-vm-build       编译为字节码文件(.comcn)并打包库依赖");
         println!("");
         println!("示例:");
         println!("  {} hello.cn", args[0]);
@@ -231,6 +443,45 @@ fn main() {
     debug_config::init_debug_config(&args);
 
     let file_path = &args[1];
+
+    // 检查是否是.comcn文件（字节码文件）
+    let is_bytecode_file = file_path.ends_with(".comcn");
+
+    if is_bytecode_file {
+        // 直接执行字节码文件
+        let show_return = args.iter().any(|arg| arg == "--cn-return");
+        let show_time = args.iter().any(|arg| arg == "--cn-time");
+        let vm_debug = args.iter().any(|arg| arg == "--cn-vm-debug");
+        let vm_tip = args.iter().any(|arg| arg == "--cn-vm-tip");
+
+        if vm_tip {
+            println!("🚀 检测到字节码文件，使用VM模式执行...");
+        }
+
+        let start_time = if show_time {
+            Some(std::time::Instant::now())
+        } else {
+            None
+        };
+
+        match execute_bytecode_file(file_path, vm_debug, vm_tip) {
+            Ok(result) => {
+                if let Some(start) = start_time {
+                    let duration = start.elapsed();
+                    println!("⏱️  程序执行时间: {:.3}ms", duration.as_secs_f64() * 1000.0);
+                }
+                if show_return {
+                    println!("程序执行结果: {:?}", result);
+                }
+            },
+            Err(err) => {
+                eprintln!("字节码执行错误: {}", err);
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
     let debug_parser = args.iter().any(|arg| arg == "--cn-parser");
     let debug_lexer = args.iter().any(|arg| arg == "--cn-lexer");
     let debug_mode = args.iter().any(|arg| arg == "--cn-debug");
@@ -248,6 +499,8 @@ fn main() {
     let check_timeout = args.iter().any(|arg| arg == "--cn-check-timeout");
     let use_vm = args.iter().any(|arg| arg == "--cn-vm");
     let vm_debug = args.iter().any(|arg| arg == "--cn-vm-debug");
+    let vm_tip = args.iter().any(|arg| arg == "--cn-vm-tip");
+    let vm_build = args.iter().any(|arg| arg == "--cn-vm-build");
 
     // v0.7.5新增：初始化内存池
     if memory_debug {
@@ -354,9 +607,24 @@ fn main() {
                     }
 
                     // 执行程序
-                    let result = if use_vm {
-                        // 使用字节码虚拟机执行
-                        execute_with_vm(&program, vm_debug)
+                    let result = if use_vm || vm_build {
+                        if vm_build {
+                            // 构建字节码文件
+                            let output_path = file_path.replace(".cn", ".comcn");
+                            match build_bytecode_file(&program, &output_path, vm_tip) {
+                                Ok(_) => {
+                                    println!("✅ 字节码文件构建完成: {}", output_path);
+                                    Value::None
+                                },
+                                Err(err) => {
+                                    eprintln!("❌ 字节码构建失败: {}", err);
+                                    std::process::exit(1);
+                                }
+                            }
+                        } else {
+                            // 使用字节码虚拟机执行
+                            execute_with_vm(&program, vm_debug, vm_tip)
+                        }
                     } else {
                         // 使用传统解释器执行
                         interpreter::interpret_with_timeout(&program, auto_namespace, check_timeout)
@@ -432,11 +700,14 @@ fn main() {
 }
 
 /// 使用字节码虚拟机执行程序
-fn execute_with_vm(program: &ast::Program, debug: bool) -> Value {
-    println!("🚀 使用字节码虚拟机执行...");
+fn execute_with_vm(program: &ast::Program, debug: bool, tip: bool) -> Value {
+    if tip {
+        println!("🚀 使用字节码虚拟机执行...");
+    }
 
     // 创建编译器
     let mut compiler = Compiler::new();
+    compiler.set_show_tips(tip);
 
     // 编译程序
     let compiled_program = match compiler.compile_program(program) {
