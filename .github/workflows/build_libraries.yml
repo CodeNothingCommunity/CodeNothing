@@ -1,0 +1,393 @@
+name: 构建CodeNothing库文件
+
+on:
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      libraries:
+        description: '要构建的库列表 (all 表示全部, 或用逗号分隔的名称列表如 io,example)'
+        required: true
+        default: 'all'
+  # 发布版本时自动触发
+  release:
+    types: [created]
+
+# 添加权限设置
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  prepare:
+    name: 准备库列表
+    runs-on: ubuntu-latest
+    outputs:
+      library_matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v3
+      
+      - id: set-matrix
+        name: 准备库矩阵
+        run: |
+          # 如果是手动触发并指定了库，则使用指定的库
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.libraries }}" != "all" ]]; then
+            # 使用提供的库列表
+            LIBRARIES=$(echo "${{ github.event.inputs.libraries }}" | tr ',' '\n' | jq -R . | jq -cs .)
+          else
+            # 否则构建所有库
+            LIBRARIES=$(find . -maxdepth 1 -type d -name "library_*" | sed 's|./library_||g' | jq -R . | jq -cs .)
+          fi
+          echo "matrix=${LIBRARIES}" >> $GITHUB_OUTPUT
+        shell: bash
+
+  build:
+    name: 构建库
+    needs: prepare
+    runs-on: ${{ matrix.platform.os }}
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        library: ${{ fromJson(needs.prepare.outputs.library_matrix) }}
+        platform:
+          # Windows 平台
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            lib_extension: 'dll'
+            archive_format: 'zip'
+            platform_name: 'windows-x64'
+          - os: windows-latest
+            target: i686-pc-windows-msvc
+            lib_extension: 'dll'
+            archive_format: 'zip'
+            platform_name: 'windows-x32'
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            lib_extension: 'dll'
+            archive_format: 'zip'
+            platform_name: 'windows-arm64'
+          # Linux 平台
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            lib_extension: 'so'
+            archive_format: 'tar.gz'
+            platform_name: 'linux-x64'
+          - os: ubuntu-latest
+            target: i686-unknown-linux-gnu
+            lib_extension: 'so'
+            archive_format: 'tar.gz'
+            platform_name: 'linux-x32'
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            lib_extension: 'so'
+            archive_format: 'tar.gz'
+            platform_name: 'linux-arm64'
+          # Android 平台
+          - os: ubuntu-latest
+            target: aarch64-linux-android
+            lib_extension: 'so'
+            archive_format: 'tar.gz'
+            platform_name: 'android-arm64'
+          # macOS 平台
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            lib_extension: 'dylib'
+            archive_format: 'tar.gz'
+            platform_name: 'macos-intel'
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            lib_extension: 'dylib'
+            archive_format: 'tar.gz'
+            platform_name: 'macos-silicon'
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: 设置Rust工具链
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: ${{ matrix.platform.target }}
+        override: true
+
+    - name: 安装 Windows 交叉编译工具
+      if: matrix.platform.os == 'windows-latest' && matrix.platform.target != 'x86_64-pc-windows-msvc'
+      run: |
+        # Windows 交叉编译通常由 Rust 工具链自动处理
+        echo "Windows 交叉编译目标: ${{ matrix.platform.target }}"
+
+    - name: 安装交叉编译依赖 (Linux)
+      if: matrix.platform.os == 'ubuntu-latest'
+      run: |
+        case ${{ matrix.platform.target }} in
+          i686-unknown-linux-gnu)
+            sudo apt-get update
+            sudo apt-get install -y gcc-multilib g++-multilib
+            echo "CC_i686_unknown_linux_gnu=i686-linux-gnu-gcc" >> $GITHUB_ENV
+            echo "CXX_i686_unknown_linux_gnu=i686-linux-gnu-g++" >> $GITHUB_ENV
+            echo "CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER=i686-linux-gnu-gcc" >> $GITHUB_ENV
+            ;;
+          aarch64-unknown-linux-gnu)
+            sudo apt-get update
+            sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+            echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+            echo "CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++" >> $GITHUB_ENV
+            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+            ;;
+          aarch64-linux-android)
+            # Android NDK 通过 setup-ndk 安装
+            ;;
+        esac
+
+    - name: 验证交叉编译工具
+      if: matrix.platform.os == 'ubuntu-latest' && matrix.platform.target != 'x86_64-unknown-linux-gnu'
+      run: |
+        case ${{ matrix.platform.target }} in
+          i686-unknown-linux-gnu)
+            which i686-linux-gnu-gcc || echo "警告: i686-linux-gnu-gcc 未找到"
+            ;;
+          aarch64-unknown-linux-gnu)
+            which aarch64-linux-gnu-gcc || echo "警告: aarch64-linux-gnu-gcc 未找到"
+            ;;
+        esac
+
+    - name: 设置 Android NDK
+      if: matrix.platform.target == 'aarch64-linux-android'
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r25c
+        add-to-path: false
+
+    - name: 配置 Android 环境变量
+      if: matrix.platform.target == 'aarch64-linux-android'
+      run: |
+        echo "CC_aarch64_linux_android=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang" >> $GITHUB_ENV
+        echo "CXX_aarch64_linux_android=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang++" >> $GITHUB_ENV
+        echo "AR_aarch64_linux_android=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar" >> $GITHUB_ENV
+        echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang" >> $GITHUB_ENV
+        # 配置 OpenSSL 相关环境变量以避免交叉编译问题
+        echo "OPENSSL_NO_VENDOR=1" >> $GITHUB_ENV
+        echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
+
+
+    
+    - name: 检查库目录是否存在
+      id: check_dir
+      run: |
+        if [ -d "library_${{ matrix.library }}" ]; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "警告: 库 ${{ matrix.library }} 的目录不存在，跳过构建"
+        fi
+      shell: bash
+    
+    - name: 获取库配置
+      if: steps.check_dir.outputs.exists == 'true'
+      id: get_config
+      run: |
+        if [ -f "library_${{ matrix.library }}/library.json" ]; then
+          OUTPUT_NAME=$(jq -r '.output_name // "${{ matrix.library }}"' library_${{ matrix.library }}/library.json)
+        else
+          OUTPUT_NAME="${{ matrix.library }}"
+        fi
+        echo "output_name=${OUTPUT_NAME}" >> $GITHUB_OUTPUT
+      shell: bash
+    
+    - name: 显示构建环境信息
+      if: steps.check_dir.outputs.exists == 'true'
+      run: |
+        echo "构建目标: ${{ matrix.platform.target }}"
+        echo "运行环境: ${{ matrix.platform.os }}"
+        echo "库名称: ${{ matrix.library }}"
+        rustc --version
+        cargo --version
+        echo "已安装的目标:"
+        rustup target list --installed
+      shell: bash
+
+    - name: 构建库 (交叉编译平台 - 跳过有问题的依赖)
+      if: steps.check_dir.outputs.exists == 'true' && (contains(matrix.platform.target, 'android') || matrix.platform.target == 'i686-unknown-linux-gnu' || matrix.platform.target == 'aarch64-unknown-linux-gnu' || matrix.platform.target == 'i686-pc-windows-msvc' || matrix.platform.target == 'aarch64-pc-windows-msvc')
+      run: |
+        cd library_${{ matrix.library }}
+        # 尝试使用最小特性集构建，避免 OpenSSL 等问题依赖
+        RUST_BACKTRACE=1 OPENSSL_NO_VENDOR=1 PKG_CONFIG_ALLOW_CROSS=1 cargo build --release --target ${{ matrix.platform.target }} --no-default-features --features minimal 2>/dev/null || \
+        RUST_BACKTRACE=1 OPENSSL_NO_VENDOR=1 PKG_CONFIG_ALLOW_CROSS=1 cargo build --release --target ${{ matrix.platform.target }} --no-default-features 2>/dev/null || \
+        RUST_BACKTRACE=1 OPENSSL_NO_VENDOR=1 PKG_CONFIG_ALLOW_CROSS=1 cargo build --release --target ${{ matrix.platform.target }} || \
+        echo "警告: 库 ${{ matrix.library }} 在平台 ${{ matrix.platform.target }} 上构建失败，跳过"
+      shell: bash
+
+    - name: 构建库 (原生平台)
+      if: steps.check_dir.outputs.exists == 'true' && !contains(matrix.platform.target, 'android') && matrix.platform.target != 'i686-unknown-linux-gnu' && matrix.platform.target != 'aarch64-unknown-linux-gnu' && matrix.platform.target != 'i686-pc-windows-msvc' && matrix.platform.target != 'aarch64-pc-windows-msvc'
+      run: |
+        cd library_${{ matrix.library }}
+        RUST_BACKTRACE=1 cargo build --release --target ${{ matrix.platform.target }}
+      shell: bash
+    
+    - name: 创建输出目录
+      if: steps.check_dir.outputs.exists == 'true'
+      run: mkdir -p library-package
+      shell: bash
+    
+    - name: 复制构建产物 (Windows)
+      if: steps.check_dir.outputs.exists == 'true' && matrix.platform.os == 'windows-latest'
+      run: |
+        LIB_PATH="library_${{ matrix.library }}/target/${{ matrix.platform.target }}/release/${{ steps.get_config.outputs.output_name }}.dll"
+        if [ -f "$LIB_PATH" ]; then
+          cp "$LIB_PATH" "library-package/${{ matrix.library }}.${{ matrix.platform.lib_extension }}"
+        else
+          echo "找不到库文件，尝试备选路径..."
+          # 尝试Cargo.toml中的包名
+          PACKAGE_NAME=$(grep -m 1 "name" "library_${{ matrix.library }}/Cargo.toml" | cut -d'"' -f2 | tr -d '\r')
+          cp "library_${{ matrix.library }}/target/${{ matrix.platform.target }}/release/${PACKAGE_NAME}.dll" "library-package/${{ matrix.library }}.${{ matrix.platform.lib_extension }}"
+        fi
+      shell: bash
+    
+    - name: 复制构建产物 (Linux/macOS/Android)
+      if: steps.check_dir.outputs.exists == 'true' && matrix.platform.os != 'windows-latest'
+      run: |
+        LIB_PATH="library_${{ matrix.library }}/target/${{ matrix.platform.target }}/release/lib${{ steps.get_config.outputs.output_name }}.${{ matrix.platform.lib_extension }}"
+        if [ -f "$LIB_PATH" ]; then
+          cp "$LIB_PATH" "library-package/${{ matrix.library }}.${{ matrix.platform.lib_extension }}"
+        else
+          echo "找不到库文件，尝试备选路径..."
+          # 尝试Cargo.toml中的包名
+          PACKAGE_NAME=$(grep -m 1 "name" "library_${{ matrix.library }}/Cargo.toml" | cut -d'"' -f2 | tr -d '\r')
+          cp "library_${{ matrix.library }}/target/${{ matrix.platform.target }}/release/lib${PACKAGE_NAME}.${{ matrix.platform.lib_extension }}" "library-package/${{ matrix.library }}.${{ matrix.platform.lib_extension }}"
+        fi
+      shell: bash
+    
+    - name: 创建档案 (Windows)
+      if: steps.check_dir.outputs.exists == 'true' && matrix.platform.os == 'windows-latest'
+      run: |
+        cd library-package
+        7z a "../${{ matrix.library }}-${{ matrix.platform.platform_name }}.${{ matrix.platform.archive_format }}" *
+      shell: bash
+
+    - name: 创建档案 (Linux/macOS/Android)
+      if: steps.check_dir.outputs.exists == 'true' && matrix.platform.os != 'windows-latest'
+      run: |
+        tar -czvf "${{ matrix.library }}-${{ matrix.platform.platform_name }}.${{ matrix.platform.archive_format }}" -C library-package .
+      shell: bash
+    
+    - name: 上传构建产物
+      if: steps.check_dir.outputs.exists == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.library }}-${{ matrix.platform.platform_name }}
+        path: ${{ matrix.library }}-${{ matrix.platform.platform_name }}.${{ matrix.platform.archive_format }}
+
+    - name: 创建发布
+      if: steps.check_dir.outputs.exists == 'true' && github.event_name == 'release'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ${{ matrix.library }}-${{ matrix.platform.platform_name }}.${{ matrix.platform.archive_format }}
+        tag_name: ${{ github.ref_name }}
+        draft: false
+        generate_release_notes: true
+
+  # 额外的工作以合并所有库为一个包
+  package-all:
+    name: 打包所有库
+    needs: build
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    # 在手动触发并指定'all'或发布版本时打包所有库
+    if: ${{ github.event.inputs.libraries == 'all' || github.event_name == 'release' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows 平台
+          - os: windows-latest
+            platform_name: 'windows-x64'
+            archive_format: 'zip'
+          - os: windows-latest
+            platform_name: 'windows-x32'
+            archive_format: 'zip'
+          - os: windows-latest
+            platform_name: 'windows-arm64'
+            archive_format: 'zip'
+          # Linux 平台
+          - os: ubuntu-latest
+            platform_name: 'linux-x64'
+            archive_format: 'tar.gz'
+          - os: ubuntu-latest
+            platform_name: 'linux-x32'
+            archive_format: 'tar.gz'
+          - os: ubuntu-latest
+            platform_name: 'linux-arm64'
+            archive_format: 'tar.gz'
+          # Android 平台
+          - os: ubuntu-latest
+            platform_name: 'android-arm64'
+            archive_format: 'tar.gz'
+          # macOS 平台
+          - os: macos-latest
+            platform_name: 'macos-intel'
+            archive_format: 'tar.gz'
+          - os: macos-latest
+            platform_name: 'macos-silicon'
+            archive_format: 'tar.gz'
+    
+    steps:
+    - name: 下载所有构建产物
+      uses: actions/download-artifact@v4
+      
+    - name: 准备合并目录
+      run: |
+        mkdir -p all-libraries
+      shell: bash
+    
+    - name: 解压所有库 (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        for d in *-${{ matrix.platform_name }}; do
+          if [ -d "$d" ]; then
+            cd "$d"
+            7z x "*.zip" -o../all-libraries
+            cd ..
+          fi
+        done
+      shell: bash
+
+    - name: 解压所有库 (Linux/macOS/Android)
+      if: matrix.os != 'windows-latest'
+      run: |
+        for d in *-${{ matrix.platform_name }}; do
+          if [ -d "$d" ]; then
+            cd "$d"
+            tar -xzvf *.tar.gz -C ../all-libraries
+            cd ..
+          fi
+        done
+      shell: bash
+    
+    - name: 创建合并档案 (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        7z a "codenothing-all-libraries-${{ matrix.platform_name }}.${{ matrix.archive_format }}" ./all-libraries/*
+      shell: bash
+
+    - name: 创建合并档案 (Linux/macOS/Android)
+      if: matrix.os != 'windows-latest'
+      run: |
+        tar -czvf "codenothing-all-libraries-${{ matrix.platform_name }}.${{ matrix.archive_format }}" -C all-libraries .
+      shell: bash
+
+    - name: 上传合并构建产物
+      uses: actions/upload-artifact@v4
+      with:
+        name: codenothing-all-libraries-${{ matrix.platform_name }}
+        path: codenothing-all-libraries-${{ matrix.platform_name }}.${{ matrix.archive_format }}
+
+    - name: 创建发布
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: codenothing-all-libraries-${{ matrix.platform_name }}.${{ matrix.archive_format }}
+        tag_name: ${{ github.ref_name }}
+        draft: false
+        generate_release_notes: true
