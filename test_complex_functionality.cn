@@ -1,0 +1,22 @@
+// 测试复杂功能：函数调用、内存管理、控制流
+fn factorial(n: int): int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    }
+}
+
+fn fibonacci(n: int): int {
+    if (n <= 1) {
+        return n;
+    } else {
+        return fibonacci(n - 1) + fibonacci(n - 2);
+    }
+}
+
+fn main(): int {
+    let fact_result = factorial(5);
+    let fib_result = fibonacci(6);
+    return fact_result + fib_result;
+}

@@ -1,0 +1,53 @@
+// Hello World in CodeNothing Language
+// This demonstrates basic language features
+
+using ns lang;
+
+// Global variable
+message : string = "Hello, CodeNothing!";
+
+// Main function
+fn main() : int {
+    // Print greeting
+    lang::println(message);
+    
+    // Demonstrate arithmetic
+    var x : int = 10;
+    var y : int = 32;
+    var result : int = x + y;
+    
+    lang::print("10 + 32 = ");
+    lang::println(lang::to_string(result));
+    
+    // Demonstrate function call
+    var factorial_result : int = factorial(5);
+    lang::print("5! = ");
+    lang::println(lang::to_string(factorial_result));
+    
+    // Demonstrate conditionals
+    if (result > 40) {
+        lang::println("Result is greater than 40");
+    } else {
+        lang::println("Result is not greater than 40");
+    }
+    
+    // Demonstrate loops
+    lang::println("Counting from 1 to 5:");
+    var i : int = 1;
+    while (i <= 5) {
+        lang::print("  ");
+        lang::println(lang::to_string(i));
+        i = i + 1;
+    }
+    
+    return 0;
+}
+
+// Factorial function
+fn factorial(n : int) : int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    }
+}

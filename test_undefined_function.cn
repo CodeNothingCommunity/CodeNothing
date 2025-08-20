@@ -1,0 +1,6 @@
+// 测试未定义函数检测
+
+fn main(): int {
+    let result = nonexistent_function(10, 20);  // 应该报错：函数不存在
+    return result;
+}

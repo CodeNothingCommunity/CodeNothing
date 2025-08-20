@@ -1,0 +1,16 @@
+// 测试复杂语义错误
+
+fn add(x: int, y: int): int {
+    return x + y;
+}
+
+fn main(): int {
+    let a = 10;
+    let b = "hello";
+    let c = add(a, b);  // 错误：参数类型不匹配
+    let d = add(a);     // 错误：参数数量不匹配
+    let e = add(a, b, c); // 错误：参数数量不匹配
+    let f = undefined_var; // 错误：未定义变量
+    let g = nonexistent_func(); // 错误：未定义函数
+    return "string";    // 错误：返回类型不匹配
+}

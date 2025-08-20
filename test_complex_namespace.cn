@@ -1,0 +1,40 @@
+// 测试复杂命名空间功能
+ns math {
+    fn add(a: int, b: int): int {
+        return a + b;
+    }
+    
+    fn multiply(x: int, y: int): int {
+        return x * y;
+    }
+    
+    fn power(base: int, exp: int): int {
+        if (exp <= 0) {
+            return 1;
+        } else {
+            return base * power(base, exp - 1);
+        }
+    }
+}
+
+ns utils {
+    fn max(a: int, b: int): int {
+        if (a > b) {
+            return a;
+        } else {
+            return b;
+        }
+    }
+}
+
+using ns math;
+using ns utils;
+
+fn main(): int {
+    let sum = add(5, 3);
+    let product = multiply(4, 6);
+    let squared = power(3, 2);
+    let maximum = max(sum, product);
+    
+    return maximum + squared;
+}

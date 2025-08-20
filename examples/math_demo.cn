@@ -1,0 +1,119 @@
+// Math Demo in CodeNothing Language
+// Demonstrates namespaces, functions, and mathematical operations
+
+using ns lang;
+
+// Math namespace with utility functions
+ns math {
+    // Calculate power (base^exponent)
+    fn power(base : int, exponent : int) : int {
+        if (exponent == 0) {
+            return 1;
+        }
+        
+        var result : int = 1;
+        var i : int = 0;
+        while (i < exponent) {
+            result = result * base;
+            i = i + 1;
+        }
+        return result;
+    }
+    
+    // Calculate greatest common divisor
+    fn gcd(a : int, b : int) : int {
+        while (b != 0) {
+            var temp : int = b;
+            b = a % b;
+            a = temp;
+        }
+        return a;
+    }
+    
+    // Check if number is prime
+    fn is_prime(n : int) : bool {
+        if (n < 2) {
+            return false;
+        }
+        
+        var i : int = 2;
+        while (i * i <= n) {
+            if (n % i == 0) {
+                return false;
+            }
+            i = i + 1;
+        }
+        return true;
+    }
+}
+
+// Statistics namespace
+ns stats {
+    // Calculate sum of numbers from 1 to n
+    fn sum_to_n(n : int) : int {
+        return n * (n + 1) / 2;
+    }
+    
+    // Calculate average of two numbers
+    fn average(a : int, b : int) : float {
+        return lang::to_float(a + b) / 2.0;
+    }
+}
+
+// Main function demonstrating namespace usage
+fn main() : int {
+    lang::println("=== CodeNothing Math Demo ===");
+    lang::println("");
+    
+    // Test power function
+    var base : int = 2;
+    var exp : int = 8;
+    var power_result : int = math::power(base, exp);
+    
+    lang::print("2^8 = ");
+    lang::println(lang::to_string(power_result));
+    
+    // Test GCD function
+    var a : int = 48;
+    var b : int = 18;
+    var gcd_result : int = math::gcd(a, b);
+    
+    lang::print("GCD(48, 18) = ");
+    lang::println(lang::to_string(gcd_result));
+    
+    // Test prime checking
+    lang::println("");
+    lang::println("Prime numbers from 1 to 20:");
+    var wnum : int = 1;
+    while (wnum <= 20) {
+        if (math::is_prime(wnum)) {
+            lang::print("  ");
+            lang::println(lang::to_string(wnum));
+        }
+        wnum = wnum + 1;
+    }
+    
+    // Test statistics functions
+    lang::println("");
+    var n : int = 10;
+    var sum_result : int = stats::sum_to_n(n);
+    lang::print("Sum of 1 to 10 = ");
+    lang::println(lang::to_string(sum_result));
+    
+    var avg_result : float = stats::average(15, 25);
+    lang::print("Average of 15 and 25 = ");
+    lang::println(lang::to_string(avg_result));
+    
+    // Demonstrate for loop
+    lang::println("");
+    lang::println("Squares of numbers 1-5:");
+    for (var i : int = 1; i <= 5; i = i + 1) {
+        var square : int = math::power(i, 2);
+        lang::print("  ");
+        lang::print(lang::to_string(i));
+        lang::print("^2 = ");
+        lang::println(lang::to_string(square));
+    }
+    
+    return 0;
+}

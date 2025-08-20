@@ -1,0 +1,21 @@
+using ns lang;
+
+fn main() : int {
+    // 计算斐波那契第30项
+    println("斐波那契第30项");
+    println("================================");
+    let memo_result : int = fibonacci(30);
+    println("F(30) = " + to_string(memo_result));
+
+    return memo_result; // F(30) = 55
+}
+
+memo{
+fn fibonacci(n: int) : int {
+    if (n <= 1) {
+        return n;
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+}
+

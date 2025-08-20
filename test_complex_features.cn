@@ -1,0 +1,33 @@
+// 测试复杂功能的程序
+
+// 全局变量
+let global_var = 42;
+
+// 命名空间
+namespace Math {
+    fn square(x: int): int {
+        return x * x;
+    }
+    
+    fn cube(x: int): int {
+        return x * x * x;
+    }
+}
+
+// 主函数
+fn main(): int {
+    let local_var = 10;
+    let result1 = Math::square(local_var);
+    let result2 = Math::cube(5);
+    
+    // 数组操作
+    let arr = [1, 2, 3, 4, 5];
+    let first = arr[0];
+    
+    // 控制流
+    if result1 > result2 {
+        return result1 + global_var;
+    } else {
+        return result2 + global_var;
+    }
+}
