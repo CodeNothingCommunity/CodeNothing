@@ -1,0 +1,131 @@
+//! 高级语法特性测试 - 命名空间、异常处理、Switch语句、Memo
+
+// 命名空间声明
+ns Math {
+    fn square(x: int) -> int {
+        return x * x;
+    }
+    
+    fn cube(x: int) -> int {
+        return x * x * x;
+    }
+    
+    const PI: float = 3.14159;
+}
+
+ns Utils {
+    ns String {
+        fn reverse(s: string) -> string {
+            // 简化实现
+            return s;
+        }
+        
+        fn length(s: string) -> int {
+            return 10; // 简化实现
+        }
+    }
+    
+    fn max(a: int, b: int) -> int {
+        if (a > b) {
+            return a;
+        } else {
+            return b;
+        }
+    }
+}
+
+// Using声明
+using ns Math;
+using ns Utils;
+
+// Memo声明测试
+memo(max_size: 100, ttl: 3600) {
+    fn fibonacci(n: int) -> int {
+        if (n <= 1) {
+            return n;
+        } else {
+            return fibonacci(n - 1) + fibonacci(n - 2);
+        }
+    }
+}
+
+memo {
+    fn expensive_calculation(x: int) -> int {
+        return x * x * x + x * x + x + 1;
+    }
+}
+
+// Switch语句测试
+fn test_switch(value: int) -> string {
+    switch (value) {
+        case 1:
+            return "one";
+        case 2:
+            return "two";
+        case 3:
+            return "three";
+        default:
+            return "other";
+    }
+}
+
+// 异常处理测试
+fn test_exceptions() {
+    try {
+        var result = divide(10, 0);
+        print("Result: " + result);
+    } catch (error) {
+        print("Caught error: " + error);
+    } finally {
+        print("Cleanup code");
+    }
+}
+
+fn divide(a: int, b: int) -> int {
+    if (b == 0) {
+        throw "Division by zero";
+    }
+    return a / b;
+}
+
+// 复杂表达式测试
+fn test_complex_expressions() {
+    var arr = [1, 2, 3, [4, 5, 6]];
+    var nested = arr[3];
+    
+    var obj = {
+        data: {
+            values: [10, 20, 30],
+            count: 3
+        },
+        name: "test"
+    };
+    
+    var count = obj.data.count;
+    var first_value = obj.data.values[0];
+}
+
+// 命名空间访问测试
+fn test_namespace_access() {
+    var squared = Math::square(5);
+    var cubed = Math::cube(3);
+    var pi = Math::PI;
+    
+    var maximum = Utils::max(10, 20);
+    var str_len = Utils::String::length("hello");
+    var reversed = Utils::String::reverse("world");
+}
+
+// 主函数
+fn main() {
+    test_switch(2);
+    test_exceptions();
+    test_complex_expressions();
+    test_namespace_access();
+    
+    var fib = fibonacci(10);
+    print("fibonacci(10) = " + fib);
+    
+    var calc = expensive_calculation(5);
+    print("expensive_calculation(5) = " + calc);
+}

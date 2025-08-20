@@ -925,6 +925,11 @@ impl CodeGenerator {
                     BinaryOperator::GreaterEqual => self.emit_instruction(Instruction::new(OpCode::Ge, 0)),
                     BinaryOperator::And => self.emit_instruction(Instruction::new(OpCode::And, 0)),
                     BinaryOperator::Or => self.emit_instruction(Instruction::new(OpCode::Or, 0)),
+                    BinaryOperator::BitAnd => self.emit_instruction(Instruction::new(OpCode::BitAnd, 0)),
+                    BinaryOperator::BitOr => self.emit_instruction(Instruction::new(OpCode::BitOr, 0)),
+                    BinaryOperator::BitXor => self.emit_instruction(Instruction::new(OpCode::BitXor, 0)),
+                    BinaryOperator::LeftShift => self.emit_instruction(Instruction::new(OpCode::Shl, 0)),
+                    BinaryOperator::RightShift => self.emit_instruction(Instruction::new(OpCode::Shr, 0)),
                     BinaryOperator::Assign => {
                         // Assignment is handled differently
                         if let Expression::Identifier(name, position) = left.as_ref() {
@@ -950,6 +955,7 @@ impl CodeGenerator {
                 match operator {
                     UnaryOperator::Minus => self.emit_instruction(Instruction::new(OpCode::Neg, 0)),
                     UnaryOperator::Not => self.emit_instruction(Instruction::new(OpCode::Not, 0)),
+                    UnaryOperator::BitNot => self.emit_instruction(Instruction::new(OpCode::BitNot, 0)),
                 }
             }
             Expression::Call { function, arguments, position } => {

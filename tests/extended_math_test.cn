@@ -1,0 +1,161 @@
+//! 数学运算扩展测试 - 验证更复杂的数学运算
+
+// 测试复杂数学运算的函数
+fn test_complex_math(): auto {
+    lang::println("=== Complex Math Test ===");
+    
+    var a: int = 12;
+    var b: int = 10;
+    var result: int = a + b * 2 - 5;  // 应该是 12 + 20 - 5 = 27
+    
+    lang::println("12 + 10 * 2 - 5 = " + lang::to_string(result));
+}
+
+// 测试运算符优先级
+fn test_operator_precedence(): auto {
+    lang::println("=== Operator Precedence Test ===");
+    
+    var result1: int = 2 + 3 * 4;      // 应该是 14 (不是 20)
+    var result2: int = (2 + 3) * 4;    // 应该是 20
+    var result3: int = 10 - 6 / 2;     // 应该是 7 (不是 2)
+    var result4: int = (10 - 6) / 2;   // 应该是 2
+    
+    lang::println("2 + 3 * 4 = " + lang::to_string(result1));
+    lang::println("(2 + 3) * 4 = " + lang::to_string(result2));
+    lang::println("10 - 6 / 2 = " + lang::to_string(result3));
+    lang::println("(10 - 6) / 2 = " + lang::to_string(result4));
+}
+
+// 测试嵌套表达式
+fn test_nested_expressions(): auto {
+    lang::println("=== Nested Expressions Test ===");
+    
+    var x: int = 5;
+    var y: int = 3;
+    var z: int = 2;
+    
+    var result1: int = x * (y + z) - (x - y) * z;  // 5 * 5 - 2 * 2 = 21
+    var result2: int = ((x + y) * z) / (x - z);    // (8 * 2) / 3 = 5 (整数除法)
+    
+    lang::println("5 * (3 + 2) - (5 - 3) * 2 = " + lang::to_string(result1));
+    lang::println("((5 + 3) * 2) / (5 - 2) = " + lang::to_string(result2));
+}
+
+// 测试比较运算的组合
+fn test_comparison_combinations(): auto {
+    lang::println("=== Comparison Combinations Test ===");
+    
+    var a: int = 10;
+    var b: int = 5;
+    var c: int = 15;
+    
+    var result1: bool = a > b && a < c;     // true && true = true
+    var result2: bool = a < b || a > c;     // false || false = false
+    var result3: bool = !(a == b);          // !false = true
+    var result4: bool = a >= b && b <= c;   // true && true = true
+    
+    lang::println("10 > 5 && 10 < 15: " + lang::to_string(result1));
+    lang::println("10 < 5 || 10 > 15: " + lang::to_string(result2));
+    lang::println("!(10 == 5): " + lang::to_string(result3));
+    lang::println("10 >= 5 && 5 <= 15: " + lang::to_string(result4));
+}
+
+// 测试模运算
+fn test_modulo_operations(): auto {
+    lang::println("=== Modulo Operations Test ===");
+    
+    var a: int = 17;
+    var b: int = 5;
+    
+    var quotient: int = a / b;
+    var remainder: int = a % b;
+    var verification: int = quotient * b + remainder;
+    
+    lang::println("17 / 5 = " + lang::to_string(quotient));
+    lang::println("17 % 5 = " + lang::to_string(remainder));
+    lang::println("Verification: " + lang::to_string(quotient) + " * " + lang::to_string(b) + " + " + lang::to_string(remainder) + " = " + lang::to_string(verification));
+    
+    // 测试负数模运算
+    var neg_a: int = -17;
+    var neg_remainder: int = neg_a % b;
+    lang::println("-17 % 5 = " + lang::to_string(neg_remainder));
+}
+
+// 测试数学函数模拟
+fn test_math_functions(): auto {
+    lang::println("=== Math Functions Simulation ===");
+    
+    // 模拟绝对值函数
+    var negative: int = -42;
+    var abs_value: int = negative;
+    if (abs_value < 0) {
+        abs_value = -abs_value;
+    }
+    lang::println("abs(-42) = " + lang::to_string(abs_value));
+    
+    // 模拟最大值函数
+    var x: int = 25;
+    var y: int = 18;
+    var max_value: int = x;
+    if (y > max_value) {
+        max_value = y;
+    }
+    lang::println("max(25, 18) = " + lang::to_string(max_value));
+    
+    // 模拟最小值函数
+    var min_value: int = x;
+    if (y < min_value) {
+        min_value = y;
+    }
+    lang::println("min(25, 18) = " + lang::to_string(min_value));
+}
+
+// 测试数值边界
+fn test_number_boundaries(): auto {
+    lang::println("=== Number Boundaries Test ===");
+    
+    var zero: int = 0;
+    var positive: int = 1000000;
+    var negative: int = -1000000;
+    
+    lang::println("Zero: " + lang::to_string(zero));
+    lang::println("Large positive: " + lang::to_string(positive));
+    lang::println("Large negative: " + lang::to_string(negative));
+    
+    // 测试除零保护
+    var safe_division: int = 0;
+    if (zero != 0) {
+        safe_division = positive / zero;
+    } else {
+        lang::println("Division by zero avoided");
+    }
+}
+
+// 主函数
+fn main(): auto {
+    lang::println("Starting Extended Math Operations Test");
+    lang::println("");
+    
+    test_complex_math();
+    lang::println("");
+    
+    test_operator_precedence();
+    lang::println("");
+    
+    test_nested_expressions();
+    lang::println("");
+    
+    test_comparison_combinations();
+    lang::println("");
+    
+    test_modulo_operations();
+    lang::println("");
+    
+    test_math_functions();
+    lang::println("");
+    
+    test_number_boundaries();
+    lang::println("");
+    
+    lang::println("All extended math operations tests completed!");
+}

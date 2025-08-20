@@ -1,0 +1,173 @@
+//! 综合功能测试 - 验证CodeNothing语言的所有核心功能
+
+// 全局变量
+counter: int = 0;
+message: string = "CodeNothing Language Test";
+
+// 基础函数
+fn add(a: int, b: int): int {
+    return a + b;
+}
+
+fn multiply(x: int, y: int): int {
+    return x * y;
+}
+
+// 递归函数
+fn factorial(n: int): int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    }
+}
+
+// 控制流测试
+fn test_control_flow(): auto {
+    lang::println("=== Control Flow Test ===");
+    
+    // If-else
+    var x: int = 10;
+    if (x > 5) {
+        lang::println("x is greater than 5");
+    } else {
+        lang::println("x is not greater than 5");
+    }
+    
+    // While循环
+    var i: int = 0;
+    while (i < 3) {
+        lang::println("While loop iteration: " + lang::to_string(i));
+        i = i + 1;
+    }
+    
+    // For循环
+    for (var j: int = 0; j < 3; j = j + 1) {
+        lang::println("For loop iteration: " + lang::to_string(j));
+    }
+}
+
+// 数组测试
+fn test_arrays(): auto {
+    lang::println("=== Array Test ===");
+    
+    var numbers: array = [1, 2, 3, 4, 5];
+    var first: int = numbers[0];
+    var last: int = numbers[4];
+    
+    lang::println("First element: " + lang::to_string(first));
+    lang::println("Last element: " + lang::to_string(last));
+}
+
+// 数学运算测试
+fn test_math(): auto {
+    lang::println("=== Math Test ===");
+    
+    var a: int = 10;
+    var b: int = 3;
+    
+    var sum: int = a + b;
+    var diff: int = a - b;
+    var prod: int = a * b;
+    var quot: int = a / b;
+    var mod: int = a % b;
+    
+    lang::println("10 + 3 = " + lang::to_string(sum));
+    lang::println("10 - 3 = " + lang::to_string(diff));
+    lang::println("10 * 3 = " + lang::to_string(prod));
+    lang::println("10 / 3 = " + lang::to_string(quot));
+    lang::println("10 % 3 = " + lang::to_string(mod));
+    
+    // 比较运算
+    var eq: bool = (a == b);
+    var ne: bool = (a != b);
+    var gt: bool = (a > b);
+    var lt: bool = (a < b);
+    
+    lang::println("10 == 3: " + lang::to_string(eq));
+    lang::println("10 != 3: " + lang::to_string(ne));
+    lang::println("10 > 3: " + lang::to_string(gt));
+    lang::println("10 < 3: " + lang::to_string(lt));
+}
+
+// 逻辑运算测试
+fn test_logic(): auto {
+    lang::println("=== Logic Test ===");
+    
+    var t: bool = true;
+    var f: bool = false;
+    
+    var and_result: bool = t && f;
+    var or_result: bool = t || f;
+    var not_result: bool = !t;
+    
+    lang::println("true && false: " + lang::to_string(and_result));
+    lang::println("true || false: " + lang::to_string(or_result));
+    lang::println("!true: " + lang::to_string(not_result));
+}
+
+// 函数调用测试
+fn test_functions(): auto {
+    lang::println("=== Function Test ===");
+    
+    var sum: int = add(5, 3);
+    var product: int = multiply(4, 7);
+    var fact: int = factorial(5);
+    
+    lang::println("add(5, 3) = " + lang::to_string(sum));
+    lang::println("multiply(4, 7) = " + lang::to_string(product));
+    lang::println("factorial(5) = " + lang::to_string(fact));
+}
+
+// 字符串测试
+fn test_strings(): auto {
+    lang::println("=== String Test ===");
+    
+    var hello: string = "Hello";
+    var world: string = "World";
+    var greeting: string = hello + ", " + world + "!";
+    
+    lang::println(greeting);
+}
+
+// 变量作用域测试
+fn test_scope(): auto {
+    lang::println("=== Scope Test ===");
+    
+    var local_var: int = 100;
+    lang::println("Local variable: " + lang::to_string(local_var));
+    lang::println("Global counter: " + lang::to_string(counter));
+    
+    counter = counter + 1;
+    lang::println("Updated global counter: " + lang::to_string(counter));
+}
+
+// 主函数
+fn main(): auto {
+    lang::println("Starting CodeNothing Comprehensive Test");
+    lang::println("Message: " + message);
+    lang::println("");
+    
+    test_control_flow();
+    lang::println("");
+    
+    test_arrays();
+    lang::println("");
+    
+    test_math();
+    lang::println("");
+    
+    test_logic();
+    lang::println("");
+    
+    test_functions();
+    lang::println("");
+    
+    test_strings();
+    lang::println("");
+    
+    test_scope();
+    lang::println("");
+    
+    lang::println("All tests completed successfully!");
+}

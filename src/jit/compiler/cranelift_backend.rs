@@ -188,6 +188,66 @@ impl CraneliftBackend {
                     stack.push(result);
                 }
 
+                // Bitwise operations
+                OpCode::BitAnd => {
+                    if stack.len() < 2 {
+                        return Err("Stack underflow in BitAnd".to_string());
+                    }
+                    let b = stack.pop().unwrap();
+                    let a = stack.pop().unwrap();
+                    let result = builder.ins().band(a, b);
+                    stack.push(result);
+                }
+
+                OpCode::BitOr => {
+                    if stack.len() < 2 {
+                        return Err("Stack underflow in BitOr".to_string());
+                    }
+                    let b = stack.pop().unwrap();
+                    let a = stack.pop().unwrap();
+                    let result = builder.ins().bor(a, b);
+                    stack.push(result);
+                }
+
+                OpCode::BitXor => {
+                    if stack.len() < 2 {
+                        return Err("Stack underflow in BitXor".to_string());
+                    }
+                    let b = stack.pop().unwrap();
+                    let a = stack.pop().unwrap();
+                    let result = builder.ins().bxor(a, b);
+                    stack.push(result);
+                }
+
+                OpCode::BitNot => {
+                    if stack.is_empty() {
+                        return Err("Stack underflow in BitNot".to_string());
+                    }
+                    let a = stack.pop().unwrap();
+                    let result = builder.ins().bnot(a);
+                    stack.push(result);
+                }
+
+                OpCode::Shl => {
+                    if stack.len() < 2 {
+                        return Err("Stack underflow in Shl".to_string());
+                    }
+                    let b = stack.pop().unwrap();
+                    let a = stack.pop().unwrap();
+                    let result = builder.ins().ishl(a, b);
+                    stack.push(result);
+                }
+
+                OpCode::Shr => {
+                    if stack.len() < 2 {
+                        return Err("Stack underflow in Shr".to_string());
+                    }
+                    let b = stack.pop().unwrap();
+                    let a = stack.pop().unwrap();
+                    let result = builder.ins().sshr(a, b);
+                    stack.push(result);
+                }
+
                 OpCode::Eq => {
                     if stack.len() < 2 {
                         return Err("Stack underflow in Eq".to_string());
@@ -258,6 +318,99 @@ impl CraneliftBackend {
                     } else {
                         return Err("Stack underflow in ReturnValue".to_string());
                     }
+                }
+
+                // Exception handling (simplified - just return error for now)
+                OpCode::Throw => {
+                    // For now, just return an error value
+                    let error_code = builder.ins().iconst(types::I64, -1);
+                    builder.ins().return_(&[error_code]);
+                    return Ok(error_code);
+                }
+
+                OpCode::TryStart | OpCode::TryEnd | OpCode::Catch | OpCode::Finally => {
+                    // Exception handling is complex in JIT - for now, just continue
+                    // In a full implementation, we'd need to set up exception handlers
+                }
+
+                // High-level memory operations (simplified implementations)
+                OpCode::StoreField => {
+                    // For now, just pop the values from stack
+                    if stack.len() < 2 {
+                        return Err("Stack underflow in StoreField".to_string());
+                    }
+                    let _value = stack.pop().unwrap();
+                    let _object = stack.pop().unwrap();
+                    // TODO: Implement proper field storage
+                }
+
+                OpCode::LoadIndex => {
+                    // For now, just return zero
+                    if stack.len() < 2 {
+                        return Err("Stack underflow in LoadIndex".to_string());
+                    }
+                    let _index = stack.pop().unwrap();
+                    let _array = stack.pop().unwrap();
+                    let zero = builder.ins().iconst(types::I64, 0);
+                    stack.push(zero);
+                }
+
+                OpCode::StoreIndex => {
+                    // For now, just pop the values
+                    if stack.len() < 3 {
+                        return Err("Stack underflow in StoreIndex".to_string());
+                    }
+                    let _value = stack.pop().unwrap();
+                    let _index = stack.pop().unwrap();
+                    let _array = stack.pop().unwrap();
+                    // TODO: Implement proper index storage
+                }
+
+                OpCode::NewObject => {
+                    // For now, just push a zero (object reference)
+                    let zero = builder.ins().iconst(types::I64, 0);
+                    stack.push(zero);
+                }
+
+                OpCode::NewArray => {
+                    // For now, just push a zero (array reference)
+                    let zero = builder.ins().iconst(types::I64, 0);
+                    stack.push(zero);
+                }
+
+                OpCode::ArrayLength => {
+                    // For now, just return zero length
+                    if stack.is_empty() {
+                        return Err("Stack underflow in ArrayLength".to_string());
+                    }
+                    let _array = stack.pop().unwrap();
+                    let zero = builder.ins().iconst(types::I64, 0);
+                    stack.push(zero);
+                }
+
+                // Type operations (simplified)
+                OpCode::IsInstance => {
+                    // For now, just return false (0)
+                    if stack.is_empty() {
+                        return Err("Stack underflow in IsInstance".to_string());
+                    }
+                    let _value = stack.pop().unwrap();
+                    let false_val = builder.ins().iconst(types::I64, 0);
+                    stack.push(false_val);
+                }
+
+                OpCode::Cast => {
+                    // For now, just pass through the value
+                    if stack.is_empty() {
+                        return Err("Stack underflow in Cast".to_string());
+                    }
+                    // Value stays on stack unchanged
+                }
+
+                // Debug operation
+                OpCode::Debug => {
+                    // For now, just continue - in a full implementation,
+                    // we might insert debugging hooks
                 }
 
                 _ => {

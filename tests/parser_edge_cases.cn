@@ -1,0 +1,185 @@
+//! 边界情况和复杂语法测试
+
+// 复杂类型注解
+fn complex_types(
+    arr: array<int>,
+    float_val: float(32),
+    num_val: num(16),
+    custom: CustomType
+) -> array<string> {
+    return ["result"];
+}
+
+// 嵌套控制流
+fn nested_control_flow(x: int, y: int) -> int {
+    if (x > 0) {
+        if (y > 0) {
+            for (var i = 0; i < x; i = i + 1) {
+                if (i == y) {
+                    break;
+                }
+                
+                switch (i) {
+                    case 0:
+                        continue;
+                    case 1:
+                        return i * 2;
+                    default:
+                        // 嵌套while
+                        var j = 0;
+                        while (j < 3) {
+                            j = j + 1;
+                            if (j == 2) {
+                                break;
+                            }
+                        }
+                }
+            }
+        } else {
+            return -1;
+        }
+    }
+    return 0;
+}
+
+// 复杂表达式链
+fn complex_expressions() {
+    var result = ((10 + 5) * 3 - 2) / (4 + 1);
+    var logical = (true && false) || (true && !false);
+    var comparison = (10 > 5) && (3 < 7) && (2 == 2) && (4 != 3);
+    
+    // 函数调用链
+    var chain_result = Math::square(Utils::max(5, 10));
+    
+    // 复杂数组和对象访问
+    var complex_obj = {
+        level1: {
+            level2: {
+                data: [1, 2, {inner: "value"}]
+            }
+        }
+    };
+    
+    var deep_value = complex_obj.level1.level2.data[2].inner;
+}
+
+// 多层命名空间
+ns Level1 {
+    ns Level2 {
+        ns Level3 {
+            fn deep_function() -> string {
+                return "deep";
+            }
+            
+            const DEEP_CONST: int = 42;
+        }
+    }
+}
+
+// 复杂Memo声明
+memo(max_size: 1000, ttl: 7200) {
+    ns CachedMath {
+        fn complex_calculation(a: int, b: int, c: int) -> int {
+            return a * b * c + a * b + a * c + b * c + a + b + c;
+        }
+    }
+}
+
+// 异常处理嵌套
+fn nested_exceptions() {
+    try {
+        try {
+            throw "inner exception";
+        } catch (inner_error) {
+            print("Inner: " + inner_error);
+            throw "outer exception";
+        }
+    } catch (outer_error) {
+        print("Outer: " + outer_error);
+    } finally {
+        print("Final cleanup");
+    }
+}
+
+// 复杂Switch语句
+fn complex_switch(value: int, flag: bool) -> string {
+    switch (value) {
+        case 1:
+            if (flag) {
+                return "one_true";
+            } else {
+                return "one_false";
+            }
+        case 2:
+            for (var i = 0; i < 2; i = i + 1) {
+                if (i == 1) {
+                    return "two_loop";
+                }
+            }
+        case 3:
+            try {
+                throw "case_three_error";
+            } catch (e) {
+                return "three_caught";
+            }
+        default:
+            switch (value % 2) {
+                case 0:
+                    return "even";
+                case 1:
+                    return "odd";
+                default:
+                    return "impossible";
+            }
+    }
+}
+
+// 空结构测试
+fn empty_structures() {
+    var empty_array = [];
+    var empty_object = {};
+    
+    // 空函数体
+    fn empty_function() {
+    }
+    
+    // 空命名空间
+    ns EmptyNamespace {
+    }
+}
+
+// Range表达式的复杂用法
+fn complex_ranges() {
+    // 嵌套Range循环
+    for (var i : 1...3) {
+        for (var j : 1...3) {
+            print("i=" + i + ", j=" + j);
+        }
+    }
+    
+    // Range在表达式中
+    var range_expr = 5...10;
+    for (var x : range_expr) {
+        print("x=" + x);
+    }
+}
+
+// 主函数
+fn main() {
+    var result = nested_control_flow(5, 2);
+    complex_expressions();
+    nested_exceptions();
+    
+    var switch_result = complex_switch(3, true);
+    print("Switch result: " + switch_result);
+    
+    empty_structures();
+    complex_ranges();
+    
+    // 深层命名空间访问
+    var deep = Level1::Level2::Level3::deep_function();
+    var deep_const = Level1::Level2::Level3::DEEP_CONST;
+    
+    print("Deep function: " + deep);
+    print("Deep const: " + deep_const);
+}

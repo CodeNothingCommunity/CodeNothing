@@ -125,6 +125,30 @@ impl VirtualMachine {
                 self.execute_field_access(instruction)
             }
 
+            crate::core::bytecode::OpCode::StoreField => {
+                self.execute_store_field(instruction)
+            }
+
+            crate::core::bytecode::OpCode::LoadIndex => {
+                self.execute_load_index()
+            }
+
+            crate::core::bytecode::OpCode::StoreIndex => {
+                self.execute_store_index()
+            }
+
+            crate::core::bytecode::OpCode::NewObject => {
+                self.execute_new_object(instruction)
+            }
+
+            crate::core::bytecode::OpCode::NewArray => {
+                self.execute_new_array(instruction)
+            }
+
+            crate::core::bytecode::OpCode::ArrayLength => {
+                self.execute_array_length()
+            }
+
             _ => Err(VMError::InvalidInstruction(format!("Not a memory instruction: {:?}", instruction.opcode)))
         }
     }
@@ -233,5 +257,168 @@ impl VirtualMachine {
         } else {
             Err(VMError::RuntimeError(format!("Uncaught exception: {}", exception.to_string())))
         }
+    }
+
+    /// Execute store field operation
+    fn execute_store_field(&mut self, instruction: &Instruction) -> VMResult<ExecutionResult> {
+        let field_index = instruction.get_u16(0)
+            .ok_or_else(|| VMError::InvalidOperand("Missing field index".to_string()))?;
+
+        let value = self.stack.pop()?;
+        let object = self.stack.pop()?;
+
+        match object {
+            Value::Null => {
+                let exception = Value::null_pointer_error("Cannot set field of null object".to_string());
+                return self.throw_exception(exception);
+            }
+            Value::Object(mut obj_map) => {
+                // Get field name from constants
+                let chunk = self.current_chunk.as_ref().unwrap();
+                let field_name = chunk.get_constant(field_index)
+                    .ok_or_else(|| VMError::InvalidOperand(format!("Invalid field index: {}", field_index)))?;
+
+                if let Value::String(field_name_str) = field_name {
+                    // Since Rc<HashMap> is immutable, we need to clone and modify
+                    let mut new_map = obj_map.as_ref().clone();
+                    new_map.insert(field_name_str.as_ref().clone(), value);
+                    let new_object = Value::Object(std::rc::Rc::new(new_map));
+                    self.stack.push(new_object)?;
+                } else {
+                    return Err(VMError::TypeMismatch("Field name must be a string".to_string()));
+                }
+            }
+            _ => {
+                return Err(VMError::TypeMismatch(format!("Cannot set field of {}", object.type_name())));
+            }
+        }
+
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    /// Execute load index operation (array[index])
+    fn execute_load_index(&mut self) -> VMResult<ExecutionResult> {
+        let index = self.stack.pop()?;
+        let array = self.stack.pop()?;
+
+        match array {
+            Value::Null => {
+                let exception = Value::null_pointer_error("Cannot index into null array".to_string());
+                return self.throw_exception(exception);
+            }
+            Value::Array(arr) => {
+                if let Value::Int(idx) = index {
+                    if idx >= 0 && (idx as usize) < arr.len() {
+                        self.stack.push(arr[idx as usize].clone())?;
+                    } else {
+                        let exception = Value::index_error(format!("Array index {} out of bounds (array length: {})", idx, arr.len()));
+                        return self.throw_exception(exception);
+                    }
+                } else {
+                    let exception = Value::type_error(format!("Array index must be an integer, got {}", index.type_name()));
+                    return self.throw_exception(exception);
+                }
+            }
+            _ => {
+                let exception = Value::type_error(format!("Cannot index into {}", array.type_name()));
+                return self.throw_exception(exception);
+            }
+        }
+
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    /// Execute store index operation (array[index] = value)
+    fn execute_store_index(&mut self) -> VMResult<ExecutionResult> {
+        let value = self.stack.pop()?;
+        let index = self.stack.pop()?;
+        let array = self.stack.pop()?;
+
+        match array {
+            Value::Null => {
+                let exception = Value::null_pointer_error("Cannot assign to null array".to_string());
+                return self.throw_exception(exception);
+            }
+            Value::Array(arr) => {
+                if let Value::Int(idx) = index {
+                    if idx >= 0 && (idx as usize) < arr.len() {
+                        // Since Rc<Vec> is immutable, we need to clone and modify
+                        let mut new_array = arr.as_ref().clone();
+                        new_array[idx as usize] = value;
+                        let new_array_value = Value::Array(std::rc::Rc::new(new_array));
+                        self.stack.push(new_array_value)?;
+                    } else {
+                        let exception = Value::index_error(format!("Array index {} out of bounds (array length: {})", idx, arr.len()));
+                        return self.throw_exception(exception);
+                    }
+                } else {
+                    let exception = Value::type_error(format!("Array index must be an integer, got {}", index.type_name()));
+                    return self.throw_exception(exception);
+                }
+            }
+            _ => {
+                let exception = Value::type_error(format!("Cannot assign to index of {}", array.type_name()));
+                return self.throw_exception(exception);
+            }
+        }
+
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    /// Execute new object operation
+    fn execute_new_object(&mut self, instruction: &Instruction) -> VMResult<ExecutionResult> {
+        let class_index = instruction.get_u16(0)
+            .ok_or_else(|| VMError::InvalidOperand("Missing class index".to_string()))?;
+
+        // For now, create an empty object
+        // In a full implementation, this would use the class definition
+        let empty_object = Value::Object(std::rc::Rc::new(HashMap::new()));
+        self.stack.push(empty_object)?;
+
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    /// Execute new array operation
+    fn execute_new_array(&mut self, instruction: &Instruction) -> VMResult<ExecutionResult> {
+        let size = instruction.get_u16(0)
+            .ok_or_else(|| VMError::InvalidOperand("Missing array size".to_string()))?;
+
+        // Create array filled with null values
+        let array = vec![Value::Null; size as usize];
+        let array_value = Value::Array(std::rc::Rc::new(array));
+        self.stack.push(array_value)?;
+
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    /// Execute array length operation
+    fn execute_array_length(&mut self) -> VMResult<ExecutionResult> {
+        let array = self.stack.pop()?;
+
+        match array {
+            Value::Null => {
+                let exception = Value::null_pointer_error("Cannot get length of null array".to_string());
+                return self.throw_exception(exception);
+            }
+            Value::Array(arr) => {
+                self.stack.push(Value::Int(arr.len() as i64))?;
+            }
+            Value::String(s) => {
+                // Also support string length
+                self.stack.push(Value::Int(s.len() as i64))?;
+            }
+            _ => {
+                let exception = Value::type_error(format!("Cannot get length of {}", array.type_name()));
+                return self.throw_exception(exception);
+            }
+        }
+
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
     }
 }

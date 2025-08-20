@@ -22,8 +22,13 @@ impl SemanticAnalyzer {
                 self.analyze_using_declaration(using);
             }
             Declaration::Variable(stmt) => {
-                // Handle global variable declarations
-                self.analyze_statement(stmt);
+                // Handle global variable declarations - only analyze initializer, don't redefine
+                if let Statement::VarDeclaration { initializer, .. } = stmt {
+                    if let Some(init_expr) = initializer {
+                        // Only analyze the initializer expression, variable was already defined in collection phase
+                        self.analyze_expression(init_expr);
+                    }
+                }
             }
         }
     }

@@ -171,7 +171,14 @@ pub enum BinaryOperator {
     // Logical
     And,
     Or,
-    
+
+    // Bitwise
+    BitAnd,
+    BitOr,
+    BitXor,
+    LeftShift,
+    RightShift,
+
     // Assignment
     Assign,
 }
@@ -181,6 +188,7 @@ pub enum BinaryOperator {
 pub enum UnaryOperator {
     Minus,
     Not,
+    BitNot, // Bitwise NOT (~)
 }
 
 /// Statements

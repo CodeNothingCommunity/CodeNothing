@@ -91,9 +91,19 @@ impl VirtualMachine {
             OpCode::Or => self.execute_or(),
             OpCode::Not => self.execute_not(),
 
+            // Bitwise operations
+            OpCode::BitAnd => self.execute_bit_and(),
+            OpCode::BitOr => self.execute_bit_or(),
+            OpCode::BitXor => self.execute_bit_xor(),
+            OpCode::BitNot => self.execute_bit_not(),
+            OpCode::Shl => self.execute_shl(),
+            OpCode::Shr => self.execute_shr(),
+
             // Memory operations
             OpCode::LoadLocal | OpCode::StoreLocal | OpCode::LoadGlobal | OpCode::StoreGlobal |
-            OpCode::CreateArray | OpCode::CreateObject | OpCode::LoadField => {
+            OpCode::CreateArray | OpCode::CreateObject | OpCode::LoadField | OpCode::StoreField |
+            OpCode::LoadIndex | OpCode::StoreIndex | OpCode::NewObject | OpCode::NewArray |
+            OpCode::ArrayLength => {
                 self.execute_memory_instruction(instruction)
             }
 
@@ -109,10 +119,15 @@ impl VirtualMachine {
                 self.execute_function_instruction(instruction)
             }
 
+            // Type operations
+            OpCode::IsInstance => self.execute_is_instance(instruction),
+            OpCode::Cast => self.execute_cast(instruction),
+
             // Special operations
             OpCode::Halt => Ok(ExecutionResult::Halt),
             OpCode::Print => self.execute_print(),
             OpCode::Nop => self.execute_nop(),
+            OpCode::Debug => self.execute_debug(),
 
             _ => Err(VMError::InvalidInstruction(format!("Unimplemented instruction: {:?}", instruction.opcode)))
         }
@@ -359,6 +374,88 @@ impl VirtualMachine {
         Ok(ExecutionResult::Continue)
     }
 
+    // Bitwise operations
+    fn execute_bit_and(&mut self) -> VMResult<ExecutionResult> {
+        let b = self.stack.pop()?;
+        let a = self.stack.pop()?;
+        let result = match (&a, &b) {
+            (Value::Int(x), Value::Int(y)) => Value::Int(x & y),
+            _ => return Err(VMError::TypeMismatch(format!("Bitwise AND requires integers, got {} and {}", a.type_name(), b.type_name()))),
+        };
+        self.stack.push(result)?;
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    fn execute_bit_or(&mut self) -> VMResult<ExecutionResult> {
+        let b = self.stack.pop()?;
+        let a = self.stack.pop()?;
+        let result = match (&a, &b) {
+            (Value::Int(x), Value::Int(y)) => Value::Int(x | y),
+            _ => return Err(VMError::TypeMismatch(format!("Bitwise OR requires integers, got {} and {}", a.type_name(), b.type_name()))),
+        };
+        self.stack.push(result)?;
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    fn execute_bit_xor(&mut self) -> VMResult<ExecutionResult> {
+        let b = self.stack.pop()?;
+        let a = self.stack.pop()?;
+        let result = match (&a, &b) {
+            (Value::Int(x), Value::Int(y)) => Value::Int(x ^ y),
+            _ => return Err(VMError::TypeMismatch(format!("Bitwise XOR requires integers, got {} and {}", a.type_name(), b.type_name()))),
+        };
+        self.stack.push(result)?;
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    fn execute_bit_not(&mut self) -> VMResult<ExecutionResult> {
+        let a = self.stack.pop()?;
+        let result = match a {
+            Value::Int(x) => Value::Int(!x),
+            _ => return Err(VMError::TypeMismatch(format!("Bitwise NOT requires integer, got {}", a.type_name()))),
+        };
+        self.stack.push(result)?;
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    fn execute_shl(&mut self) -> VMResult<ExecutionResult> {
+        let b = self.stack.pop()?;
+        let a = self.stack.pop()?;
+        let result = match (&a, &b) {
+            (Value::Int(x), Value::Int(y)) => {
+                if *y < 0 || *y >= 64 {
+                    return Err(VMError::RuntimeError(format!("Shift amount {} is out of range", y)));
+                }
+                Value::Int(x << y)
+            },
+            _ => return Err(VMError::TypeMismatch(format!("Left shift requires integers, got {} and {}", a.type_name(), b.type_name()))),
+        };
+        self.stack.push(result)?;
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    fn execute_shr(&mut self) -> VMResult<ExecutionResult> {
+        let b = self.stack.pop()?;
+        let a = self.stack.pop()?;
+        let result = match (&a, &b) {
+            (Value::Int(x), Value::Int(y)) => {
+                if *y < 0 || *y >= 64 {
+                    return Err(VMError::RuntimeError(format!("Shift amount {} is out of range", y)));
+                }
+                Value::Int(x >> y)
+            },
+            _ => return Err(VMError::TypeMismatch(format!("Right shift requires integers, got {} and {}", a.type_name(), b.type_name()))),
+        };
+        self.stack.push(result)?;
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
     // Special operations
     fn execute_print(&mut self) -> VMResult<ExecutionResult> {
         let value = self.stack.pop()?;
@@ -368,6 +465,107 @@ impl VirtualMachine {
     }
 
     fn execute_nop(&mut self) -> VMResult<ExecutionResult> {
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    // Type operations
+    fn execute_is_instance(&mut self, instruction: &Instruction) -> VMResult<ExecutionResult> {
+        let type_index = instruction.get_u16(0)
+            .ok_or_else(|| VMError::InvalidOperand("Missing type index".to_string()))?;
+
+        let value = self.stack.pop()?;
+
+        // Get type name from constants
+        let chunk = self.current_chunk.as_ref().unwrap();
+        let type_name = chunk.get_constant(type_index)
+            .ok_or_else(|| VMError::InvalidOperand(format!("Invalid type index: {}", type_index)))?;
+
+        if let Value::String(type_name_str) = type_name {
+            let is_instance = match type_name_str.as_str() {
+                "int" => matches!(value, Value::Int(_)),
+                "float" => matches!(value, Value::Float(_)),
+                "string" => matches!(value, Value::String(_)),
+                "bool" => matches!(value, Value::Bool(_)),
+                "array" => matches!(value, Value::Array(_)),
+                "object" => matches!(value, Value::Object(_)),
+                "null" => matches!(value, Value::Null),
+                _ => false, // Unknown type
+            };
+            self.stack.push(Value::Bool(is_instance))?;
+        } else {
+            return Err(VMError::TypeMismatch("Type name must be a string".to_string()));
+        }
+
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    fn execute_cast(&mut self, instruction: &Instruction) -> VMResult<ExecutionResult> {
+        let type_index = instruction.get_u16(0)
+            .ok_or_else(|| VMError::InvalidOperand("Missing type index".to_string()))?;
+
+        let value = self.stack.pop()?;
+
+        // Get type name from constants
+        let chunk = self.current_chunk.as_ref().unwrap();
+        let type_name = chunk.get_constant(type_index)
+            .ok_or_else(|| VMError::InvalidOperand(format!("Invalid type index: {}", type_index)))?;
+
+        if let Value::String(type_name_str) = type_name {
+            let result = match type_name_str.as_str() {
+                "int" => match value {
+                    Value::Int(i) => Value::Int(i),
+                    Value::Float(f) => Value::Int(f as i64),
+                    Value::String(s) => {
+                        match s.parse::<i64>() {
+                            Ok(i) => Value::Int(i),
+                            Err(_) => return Err(VMError::TypeMismatch(format!("Cannot cast '{}' to int", s))),
+                        }
+                    }
+                    Value::Bool(b) => Value::Int(if b { 1 } else { 0 }),
+                    _ => return Err(VMError::TypeMismatch(format!("Cannot cast {} to int", value.type_name()))),
+                },
+                "float" => match value {
+                    Value::Int(i) => Value::Float(i as f64),
+                    Value::Float(f) => Value::Float(f),
+                    Value::String(s) => {
+                        match s.parse::<f64>() {
+                            Ok(f) => Value::Float(f),
+                            Err(_) => return Err(VMError::TypeMismatch(format!("Cannot cast '{}' to float", s))),
+                        }
+                    }
+                    _ => return Err(VMError::TypeMismatch(format!("Cannot cast {} to float", value.type_name()))),
+                },
+                "string" => Value::String(std::rc::Rc::new(value.to_string())),
+                "bool" => Value::Bool(value.is_truthy()),
+                _ => return Err(VMError::TypeMismatch(format!("Unknown cast type: {}", type_name_str))),
+            };
+            self.stack.push(result)?;
+        } else {
+            return Err(VMError::TypeMismatch("Type name must be a string".to_string()));
+        }
+
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    fn execute_debug(&mut self) -> VMResult<ExecutionResult> {
+        // Debug breakpoint - print current state
+        println!("=== DEBUG BREAKPOINT ===");
+        println!("IP: {}", self.ip);
+        println!("Stack size: {}", self.stack.size());
+        if self.stack.size() > 0 {
+            if let Ok(top) = self.stack.peek() {
+                println!("Stack top: {}", top);
+            }
+        }
+        if let Some(locals) = &self.locals {
+            println!("Local variables: {}", locals.count());
+        }
+        println!("Call stack depth: {}", self.call_stack.depth());
+        println!("========================");
+
         self.ip += 1;
         Ok(ExecutionResult::Continue)
     }

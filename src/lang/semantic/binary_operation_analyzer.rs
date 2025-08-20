@@ -36,6 +36,12 @@ impl SemanticAnalyzer {
                 self.analyze_logical_operation(left_type, operator, right_type, position)
             }
 
+            // Bitwise operations
+            BinaryOperator::BitAnd | BinaryOperator::BitOr | BinaryOperator::BitXor |
+            BinaryOperator::LeftShift | BinaryOperator::RightShift => {
+                self.analyze_bitwise_operation(left_type, operator, right_type, position)
+            }
+
             // Assignment operation
             BinaryOperator::Assign => {
                 // Assignment should return the assigned value's type
@@ -139,7 +145,29 @@ impl SemanticAnalyzer {
             (Type::Bool, Type::Bool) => Type::Bool,
             _ => {
                 self.add_error(TypeError::new(
-                    format!("Logical {:?} requires boolean operands, got '{}' and '{}'", 
+                    format!("Logical {:?} requires boolean operands, got '{}' and '{}'",
+                           operator, left_type, right_type),
+                    position.clone(),
+                ));
+                Type::Unknown
+            }
+        }
+    }
+
+    /// Analyze bitwise operations
+    fn analyze_bitwise_operation(
+        &mut self,
+        left_type: &Type,
+        operator: &BinaryOperator,
+        right_type: &Type,
+        position: &Position,
+    ) -> Type {
+        match (left_type, right_type) {
+            // Bitwise operations require integer operands
+            (Type::Int, Type::Int) => Type::Int,
+            _ => {
+                self.add_error(TypeError::new(
+                    format!("Bitwise {:?} requires integer operands, got '{}' and '{}'",
                            operator, left_type, right_type),
                     position.clone(),
                 ));

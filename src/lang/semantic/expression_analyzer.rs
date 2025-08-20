@@ -59,7 +59,17 @@ impl SemanticAnalyzer {
                             Type::Unknown
                         }
                     }
-                    // Plus operator doesn't exist in current UnaryOperator enum
+                    UnaryOperator::BitNot => {
+                        if matches!(operand_type, Type::Int) {
+                            Type::Int
+                        } else {
+                            self.add_error(TypeError::new(
+                                format!("Bitwise NOT requires integer operand, got '{}'", operand_type),
+                                position.clone(),
+                            ));
+                            Type::Unknown
+                        }
+                    }
                 }
             }
             
@@ -138,12 +148,21 @@ impl SemanticAnalyzer {
             Expression::FieldAccess { object, field: _, position } => {
                 let object_type = self.analyze_expression(object);
 
-                // For now, we don't have struct/object types, so this is an error
-                self.add_error(TypeError::new(
-                    format!("Field access not supported for type '{}'", object_type),
-                    position.clone(),
-                ));
-                Type::Unknown
+                match object_type {
+                    Type::Obj => {
+                        // For object types, we can't determine the field type statically
+                        // Return Unknown for now - in a full implementation, we'd need
+                        // structural typing or object schemas
+                        Type::Unknown
+                    }
+                    _ => {
+                        self.add_error(TypeError::new(
+                            format!("Cannot access field of type '{}'", object_type),
+                            position.clone(),
+                        ));
+                        Type::Unknown
+                    }
+                }
             }
 
             Expression::Range { start, end, position: _ } => {
