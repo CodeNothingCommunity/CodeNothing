@@ -70,6 +70,14 @@ pub enum TokenType {
     Or,         // ||
     Not,        // !
     Range,      // ...
+
+    // Bitwise operators
+    BitAnd,     // &
+    BitOr,      // |
+    BitXor,     // ^
+    BitNot,     // ~
+    LeftShift,  // <<
+    RightShift, // >>
     
     // Punctuation
     LeftParen,  // (
@@ -367,6 +375,9 @@ impl Lexer {
                     if self.peek() == Some('=') {
                         self.advance();
                         TokenType::LessEqual
+                    } else if self.peek() == Some('<') {
+                        self.advance();
+                        TokenType::LeftShift
                     } else {
                         TokenType::Less
                     }
@@ -376,6 +387,9 @@ impl Lexer {
                     if self.peek() == Some('=') {
                         self.advance();
                         TokenType::GreaterEqual
+                    } else if self.peek() == Some('>') {
+                        self.advance();
+                        TokenType::RightShift
                     } else {
                         TokenType::Greater
                     }
@@ -386,7 +400,7 @@ impl Lexer {
                         self.advance();
                         TokenType::And
                     } else {
-                        return Err(format!("Unexpected character '&' at {}:{}", start_line, start_column));
+                        TokenType::BitAnd
                     }
                 }
                 '|' => {
@@ -395,8 +409,16 @@ impl Lexer {
                         self.advance();
                         TokenType::Or
                     } else {
-                        return Err(format!("Unexpected character '|' at {}:{}", start_line, start_column));
+                        TokenType::BitOr
                     }
+                }
+                '^' => {
+                    self.advance();
+                    TokenType::BitXor
+                }
+                '~' => {
+                    self.advance();
+                    TokenType::BitNot
                 }
                 '(' => {
                     self.advance();

@@ -100,7 +100,43 @@ impl Parser {
             ))
         }
     }
-    
+
+    /// Expect '>' token, but handle '>>' as two '>' tokens for generic parsing
+    fn expect_greater_or_right_shift(&mut self, message: &str) -> Result<(), ParseError> {
+        if let Some(token) = self.peek().cloned() {
+            match token.token_type {
+                TokenType::Greater => {
+                    self.advance();
+                    Ok(())
+                }
+                TokenType::RightShift => {
+                    // Convert >> to > by replacing the current token with >
+                    // and inserting another > token after it
+                    self.advance(); // consume the >>
+
+                    // Insert a Greater token at the current position
+                    let greater_token = Token {
+                        token_type: TokenType::Greater,
+                        lexeme: ">".to_string(),
+                        line: token.line,
+                        column: token.column + 1,
+                    };
+                    self.tokens.insert(self.current, greater_token);
+                    Ok(())
+                }
+                _ => Err(ParseError::new(
+                    format!("{}, found {:?}", message, token.token_type),
+                    Position::new(token.line, token.column)
+                ))
+            }
+        } else {
+            Err(ParseError::new(
+                format!("{}, found EOF", message),
+                Position::new(0, 0)
+            ))
+        }
+    }
+
     /// Skip newlines
     fn skip_newlines(&mut self) {
         while self.match_token(TokenType::Newline) {
@@ -285,8 +321,15 @@ impl Parser {
                 }
                 TokenType::Array => {
                     self.advance();
-                    // TODO: Parse array element type
-                    Ok(TypeAnnotation::Array(Box::new(TypeAnnotation::Auto)))
+                    // Check for generic syntax: array<type>
+                    if self.match_token(TokenType::Less) {
+                        let element_type = self.parse_type_annotation()?;
+                        self.expect_greater_or_right_shift("Expected '>' after array element type")?;
+                        Ok(TypeAnnotation::Array(Box::new(element_type)))
+                    } else {
+                        // Default to auto if no generic type specified
+                        Ok(TypeAnnotation::Array(Box::new(TypeAnnotation::Auto)))
+                    }
                 }
                 TokenType::Obj => {
                     self.advance();
@@ -907,11 +950,11 @@ impl Parser {
     
     /// Parse logical OR expression
     fn parse_logical_or(&mut self) -> Result<Expression, ParseError> {
-        let mut expr = self.parse_logical_and()?;
+        let mut expr = self.parse_bit_or()?;
 
         while self.match_token(TokenType::Or) {
             let position = expr.position().clone();
-            let right = self.parse_logical_and()?;
+            let right = self.parse_bit_or()?;
             expr = Expression::Binary {
                 left: Box::new(expr),
                 operator: BinaryOperator::Or,
@@ -922,7 +965,61 @@ impl Parser {
 
         Ok(expr)
     }
-    
+
+    /// Parse bitwise OR expression
+    fn parse_bit_or(&mut self) -> Result<Expression, ParseError> {
+        let mut expr = self.parse_bit_xor()?;
+
+        while self.match_token(TokenType::BitOr) {
+            let position = expr.position().clone();
+            let right = self.parse_bit_xor()?;
+            expr = Expression::Binary {
+                left: Box::new(expr),
+                operator: BinaryOperator::BitOr,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    /// Parse bitwise XOR expression
+    fn parse_bit_xor(&mut self) -> Result<Expression, ParseError> {
+        let mut expr = self.parse_bit_and()?;
+
+        while self.match_token(TokenType::BitXor) {
+            let position = expr.position().clone();
+            let right = self.parse_bit_and()?;
+            expr = Expression::Binary {
+                left: Box::new(expr),
+                operator: BinaryOperator::BitXor,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    /// Parse bitwise AND expression
+    fn parse_bit_and(&mut self) -> Result<Expression, ParseError> {
+        let mut expr = self.parse_logical_and()?;
+
+        while self.match_token(TokenType::BitAnd) {
+            let position = expr.position().clone();
+            let right = self.parse_logical_and()?;
+            expr = Expression::Binary {
+                left: Box::new(expr),
+                operator: BinaryOperator::BitAnd,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
     /// Parse logical AND expression
     fn parse_logical_and(&mut self) -> Result<Expression, ParseError> {
         let mut expr = self.parse_equality()?;
@@ -973,7 +1070,7 @@ impl Parser {
     
     /// Parse comparison expression
     fn parse_comparison(&mut self) -> Result<Expression, ParseError> {
-        let mut expr = self.parse_range()?;
+        let mut expr = self.parse_shift()?;
 
         while let Some(token) = self.peek() {
             let operator = match token.token_type {
@@ -997,7 +1094,37 @@ impl Parser {
             };
 
             let position = expr.position().clone();
-            let right = self.parse_term()?;
+            let right = self.parse_shift()?;
+            expr = Expression::Binary {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    /// Parse shift expression (<< >>)
+    fn parse_shift(&mut self) -> Result<Expression, ParseError> {
+        let mut expr = self.parse_range()?;
+
+        while let Some(token) = self.peek() {
+            let operator = match token.token_type {
+                TokenType::LeftShift => {
+                    self.advance();
+                    BinaryOperator::LeftShift
+                }
+                TokenType::RightShift => {
+                    self.advance();
+                    BinaryOperator::RightShift
+                }
+                _ => break,
+            };
+
+            let position = expr.position().clone();
+            let right = self.parse_range()?;
             expr = Expression::Binary {
                 left: Box::new(expr),
                 operator,
@@ -1111,6 +1238,15 @@ impl Parser {
                     let operand = self.parse_unary()?;
                     Ok(Expression::Unary {
                         operator: UnaryOperator::Not,
+                        operand: Box::new(operand),
+                        position,
+                    })
+                }
+                TokenType::BitNot => {
+                    self.advance();
+                    let operand = self.parse_unary()?;
+                    Ok(Expression::Unary {
+                        operator: UnaryOperator::BitNot,
                         operand: Box::new(operand),
                         position,
                     })
