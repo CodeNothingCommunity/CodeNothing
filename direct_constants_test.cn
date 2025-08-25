@@ -1,0 +1,8 @@
+lib <math>;
+lib <io>;
+
+fn main() {
+    std::println("Testing direct constants call");
+    var pi_val := constants::pi();
+    std::println("π = " + pi_val);
+}

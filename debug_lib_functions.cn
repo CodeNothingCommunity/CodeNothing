@@ -1,0 +1,15 @@
+// 调试库函数加载
+
+lib <io>;
+
+fn main() {
+    lang::print(fib(30));
+}
+memo{
+    fn fib(n) {
+        if n < 2 {
+            return n;
+        }
+        return fib(n - 1) + fib(n - 2);
+    }
+}

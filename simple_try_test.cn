@@ -1,0 +1,20 @@
+// 简单的 try-catch 测试
+
+lib <io>;
+
+fn main() {
+    std::println("开始测试");
+    
+    // 测试输入非数字
+    var input := "abc";
+    std::println("输入: " + input);
+    
+    try {
+        var number := lang::to_int(input);
+        std::println("转换成功: " + lang::to_string(number));
+    } catch {
+        std::println("转换失败，捕获到异常");
+    }
+    
+    std::println("测试完成");
+}

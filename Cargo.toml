@@ -29,6 +29,11 @@ anyhow = "1.0"
 log = "0.4"
 env_logger = "0.10"
 
+# Library loading
+libloading = "0.8"
+once_cell = "1.19"
+dashmap = "5.5"
+
 # Serialization for bytecode
 serde = { version = "1.0", features = ["derive", "rc"] }
 bincode = "1.3"

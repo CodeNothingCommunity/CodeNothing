@@ -1,0 +1,6 @@
+{
+  "name": "json",
+  "output_name": "json",
+  
+  "_comment": "此配置文件仅用于GitHub工作流，不用于源代码中。实际库的命名空间信息直接从lib.rs中获取。"
+} 

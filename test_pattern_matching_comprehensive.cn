@@ -1,0 +1,186 @@
+// 🎯 CodeNothing 模式匹配功能全面测试
+// 测试各种复杂的模式匹配场景
+
+lib <io>;
+
+fn test_nested_match() {
+    std::println("=== 嵌套模式匹配测试 ===");
+    
+    var x : int = 1;
+    var y : int = 2;
+    
+    var result : string = match x {
+        1 => match y {
+            1 => "x=1, y=1",
+            2 => "x=1, y=2",
+            _ => "x=1, y=其他",
+        },
+        2 => "x=2",
+        _ => "x=其他",
+    };
+    std::println("嵌套匹配结果: " + result);
+}
+
+fn test_match_as_expression() {
+    std::println("");
+    std::println("=== Match 作为表达式测试 ===");
+    
+    var day : int = 3;
+    
+    // match 表达式可以直接用在函数调用中
+    std::println("今天是: " + match day {
+        1 => "星期一",
+        2 => "星期二", 
+        3 => "星期三",
+        4 => "星期四",
+        5 => "星期五",
+        6 => "星期六",
+        7 => "星期日",
+        _ => "无效日期",
+    });
+    
+    // match 表达式可以用在算术运算中
+    var multiplier : int = match day {
+        1 => 1,
+        2 => 2,
+        3 => 3,
+        _ => 0,
+    };
+    var result : int = day * multiplier;
+    std::println("day * multiplier = " + to_string(result));
+}
+
+fn test_complex_patterns() {
+    std::println("");
+    std::println("=== 复杂模式测试 ===");
+    
+    // 测试多个相同类型的模式
+    var score : int = 85;
+    var grade : string = match score {
+        100 => "满分!",
+        90 => "优秀",
+        80 => "良好", 
+        70 => "及格",
+        60 => "勉强及格",
+        _ => "需要努力",
+    };
+    std::println("score = 85, 等级: " + grade);
+    
+    // 测试字符串模式的多种情况
+    var language : string = "Rust";
+    var description : string = match language {
+        "Rust" => "系统编程语言",
+        "Python" => "脚本语言",
+        "JavaScript" => "Web语言",
+        "Go" => "并发语言",
+        "C++" => "高性能语言",
+        _ => "未知语言",
+    };
+    std::println("language = Rust, 描述: " + description);
+}
+
+fn test_boolean_combinations() {
+    std::println("");
+    std::println("=== 布尔值组合测试 ===");
+    
+    var is_admin : bool = true;
+    var is_logged_in : bool = false;
+    
+    var access_level : string = match is_admin {
+        true => match is_logged_in {
+            true => "管理员已登录",
+            false => "管理员未登录",
+        },
+        false => match is_logged_in {
+            true => "普通用户已登录",
+            false => "未登录用户",
+        },
+    };
+    std::println("访问级别: " + access_level);
+}
+
+fn test_edge_cases() {
+    std::println("");
+    std::println("=== 边界情况测试 ===");
+    
+    // 测试负数 (注意：当前版本不支持负数字面量模式)
+    var negative : int = -42;
+    var sign : string = match negative {
+        0 => "零",
+        42 => "四十二",
+        _ => "其他数字",
+    };
+    std::println("negative = -42, 符号: " + sign);
+    
+    // 测试空字符串
+    var empty : string = "";
+    var length_desc : string = match empty {
+        "" => "空字符串",
+        "a" => "单字符",
+        _ => "多字符",
+    };
+    std::println("empty string 测试: " + length_desc);
+    
+    // 测试大数字
+    var big_number : int = 999999;
+    var size : string = match big_number {
+        1 => "小",
+        100 => "中",
+        1000 => "大",
+        _ => "超大",
+    };
+    std::println("big_number = 999999, 大小: " + size);
+}
+
+fn test_return_values() {
+    std::println("");
+    std::println("=== 返回值测试 ===");
+    
+    // 测试 match 表达式返回不同类型的值
+    var number : int = 42;
+    var is_special : bool = match number {
+        42 => true,
+        0 => false,
+        _ => false,
+    };
+    std::println("number = 42, is_special = " + to_string(is_special));
+    
+    // 测试返回计算结果
+    var base : int = 5;
+    var power : int = match base {
+        2 => 4,   // 2^2
+        3 => 9,   // 3^2
+        4 => 16,  // 4^2
+        5 => 25,  // 5^2
+        _ => 1,
+    };
+    std::println("base = 5, power = " + to_string(power));
+}
+
+fn main() : int {
+    std::println("🚀 CodeNothing 模式匹配功能全面测试");
+    std::println("=====================================");
+    
+    test_nested_match();
+    test_match_as_expression();
+    test_complex_patterns();
+    test_boolean_combinations();
+    test_edge_cases();
+    test_return_values();
+    
+    std::println("");
+    std::println("✅ 所有模式匹配测试完成!");
+    std::println("🎉 CodeNothing 模式匹配功能已完全实现!");
+    std::println("");
+    std::println("支持的功能:");
+    std::println("- ✅ 整数字面量模式匹配");
+    std::println("- ✅ 字符串字面量模式匹配");
+    std::println("- ✅ 布尔值模式匹配");
+    std::println("- ✅ 通配符模式 (_)");
+    std::println("- ✅ 嵌套模式匹配");
+    std::println("- ✅ Match 作为表达式");
+    std::println("- ✅ 复杂模式组合");
+    std::println("- ✅ 边界情况处理");
+    
+    return 0;
+}

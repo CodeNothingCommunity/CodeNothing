@@ -1,0 +1,118 @@
+// 🎯 CodeNothing 模式匹配功能测试
+// 测试基本的模式匹配功能
+
+lib <io>;
+
+fn test_basic_patterns() {
+    std::println("=== 基本模式匹配测试 ===");
+    
+    // 测试字面量模式
+    var x : int = 42;
+    var result : string = match x {
+        42 => "找到答案!",
+        0 => "零",
+        _ => "其他数字",
+    };
+    std::println("x = 42, 匹配结果: " + result);
+    
+    // 测试不同的值
+    var y : int = 0;
+    var result2 : string = match y {
+        42 => "找到答案!",
+        0 => "零",
+        _ => "其他数字",
+    };
+    std::println("y = 0, 匹配结果: " + result2);
+    
+    // 测试默认分支
+    var z : int = 100;
+    var result3 : string = match z {
+        42 => "找到答案!",
+        0 => "零",
+        _ => "其他数字",
+    };
+    std::println("z = 100, 匹配结果: " + result3);
+}
+
+fn test_string_patterns() {
+    std::println("");
+    std::println("=== 字符串模式匹配测试 ===");
+    
+    var name : string = "Alice";
+    var greeting : string = match name {
+        "Alice" => "你好, Alice!",
+        "Bob" => "嗨, Bob!",
+        _ => "你好, 陌生人!",
+    };
+    std::println("name = Alice, 问候: " + greeting);
+    
+    var name2 : string = "Charlie";
+    var greeting2 : string = match name2 {
+        "Alice" => "你好, Alice!",
+        "Bob" => "嗨, Bob!",
+        _ => "你好, 陌生人!",
+    };
+    std::println("name2 = Charlie, 问候: " + greeting2);
+}
+
+fn test_boolean_patterns() {
+    std::println("");
+    std::println("=== 布尔值模式匹配测试 ===");
+    
+    var flag : bool = true;
+    var status : string = match flag {
+        true => "开启",
+        false => "关闭",
+    };
+    std::println("flag = true, 状态: " + status);
+    
+    var flag2 : bool = false;
+    var status2 : string = match flag2 {
+        true => "开启",
+        false => "关闭",
+    };
+    std::println("flag2 = false, 状态: " + status2);
+}
+
+fn test_wildcard_patterns() {
+    std::println("");
+    std::println("=== 通配符模式测试 ===");
+    
+    var value : int = 999;
+    var category : string = match value {
+        1 => "一",
+        2 => "二",
+        3 => "三",
+        _ => "其他",
+    };
+    std::println("value = 999, 分类: " + category);
+}
+
+fn test_identifier_patterns() {
+    std::println("");
+    std::println("=== 标识符模式测试 ===");
+    
+    // 注意：标识符模式绑定功能还未完全实现
+    // 这里只是测试语法解析
+    var num : int = 123;
+    var description : string = match num {
+        n => "任意数字",  // n 应该绑定到 num 的值
+    };
+    std::println("num = 123, 描述: " + description);
+}
+
+fn main() : int {
+    std::println("🚀 CodeNothing 模式匹配功能测试");
+    std::println("=====================================");
+    
+    test_basic_patterns();
+    test_string_patterns();
+    test_boolean_patterns();
+    test_wildcard_patterns();
+    test_identifier_patterns();
+    
+    std::println("");
+    std::println("✅ 模式匹配测试完成!");
+    
+    return 0;
+}

@@ -1,0 +1,8 @@
+lib <math>;
+lib <io>;
+
+fn main() {
+    std::println("Testing direct trig call");
+    var result := trig::sin("1.57");
+    std::println("trig::sin(1.57) = " + result);
+}

@@ -1,0 +1,46 @@
+lib <io>;
+
+fn test_nested_match() {
+    std::println("=== 嵌套模式匹配测试 ===");
+    
+    var x : int = 1;
+    var y : int = 2;
+    
+    var result : string = match x {
+        1 => match y {
+            1 => "x=1, y=1",
+            2 => "x=1, y=2",
+            _ => "x=1, y=其他",
+        },
+        2 => "x=2",
+        _ => "x=其他",
+    };
+    std::println("嵌套匹配结果: " + result);
+}
+
+fn test_match_as_expression() {
+    std::println("");
+    std::println("=== Match 作为表达式测试 ===");
+
+    var day : int = 3;
+
+    // match 表达式可以直接用在函数调用中
+    std::println("今天是: " + match day {
+        1 => "星期一",
+        2 => "星期二",
+        3 => "星期三",
+        4 => "星期四",
+        5 => "星期五",
+        6 => "星期六",
+        7 => "星期日",
+        _ => "无效日期",
+    });
+}
+
+fn main() : int {
+    std::println("🚀 测试开始");
+    test_nested_match();
+    test_match_as_expression();
+    std::println("✅ 测试完成");
+    return 0;
+}

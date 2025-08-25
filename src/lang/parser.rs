@@ -181,6 +181,35 @@ impl Parser {
                     let memo = self.parse_memo()?;
                     Ok(Declaration::Memo(memo))
                 }
+                TokenType::Enum => {
+                    let enum_decl = self.parse_enum()?;
+                    Ok(Declaration::Enum(enum_decl))
+                }
+                TokenType::Struct => {
+                    let struct_decl = self.parse_struct()?;
+                    Ok(Declaration::Struct(struct_decl))
+                }
+                TokenType::Class => {
+                    let class_decl = self.parse_class()?;
+                    Ok(Declaration::Class(class_decl))
+                }
+                TokenType::Abstract => {
+                    // Handle abstract class
+                    let class_decl = self.parse_class()?;
+                    Ok(Declaration::Class(class_decl))
+                }
+                TokenType::Trait => {
+                    let trait_decl = self.parse_trait()?;
+                    Ok(Declaration::Trait(trait_decl))
+                }
+                TokenType::Impl => {
+                    let impl_decl = self.parse_impl()?;
+                    Ok(Declaration::Impl(impl_decl))
+                }
+                TokenType::Lib => {
+                    let lib_import = self.parse_lib_import_statement()?;
+                    Ok(Declaration::LibImport(lib_import))
+                }
                 TokenType::Identifier(_) => {
                     // Global variable declaration: name : type = value;
                     let stmt = self.parse_global_variable()?;
@@ -246,7 +275,60 @@ impl Parser {
             position,
         })
     }
-    
+
+    /// Parse abstract function declaration (no body, ends with semicolon)
+    fn parse_abstract_function(&mut self) -> Result<FunctionDeclaration, ParseError> {
+        let fn_token = self.expect(TokenType::Fn, "Expected 'fn'")?;
+        let position = Position::new(fn_token.line, fn_token.column);
+
+        let name_token = self.expect(TokenType::Identifier(String::new()), "Expected function name")?;
+        let name = if let TokenType::Identifier(n) = name_token.token_type {
+            n
+        } else {
+            return Err(ParseError::new("Expected function name".to_string(), position));
+        };
+
+        self.expect(TokenType::LeftParen, "Expected '(' after function name")?;
+
+        let mut parameters = Vec::new();
+
+        if !self.check(&TokenType::RightParen) {
+            loop {
+                let param = self.parse_parameter()?;
+                parameters.push(param);
+
+                if !self.match_token(TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+
+        self.expect(TokenType::RightParen, "Expected ')' after parameters")?;
+
+        let return_type = if self.match_token(TokenType::Colon) {
+            Some(self.parse_type_annotation()?)
+        } else {
+            None
+        };
+
+        // Abstract methods end with semicolon, not a body
+        self.expect(TokenType::Semicolon, "Expected ';' after abstract method signature")?;
+
+        // Create an empty block as the body for abstract methods
+        let empty_body = Statement::Block {
+            statements: Vec::new(),
+            position: position.clone(),
+        };
+
+        Ok(FunctionDeclaration {
+            name,
+            parameters,
+            return_type,
+            body: empty_body,
+            position,
+        })
+    }
+
     /// Parse function parameter
     fn parse_parameter(&mut self) -> Result<Parameter, ParseError> {
         let name_token = self.expect(TokenType::Identifier(String::new()), "Expected parameter name")?;
@@ -269,6 +351,11 @@ impl Parser {
         })
     }
     
+    /// Parse type annotation (alias for parse_type_annotation)
+    fn parse_type(&mut self) -> Result<TypeAnnotation, ParseError> {
+        self.parse_type_annotation()
+    }
+
     /// Parse type annotation
     fn parse_type_annotation(&mut self) -> Result<TypeAnnotation, ParseError> {
         if let Some(token) = self.peek() {
@@ -388,8 +475,12 @@ impl Parser {
                 // Parse nested namespace
                 let nested_ns = self.parse_namespace()?;
                 items.push(NamespaceItem::Namespace(nested_ns));
+            } else if self.check(&TokenType::Var) {
+                // Parse namespace variable
+                let var_stmt = self.parse_variable_declaration()?;
+                items.push(NamespaceItem::Variable(var_stmt));
             } else {
-                // TODO: Parse other namespace items (variables)
+                // Unknown token in namespace
                 break;
             }
             self.skip_newlines();
@@ -621,6 +712,9 @@ impl Parser {
                 TokenType::Throw => {
                     self.parse_throw_statement()
                 }
+                TokenType::Lib => {
+                    self.parse_lib_import_statement()
+                }
                 _ => {
                     // Expression statement
                     let expr = self.parse_expression()?;
@@ -656,16 +750,20 @@ impl Parser {
             ));
         };
         
-        let type_annotation = if self.match_token(TokenType::Colon) {
-            Some(self.parse_type_annotation()?)
+        let (type_annotation, initializer) = if self.match_token(TokenType::ColonAssign) {
+            // := syntax - type inference from initializer
+            (None, Some(self.parse_expression()?))
+        } else if self.match_token(TokenType::Colon) {
+            // : type syntax - explicit type annotation
+            let type_ann = Some(self.parse_type_annotation()?);
+            let init = if self.match_token(TokenType::Assign) {
+                Some(self.parse_expression()?)
+            } else {
+                None
+            };
+            (type_ann, init)
         } else {
-            None
-        };
-        
-        let initializer = if self.match_token(TokenType::Assign) {
-            Some(self.parse_expression()?)
-        } else {
-            None
+            (None, None)
         };
         
         self.expect(TokenType::Semicolon, "Expected ';' after variable declaration")?;
@@ -683,15 +781,20 @@ impl Parser {
     fn parse_return_statement(&mut self) -> Result<Statement, ParseError> {
         let return_token = self.expect(TokenType::Return, "Expected 'return'")?;
         let position = Position::new(return_token.line, return_token.column);
-        
-        let value = if self.check(&TokenType::Semicolon) {
+
+        let value = if self.check(&TokenType::Semicolon) || self.check(&TokenType::Newline) || self.check(&TokenType::RightBrace) {
             None
         } else {
             Some(self.parse_expression()?)
         };
-        
-        self.expect(TokenType::Semicolon, "Expected ';' after return statement")?;
-        
+
+        // Semicolon is optional if we're at the end of a block or line
+        if self.check(&TokenType::Semicolon) {
+            self.advance();
+        } else if !self.check(&TokenType::Newline) && !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
+            return Err(ParseError::new("Expected ';' after return statement".to_string(), position));
+        }
+
         Ok(Statement::Return { value, position })
     }
     
@@ -907,6 +1010,11 @@ impl Parser {
         })
     }
 
+    /// Parse block (alias for parse_block_statement)
+    fn parse_block(&mut self) -> Result<Statement, ParseError> {
+        self.parse_block_statement()
+    }
+
     /// Parse block statement
     fn parse_block_statement(&mut self) -> Result<Statement, ParseError> {
         let brace_token = self.expect(TokenType::LeftBrace, "Expected '{'")?;
@@ -932,14 +1040,42 @@ impl Parser {
     
     /// Parse assignment expression
     fn parse_assignment(&mut self) -> Result<Expression, ParseError> {
-        let expr = self.parse_logical_or()?;
+        let expr = self.parse_ternary()?;
 
-        if self.match_token(TokenType::Assign) {
+        if let Some(token) = self.peek() {
+            let operator = match &token.token_type {
+                TokenType::Assign => {
+                    self.advance();
+                    BinaryOperator::Assign
+                }
+                TokenType::PlusEqual => {
+                    self.advance();
+                    BinaryOperator::AddAssign
+                }
+                TokenType::MinusEqual => {
+                    self.advance();
+                    BinaryOperator::SubtractAssign
+                }
+                TokenType::MultiplyEqual => {
+                    self.advance();
+                    BinaryOperator::MultiplyAssign
+                }
+                TokenType::DivideEqual => {
+                    self.advance();
+                    BinaryOperator::DivideAssign
+                }
+                TokenType::ModuloEqual => {
+                    self.advance();
+                    BinaryOperator::ModuloAssign
+                }
+                _ => return Ok(expr),
+            };
+
             let position = expr.position().clone();
             let right = self.parse_assignment()?;
             return Ok(Expression::Binary {
                 left: Box::new(expr),
-                operator: BinaryOperator::Assign,
+                operator,
                 right: Box::new(right),
                 position,
             });
@@ -947,7 +1083,31 @@ impl Parser {
 
         Ok(expr)
     }
-    
+
+    /// Parse ternary conditional expression (condition ? true_expr : false_expr)
+    fn parse_ternary(&mut self) -> Result<Expression, ParseError> {
+        let expr = self.parse_logical_or()?;
+
+        if self.match_token(TokenType::Question) {
+            let position = expr.position().clone();
+            self.skip_newlines(); // Allow newlines after ?
+            let true_expr = self.parse_expression()?;
+            self.skip_newlines(); // Allow newlines before :
+            self.expect(TokenType::Colon, "Expected ':' after true expression in ternary operator")?;
+            self.skip_newlines(); // Allow newlines after :
+            let false_expr = self.parse_ternary()?;
+
+            return Ok(Expression::Ternary {
+                condition: Box::new(expr),
+                true_expr: Box::new(true_expr),
+                false_expr: Box::new(false_expr),
+                position,
+            });
+        }
+
+        Ok(expr)
+    }
+
     /// Parse logical OR expression
     fn parse_logical_or(&mut self) -> Result<Expression, ParseError> {
         let mut expr = self.parse_bit_or()?;
@@ -1251,7 +1411,25 @@ impl Parser {
                         position,
                     })
                 }
-                _ => self.parse_call(),
+                TokenType::PlusPlus => {
+                    self.advance();
+                    let operand = self.parse_unary()?;
+                    Ok(Expression::Unary {
+                        operator: UnaryOperator::PreIncrement,
+                        operand: Box::new(operand),
+                        position,
+                    })
+                }
+                TokenType::MinusMinus => {
+                    self.advance();
+                    let operand = self.parse_unary()?;
+                    Ok(Expression::Unary {
+                        operator: UnaryOperator::PreDecrement,
+                        operand: Box::new(operand),
+                        position,
+                    })
+                }
+                _ => self.parse_postfix(),
             }
         } else {
             Err(ParseError::new(
@@ -1260,7 +1438,38 @@ impl Parser {
             ))
         }
     }
-    
+
+    /// Parse postfix expression (for postfix increment/decrement)
+    fn parse_postfix(&mut self) -> Result<Expression, ParseError> {
+        let mut expr = self.parse_call()?;
+
+        while let Some(token) = self.peek() {
+            match token.token_type {
+                TokenType::PlusPlus => {
+                    let position = expr.position().clone();
+                    self.advance();
+                    expr = Expression::Unary {
+                        operator: UnaryOperator::PostIncrement,
+                        operand: Box::new(expr),
+                        position,
+                    };
+                }
+                TokenType::MinusMinus => {
+                    let position = expr.position().clone();
+                    self.advance();
+                    expr = Expression::Unary {
+                        operator: UnaryOperator::PostDecrement,
+                        operand: Box::new(expr),
+                        position,
+                    };
+                }
+                _ => break,
+            }
+        }
+
+        Ok(expr)
+    }
+
     /// Parse call expression
     fn parse_call(&mut self) -> Result<Expression, ParseError> {
         let mut expr = self.parse_primary()?;
@@ -1299,24 +1508,55 @@ impl Parser {
                     position,
                 };
             } else if self.match_token(TokenType::Dot) {
-                // Field access
-                let field_token = self.peek().ok_or_else(|| ParseError::new("Expected field name after '.'".to_string(),
+                // Field access or method call
+                let member_token = self.peek().ok_or_else(|| ParseError::new("Expected member name after '.'".to_string(),
                     Position::new(0, 0)))?;
-                let field_name = if let TokenType::Identifier(name) = &field_token.token_type {
+                let member_name = if let TokenType::Identifier(name) = &member_token.token_type {
                     let name = name.clone();
                     self.advance();
                     name
                 } else {
                     return Err(ParseError::new("Expected identifier after '.'".to_string(),
-                        Position::new(field_token.line, field_token.column)));
+                        Position::new(member_token.line, member_token.column)));
                 };
 
                 let position = expr.position().clone();
-                expr = Expression::FieldAccess {
-                    object: Box::new(expr),
-                    field: field_name,
-                    position,
-                };
+
+                // Check if this is a method call (followed by '(')
+                if self.check(&TokenType::LeftParen) {
+                    self.advance(); // consume '('
+                    let mut arguments = Vec::new();
+
+                    if !self.check(&TokenType::RightParen) {
+                        loop {
+                            let arg = self.parse_expression()?;
+                            arguments.push(arg);
+
+                            if self.match_token(TokenType::Comma) {
+                                continue;
+                            } else if self.check(&TokenType::RightParen) {
+                                break;
+                            } else {
+                                return Err(ParseError::new("Expected ',' or ')' in method call".to_string(), position));
+                            }
+                        }
+                    }
+
+                    self.expect(TokenType::RightParen, "Expected ')' after method arguments")?;
+                    expr = Expression::MethodCall {
+                        object: Box::new(expr),
+                        method_name: member_name,
+                        arguments,
+                        position,
+                    };
+                } else {
+                    // Field access
+                    expr = Expression::FieldAccess {
+                        object: Box::new(expr),
+                        field: member_name,
+                        position,
+                    };
+                }
             } else {
                 break;
             }
@@ -1358,13 +1598,62 @@ impl Parser {
                     self.advance();
                     Ok(Expression::Null(position))
                 }
+                TokenType::Super => {
+                    self.advance(); // consume 'super'
+
+                    if self.match_token(TokenType::Dot) {
+                        // super.field or super.method()
+                        let member_token = self.expect(TokenType::Identifier(String::new()), "Expected member name after 'super.'")?;
+                        let member_name = if let TokenType::Identifier(n) = member_token.token_type {
+                            n
+                        } else {
+                            return Err(ParseError::new("Expected member name".to_string(), position));
+                        };
+
+                        if self.check(&TokenType::LeftParen) {
+                            // super.method_name(args...)
+                            self.advance(); // consume '('
+                            let mut arguments = Vec::new();
+
+                            if !self.check(&TokenType::RightParen) {
+                                loop {
+                                    let arg = self.parse_expression()?;
+                                    arguments.push(arg);
+
+                                    if self.match_token(TokenType::Comma) {
+                                        continue;
+                                    } else if self.check(&TokenType::RightParen) {
+                                        break;
+                                    } else {
+                                        return Err(ParseError::new("Expected ',' or ')' in super method call".to_string(), position));
+                                    }
+                                }
+                            }
+
+                            self.expect(TokenType::RightParen, "Expected ')' after super method arguments")?;
+                            Ok(Expression::SuperCall {
+                                method_name: member_name,
+                                arguments,
+                                position,
+                            })
+                        } else {
+                            // super.field_name
+                            Ok(Expression::SuperFieldAccess {
+                                field_name: member_name,
+                                position,
+                            })
+                        }
+                    } else {
+                        return Err(ParseError::new("Expected '.' after 'super'".to_string(), position));
+                    }
+                }
                 TokenType::Identifier(name) => {
                     let name = name.clone();
                     self.advance();
                     
-                    // Check for namespace access (support multiple levels)
+                    // Check for namespace access or static member access (support multiple levels)
                     if self.match_token(TokenType::DoubleColon) {
-                        let mut namespace_path = vec![name];
+                        let mut namespace_path = vec![name.clone()];
 
                         // Parse the rest of the namespace path
                         loop {
@@ -1375,6 +1664,7 @@ impl Parser {
                                     namespace_path.push(member);
                                 } else {
                                     // This is the final member name
+                                    // Always treat as namespace access first, let semantic analysis decide
                                     return Ok(Expression::NamespaceAccess {
                                         namespace_path,
                                         name: member,
@@ -1385,7 +1675,45 @@ impl Parser {
                                 return Err(ParseError::new("Expected member name".to_string(), position));
                             }
                         }
+                    } else if self.check(&TokenType::LeftBrace) {
+                        // This might be a struct construction: StructName { field: value, ... }
+                        self.advance(); // consume '{'
+                        let mut fields = Vec::new();
+
+                        // Handle empty struct
+                        if self.match_token(TokenType::RightBrace) {
+                            return Ok(Expression::Object(fields, position));
+                        }
+
+                        // Parse struct fields
+                        loop {
+                            // Parse field name (must be identifier)
+                            let field_token = self.expect(TokenType::Identifier(String::new()), "Expected field name")?;
+                            let field_name = if let TokenType::Identifier(n) = field_token.token_type {
+                                n
+                            } else {
+                                return Err(ParseError::new("Expected field name".to_string(), position));
+                            };
+
+                            // Expect colon
+                            self.expect(TokenType::Colon, "Expected ':' after field name")?;
+
+                            // Parse value
+                            let value = self.parse_expression()?;
+                            fields.push((field_name, value));
+
+                            if self.match_token(TokenType::Comma) {
+                                continue;
+                            } else if self.match_token(TokenType::RightBrace) {
+                                break;
+                            } else {
+                                return Err(ParseError::new("Expected ',' or '}' in struct literal".to_string(), position));
+                            }
+                        }
+
+                        Ok(Expression::Object(fields, position))
                     } else {
+                        // Simple identifier
                         Ok(Expression::Identifier(name, position))
                     }
                 }
@@ -1462,6 +1790,15 @@ impl Parser {
                     }
 
                     Ok(Expression::Object(fields, position))
+                }
+                TokenType::Pipe => {
+                    // Lambda expression: |param1, param2| body
+                    self.parse_lambda()
+                }
+                TokenType::Match => {
+                    // Match expression: match expr { ... }
+                    self.advance(); // consume 'match' token
+                    self.parse_match()
                 }
                 _ => {
                     Err(ParseError::new(
@@ -1577,9 +1914,1221 @@ impl Parser {
         })
     }
 
+    /// Parse library import statement
+    fn parse_lib_import_statement(&mut self) -> Result<Statement, ParseError> {
+        let lib_token = self.advance().unwrap(); // consume 'lib'
+        let position = Position::new(lib_token.line, lib_token.column);
+
+        // Check for system library import: lib <library_name>;
+        if self.match_token(TokenType::Less) {
+            // Parse system library name
+            let library_name = if let Some(token) = self.advance() {
+                match &token.token_type {
+                    TokenType::Identifier(name) => name.clone(),
+                    _ => return Err(ParseError::new(
+                        "Expected library name after 'lib <'".to_string(),
+                        Position::new(token.line, token.column),
+                    )),
+                }
+            } else {
+                return Err(ParseError::new(
+                    "Expected library name after 'lib <'".to_string(),
+                    position,
+                ));
+            };
+
+            self.expect(TokenType::Greater, "Expected '>' after system library name")?;
+            self.expect(TokenType::Semicolon, "Expected ';' after library import")?;
+
+            return Ok(Statement::LibImport {
+                library_name,
+                import_type: LibImportType::System,
+                position,
+            });
+        }
+
+        // Check for local library import: lib "library_name";
+        if let Some(token) = self.peek() {
+            match &token.token_type {
+                TokenType::String(library_name) => {
+                    let library_name = library_name.clone();
+                    self.advance(); // consume string
+                    self.expect(TokenType::Semicolon, "Expected ';' after library import")?;
+
+                    return Ok(Statement::LibImport {
+                        library_name,
+                        import_type: LibImportType::Local,
+                        position,
+                    });
+                }
+                _ => {
+                    return Err(ParseError::new(
+                        "Expected '<library_name>' or \"library_name\" after 'lib'".to_string(),
+                        Position::new(token.line, token.column),
+                    ));
+                }
+            }
+        }
+
+        Err(ParseError::new(
+            "Expected library import syntax: 'lib <name>;' or 'lib \"name\";'".to_string(),
+            position,
+        ))
+    }
+
     /// Check if we're at the end of tokens
     fn is_at_end(&self) -> bool {
         self.current >= self.tokens.len()
+    }
+    /// Parse enum declaration
+    fn parse_enum(&mut self) -> Result<EnumDeclaration, ParseError> {
+        let enum_token = self.expect(TokenType::Enum, "Expected 'enum'")?;
+        let position = Position::new(enum_token.line, enum_token.column);
+
+        let name_token = self.expect(TokenType::Identifier(String::new()), "Expected enum name")?;
+        let name = if let TokenType::Identifier(n) = name_token.token_type {
+            n
+        } else {
+            return Err(ParseError::new("Expected enum name".to_string(), position));
+        };
+
+        self.expect(TokenType::LeftBrace, "Expected '{' after enum name")?;
+
+        let mut variants = Vec::new();
+
+        while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
+            // Skip newlines
+            while self.check(&TokenType::Newline) {
+                self.advance();
+            }
+
+            // Check if we've reached the end
+            if self.check(&TokenType::RightBrace) || self.check(&TokenType::Eof) {
+                break;
+            }
+
+            let variant_token = self.expect(TokenType::Identifier(String::new()), "Expected variant name")?;
+            let variant_name = if let TokenType::Identifier(n) = variant_token.token_type {
+                n
+            } else {
+                return Err(ParseError::new("Expected variant name".to_string(), position));
+            };
+
+            let variant_position = Position::new(variant_token.line, variant_token.column);
+
+            // Check for associated types (tuple-like variants)
+            let value = if self.check(&TokenType::LeftParen) {
+                self.advance(); // consume '('
+
+                // Parse type annotations for tuple-like enum variants
+                let mut types = Vec::new();
+
+                if !self.check(&TokenType::RightParen) {
+                    loop {
+                        let type_annotation = self.parse_type_annotation()?;
+                        // Convert type annotation to a dummy expression for compatibility
+                        // This is a temporary solution - ideally we'd modify the AST
+                        let dummy_expr = Expression::String(
+                            format!("{:?}", type_annotation),
+                            variant_position.clone(),
+                        );
+                        types.push(dummy_expr);
+
+                        if !self.match_token(TokenType::Comma) {
+                            break;
+                        }
+                    }
+                }
+
+                self.expect(TokenType::RightParen, "Expected ')' after variant types")?;
+
+                // For now, just use the first type as the value
+                // TODO: Modify AST to support multiple types per variant
+                types.into_iter().next()
+            } else {
+                None
+            };
+
+            variants.push(EnumVariant {
+                name: variant_name,
+                value,
+                position: variant_position,
+            });
+
+            // Skip optional comma and newlines
+            if self.check(&TokenType::Comma) {
+                self.advance();
+            }
+
+            // Skip trailing newlines
+            while self.check(&TokenType::Newline) {
+                self.advance();
+            }
+        }
+
+        self.expect(TokenType::RightBrace, "Expected '}' after enum variants")?;
+
+        Ok(EnumDeclaration {
+            name,
+            variants,
+            position,
+        })
+    }
+
+    /// Parse struct declaration
+    fn parse_struct(&mut self) -> Result<StructDeclaration, ParseError> {
+        let struct_token = self.expect(TokenType::Struct, "Expected 'struct'")?;
+        let position = Position::new(struct_token.line, struct_token.column);
+
+        let name_token = self.expect(TokenType::Identifier(String::new()), "Expected struct name")?;
+        let name = if let TokenType::Identifier(n) = name_token.token_type {
+            n
+        } else {
+            return Err(ParseError::new("Expected struct name".to_string(), position));
+        };
+
+        self.expect(TokenType::LeftBrace, "Expected '{' after struct name")?;
+
+        let mut fields = Vec::new();
+
+        while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
+            // Skip newlines
+            while self.check(&TokenType::Newline) {
+                self.advance();
+            }
+
+            // Check if we've reached the end
+            if self.check(&TokenType::RightBrace) || self.check(&TokenType::Eof) {
+                break;
+            }
+
+            let field_token = self.expect(TokenType::Identifier(String::new()), "Expected field name")?;
+            let field_name = if let TokenType::Identifier(n) = field_token.token_type {
+                n
+            } else {
+                return Err(ParseError::new("Expected field name".to_string(), position));
+            };
+
+            let field_position = Position::new(field_token.line, field_token.column);
+
+            self.expect(TokenType::Colon, "Expected ':' after field name")?;
+            let field_type = self.parse_type()?;
+
+            fields.push(StructField {
+                name: field_name,
+                type_annotation: field_type,
+                position: field_position,
+            });
+
+            // Skip optional comma and newlines
+            if self.check(&TokenType::Comma) {
+                self.advance();
+            }
+
+            // Skip trailing newlines
+            while self.check(&TokenType::Newline) {
+                self.advance();
+            }
+        }
+
+        self.expect(TokenType::RightBrace, "Expected '}' after struct fields")?;
+
+        Ok(StructDeclaration {
+            name,
+            fields,
+            position,
+        })
+    }
+
+    /// Parse trait declaration
+    fn parse_trait(&mut self) -> Result<TraitDeclaration, ParseError> {
+        let trait_token = self.expect(TokenType::Trait, "Expected 'trait'")?;
+        let position = Position::new(trait_token.line, trait_token.column);
+
+        let name_token = self.expect(TokenType::Identifier(String::new()), "Expected trait name")?;
+        let name = if let TokenType::Identifier(n) = name_token.token_type {
+            n
+        } else {
+            return Err(ParseError::new("Expected trait name".to_string(), position));
+        };
+
+        self.expect(TokenType::LeftBrace, "Expected '{' after trait name")?;
+
+        let mut methods = Vec::new();
+
+        while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
+            // Skip newlines
+            while self.check(&TokenType::Newline) {
+                self.advance();
+            }
+
+            // Check if we've reached the end
+            if self.check(&TokenType::RightBrace) || self.check(&TokenType::Eof) {
+                break;
+            }
+
+            self.expect(TokenType::Fn, "Expected 'fn' for trait method")?;
+
+            let method_token = self.expect(TokenType::Identifier(String::new()), "Expected method name")?;
+            let method_name = if let TokenType::Identifier(n) = method_token.token_type {
+                n
+            } else {
+                return Err(ParseError::new("Expected method name".to_string(), position));
+            };
+
+            let method_position = Position::new(method_token.line, method_token.column);
+
+            self.expect(TokenType::LeftParen, "Expected '(' after method name")?;
+
+            let mut parameters = Vec::new();
+
+            if !self.check(&TokenType::RightParen) {
+                loop {
+                    let param_token = self.expect(TokenType::Identifier(String::new()), "Expected parameter name")?;
+                    let param_name = if let TokenType::Identifier(n) = param_token.token_type {
+                        n
+                    } else {
+                        return Err(ParseError::new("Expected parameter name".to_string(), position));
+                    };
+
+                    self.expect(TokenType::Colon, "Expected ':' after parameter name")?;
+                    let param_type = self.parse_type()?;
+
+                    parameters.push(Parameter {
+                        name: param_name,
+                        type_annotation: param_type,
+                        position: Position::new(param_token.line, param_token.column),
+                    });
+
+                    if self.check(&TokenType::Comma) {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            self.expect(TokenType::RightParen, "Expected ')' after parameters")?;
+
+            let return_type = if self.check(&TokenType::Colon) {
+                self.advance();
+                Some(self.parse_type()?)
+            } else {
+                None
+            };
+
+            // Check for default implementation
+            let default_body = if self.check(&TokenType::LeftBrace) {
+                Some(self.parse_block()?)
+            } else {
+                self.expect(TokenType::Semicolon, "Expected ';' after trait method signature")?;
+                None
+            };
+
+            let is_required = default_body.is_none();
+            methods.push(TraitMethod {
+                name: method_name,
+                parameters,
+                return_type,
+                default_body,
+                is_required,
+                position: method_position,
+            });
+        }
+
+        self.expect(TokenType::RightBrace, "Expected '}' after trait methods")?;
+
+        Ok(TraitDeclaration {
+            name,
+            super_traits: Vec::new(),  // TODO: Support trait inheritance
+            methods,
+            default_methods: Vec::new(),  // TODO: Separate default methods
+            associated_types: Vec::new(),  // TODO: Support associated types
+            position,
+        })
+    }
+
+    /// Parse impl declaration
+    fn parse_impl(&mut self) -> Result<ImplDeclaration, ParseError> {
+        let impl_token = self.expect(TokenType::Impl, "Expected 'impl'")?;
+        let position = Position::new(impl_token.line, impl_token.column);
+
+        // Parse either "impl TraitName for TypeName" or "impl TypeName"
+        let first_name_token = self.expect(TokenType::Identifier(String::new()), "Expected type or trait name")?;
+        let first_name = if let TokenType::Identifier(n) = first_name_token.token_type {
+            n
+        } else {
+            return Err(ParseError::new("Expected type or trait name".to_string(), position));
+        };
+
+        let (trait_name, type_name) = if self.check(&TokenType::For) {
+            // impl TraitName for TypeName
+            self.advance(); // consume 'for'
+            let type_token = self.expect(TokenType::Identifier(String::new()), "Expected type name after 'for'")?;
+            let type_name = if let TokenType::Identifier(n) = type_token.token_type {
+                n
+            } else {
+                return Err(ParseError::new("Expected type name".to_string(), position));
+            };
+            (Some(first_name), type_name)
+        } else {
+            // impl TypeName
+            (None, first_name)
+        };
+
+        self.expect(TokenType::LeftBrace, "Expected '{' after impl declaration")?;
+
+        let mut methods = Vec::new();
+
+        while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
+            // Skip newlines
+            while self.check(&TokenType::Newline) {
+                self.advance();
+            }
+
+            // Check if we've reached the end
+            if self.check(&TokenType::RightBrace) || self.check(&TokenType::Eof) {
+                break;
+            }
+
+            let method = self.parse_function()?;
+            methods.push(method);
+        }
+
+        self.expect(TokenType::RightBrace, "Expected '}' after impl methods")?;
+
+        Ok(ImplDeclaration {
+            trait_name,
+            type_name,
+            methods,
+            position,
+        })
+    }
+
+    /// Parse class declaration
+    fn parse_class(&mut self) -> Result<ClassDeclaration, ParseError> {
+        // Check for abstract keyword
+        let is_abstract = if self.check(&TokenType::Abstract) {
+            self.advance(); // consume 'abstract'
+            true
+        } else {
+            false
+        };
+
+        let class_token = self.expect(TokenType::Class, "Expected 'class'")?;
+        let position = Position::new(class_token.line, class_token.column);
+
+        let name_token = self.expect(TokenType::Identifier(String::new()), "Expected class name")?;
+        let name = if let TokenType::Identifier(n) = name_token.token_type {
+            n
+        } else {
+            return Err(ParseError::new("Expected class name".to_string(), position));
+        };
+
+        // Parse generic parameters if present
+        let mut generic_parameters = Vec::new();
+        if self.match_token(TokenType::Less) {
+            loop {
+                let param_token = self.expect(TokenType::Identifier(String::new()), "Expected generic parameter name")?;
+                let param_name = if let TokenType::Identifier(name) = param_token.token_type {
+                    name
+                } else {
+                    return Err(ParseError::new("Expected generic parameter name".to_string(), position));
+                };
+
+                // TODO: Parse type bounds (e.g., T: Drawable + Movable)
+                let bounds = Vec::new();
+
+                generic_parameters.push(crate::lang::ast::GenericParameter {
+                    name: param_name,
+                    bounds,
+                    position: Position::new(param_token.line, param_token.column),
+                });
+
+                if self.match_token(TokenType::Comma) {
+                    continue;
+                } else if self.match_token(TokenType::Greater) {
+                    break;
+                } else {
+                    return Err(ParseError::new("Expected ',' or '>' in generic parameter list".to_string(), position));
+                }
+            }
+        }
+
+        // Check for inheritance (extends keyword)
+        let base_class = if self.match_token(TokenType::Extends) {
+            let base_name_token = self.expect(TokenType::Identifier(String::new()), "Expected base class name after 'extends'")?;
+            if let TokenType::Identifier(base_name) = base_name_token.token_type {
+                Some(base_name)
+            } else {
+                return Err(ParseError::new("Expected base class name".to_string(), position));
+            }
+        } else {
+            None
+        };
+
+        // Check for interface implementation (implements keyword)
+        let mut implemented_traits = Vec::new();
+        if self.match_token(TokenType::Implements) {
+            loop {
+                let trait_name_token = self.expect(TokenType::Identifier(String::new()), "Expected trait name after 'implements'")?;
+                if let TokenType::Identifier(trait_name) = trait_name_token.token_type {
+                    implemented_traits.push(trait_name);
+                } else {
+                    return Err(ParseError::new("Expected trait name".to_string(), position));
+                }
+
+                if self.match_token(TokenType::Comma) {
+                    continue; // Parse next trait
+                } else {
+                    break; // No more traits
+                }
+            }
+        }
+
+        self.expect(TokenType::LeftBrace, "Expected '{' after class name or base class")?;
+
+        let mut fields = Vec::new();
+        let mut constructor = None;
+        let mut destructor = None;
+        let mut methods = Vec::new();
+        let mut friend_classes = Vec::new();
+
+        while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
+            // Skip newlines
+            while self.check(&TokenType::Newline) {
+                self.advance();
+            }
+
+            // Check if we've reached the end
+            if self.check(&TokenType::RightBrace) || self.check(&TokenType::Eof) {
+                break;
+            }
+
+            // Parse class members
+            if let Some(token) = self.peek() {
+                match &token.token_type {
+                    // Access modifiers
+                    TokenType::Public | TokenType::Private | TokenType::Protected | TokenType::Package => {
+                        let access_modifier = self.parse_access_modifier()?;
+
+                        // Check what follows the access modifier
+                        if let Some(next_token) = self.peek() {
+                            match &next_token.token_type {
+                                TokenType::Static => {
+                                    self.advance(); // consume 'static'
+                                    if let Some(after_static) = self.peek() {
+                                        match &after_static.token_type {
+                                            TokenType::Fn => {
+                                                let line = after_static.line;
+                                                let column = after_static.column;
+                                                let (method, ctor) = self.parse_class_method_or_constructor(&name, access_modifier, true, false, false, false)?;
+                                                if let Some(method) = method {
+                                                    methods.push(method);
+                                                }
+                                                if let Some(_ctor) = ctor {
+                                                    return Err(ParseError::new("Constructors cannot be static".to_string(), Position::new(line, column)));
+                                                }
+                                            }
+                                            TokenType::Identifier(_) => {
+                                                let field = self.parse_class_field(access_modifier, true)?;
+                                                fields.push(field);
+                                            }
+                                            _ => {
+                                                return Err(ParseError::new(
+                                                    "Expected field or method after 'static'".to_string(),
+                                                    Position::new(after_static.line, after_static.column)
+                                                ));
+                                            }
+                                        }
+                                    }
+                                }
+                                TokenType::Fn => {
+                                    let (method, ctor) = self.parse_class_method_or_constructor(&name, access_modifier, false, false, false, false)?;
+                                    if let Some(method) = method {
+                                        methods.push(method);
+                                    }
+                                    if let Some(ctor) = ctor {
+                                        if constructor.is_some() {
+                                            return Err(ParseError::new("Multiple constructors not allowed".to_string(), Position::new(self.peek().unwrap().line, self.peek().unwrap().column)));
+                                        }
+                                        constructor = Some(ctor);
+                                    }
+                                }
+                                TokenType::Virtual => {
+                                    self.advance(); // consume 'virtual'
+                                    if self.check(&TokenType::Fn) {
+                                        let (method, ctor) = self.parse_class_method_or_constructor(&name, access_modifier, false, true, false, false)?;
+                                        if let Some(method) = method {
+                                            methods.push(method);
+                                        }
+                                        if let Some(_ctor) = ctor {
+                                            return Err(ParseError::new("Constructors cannot be virtual".to_string(), Position::new(self.peek().unwrap().line, self.peek().unwrap().column)));
+                                        }
+                                    } else {
+                                        return Err(ParseError::new(
+                                            "Expected 'fn' after 'virtual'".to_string(),
+                                            Position::new(self.peek().unwrap().line, self.peek().unwrap().column)
+                                        ));
+                                    }
+                                }
+                                TokenType::Override => {
+                                    self.advance(); // consume 'override'
+                                    if self.check(&TokenType::Fn) {
+                                        let (method, ctor) = self.parse_class_method_or_constructor(&name, access_modifier, false, false, true, false)?;
+                                        if let Some(method) = method {
+                                            methods.push(method);
+                                        }
+                                        if let Some(_ctor) = ctor {
+                                            return Err(ParseError::new("Constructors cannot be override".to_string(), Position::new(self.peek().unwrap().line, self.peek().unwrap().column)));
+                                        }
+                                    } else {
+                                        return Err(ParseError::new(
+                                            "Expected 'fn' after 'override'".to_string(),
+                                            Position::new(self.peek().unwrap().line, self.peek().unwrap().column)
+                                        ));
+                                    }
+                                }
+                                TokenType::Abstract => {
+                                    self.advance(); // consume 'abstract'
+                                    if self.check(&TokenType::Fn) {
+                                        let (method, ctor) = self.parse_class_method_or_constructor(&name, access_modifier, false, false, false, true)?;
+                                        if let Some(method) = method {
+                                            methods.push(method);
+                                        }
+                                        if let Some(_ctor) = ctor {
+                                            return Err(ParseError::new("Constructors cannot be abstract".to_string(), Position::new(self.peek().unwrap().line, self.peek().unwrap().column)));
+                                        }
+                                    } else {
+                                        return Err(ParseError::new(
+                                            "Expected 'fn' after 'abstract'".to_string(),
+                                            Position::new(self.peek().unwrap().line, self.peek().unwrap().column)
+                                        ));
+                                    }
+                                }
+                                TokenType::Identifier(id) => {
+                                    // Check if this is a constructor (identifier matches class name)
+                                    if id == &name {
+                                        if constructor.is_some() {
+                                            return Err(ParseError::new("Multiple constructors not allowed".to_string(), Position::new(next_token.line, next_token.column)));
+                                        }
+                                        constructor = Some(self.parse_constructor(&name, access_modifier)?);
+                                    } else {
+                                        let field = self.parse_class_field(access_modifier, false)?;
+                                        fields.push(field);
+                                    }
+                                }
+                                _ => {
+                                    return Err(ParseError::new(
+                                        "Expected field or method after access modifier".to_string(),
+                                        Position::new(next_token.line, next_token.column)
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    // Static members without explicit access modifier
+                    TokenType::Static => {
+                        self.advance(); // consume 'static'
+                        if let Some(next_token) = self.peek() {
+                            match &next_token.token_type {
+                                TokenType::Fn => {
+                                    let method = self.parse_class_method(AccessModifier::Public, true, false, false, false)?;
+                                    methods.push(method);
+                                }
+                                TokenType::Identifier(_) => {
+                                    let field = self.parse_class_field(AccessModifier::Public, true)?;
+                                    fields.push(field);
+                                }
+                                _ => {
+                                    return Err(ParseError::new(
+                                        "Expected field or method after 'static'".to_string(),
+                                        Position::new(next_token.line, next_token.column)
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    // Constructor: class_name(params) { ... }
+                    TokenType::Identifier(id) if id == &name => {
+                        if constructor.is_some() {
+                            return Err(ParseError::new("Multiple constructors not allowed".to_string(), position));
+                        }
+                        constructor = Some(self.parse_constructor(&name, AccessModifier::Public)?);
+                    }
+                    // Destructor: ~class_name() { ... }
+                    TokenType::BitNot => {
+                        if destructor.is_some() {
+                            return Err(ParseError::new("Multiple destructors not allowed".to_string(), position));
+                        }
+                        destructor = Some(self.parse_destructor(&name)?);
+                    }
+                    // Virtual method: virtual fn method_name(params) { ... }
+                    TokenType::Virtual => {
+                        self.advance(); // consume 'virtual'
+                        if self.check(&TokenType::Fn) {
+                            let method = self.parse_class_method(AccessModifier::Public, false, true, false, false)?;
+                            methods.push(method);
+                        } else {
+                            return Err(ParseError::new(
+                                "Expected 'fn' after 'virtual'".to_string(),
+                                Position::new(self.peek().unwrap().line, self.peek().unwrap().column)
+                            ));
+                        }
+                    }
+                    // Override method: override fn method_name(params) { ... }
+                    TokenType::Override => {
+                        self.advance(); // consume 'override'
+                        if self.check(&TokenType::Fn) {
+                            let method = self.parse_class_method(AccessModifier::Public, false, false, true, false)?;
+                            methods.push(method);
+                        } else {
+                            return Err(ParseError::new(
+                                "Expected 'fn' after 'override'".to_string(),
+                                Position::new(self.peek().unwrap().line, self.peek().unwrap().column)
+                            ));
+                        }
+                    }
+                    // Abstract method: abstract fn method_name(params);
+                    TokenType::Abstract => {
+                        self.advance(); // consume 'abstract'
+                        if self.check(&TokenType::Fn) {
+                            let method = self.parse_class_method(AccessModifier::Public, false, false, false, true)?;
+                            methods.push(method);
+                        } else {
+                            return Err(ParseError::new(
+                                "Expected 'fn' after 'abstract'".to_string(),
+                                Position::new(self.peek().unwrap().line, self.peek().unwrap().column)
+                            ));
+                        }
+                    }
+                    // Friend class: friend ClassName;
+                    TokenType::Friend => {
+                        self.advance(); // consume 'friend'
+
+                        // Expect 'class' keyword (optional, for clarity)
+                        if self.match_token(TokenType::Class) {
+                            // friend class ClassName;
+                        }
+
+                        let friend_name_token = self.expect(TokenType::Identifier(String::new()), "Expected friend class name after 'friend'")?;
+                        if let TokenType::Identifier(friend_name) = friend_name_token.token_type {
+                            friend_classes.push(friend_name);
+                        } else {
+                            return Err(ParseError::new("Expected friend class name".to_string(), position));
+                        }
+
+                        self.expect(TokenType::Semicolon, "Expected ';' after friend class declaration")?;
+                    }
+                    // Method: fn method_name(params) { ... }
+                    TokenType::Fn => {
+                        let method = self.parse_class_method(AccessModifier::Public, false, false, false, false)?;
+                        methods.push(method);
+                    }
+                    // Field: field_name: type;
+                    TokenType::Identifier(_) => {
+                        let field = self.parse_class_field(AccessModifier::Public, false)?;
+                        fields.push(field);
+                    }
+                    _ => {
+                        return Err(ParseError::new(
+                            format!("Unexpected token in class body: {:?}", token.token_type),
+                            Position::new(token.line, token.column)
+                        ));
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+
+        self.expect(TokenType::RightBrace, "Expected '}' after class body")?;
+
+        Ok(ClassDeclaration {
+            name,
+            generic_parameters,
+            base_class,
+            implemented_traits,
+            is_abstract,
+            friend_classes,
+            fields,
+            constructor,
+            destructor,
+            methods,
+            nested_classes: Vec::new(),  // TODO: Parse nested classes
+            position,
+        })
+    }
+
+    /// Parse access modifier
+    fn parse_access_modifier(&mut self) -> Result<AccessModifier, ParseError> {
+        if let Some(token) = self.peek() {
+            let access_modifier = match &token.token_type {
+                TokenType::Public => {
+                    self.advance();
+                    AccessModifier::Public
+                }
+                TokenType::Private => {
+                    self.advance();
+                    AccessModifier::Private
+                }
+                TokenType::Protected => {
+                    self.advance();
+                    AccessModifier::Protected
+                }
+                TokenType::Package => {
+                    self.advance();
+                    AccessModifier::Package
+                }
+                _ => {
+                    return Err(ParseError::new(
+                        "Expected access modifier (public, private, protected, package)".to_string(),
+                        Position::new(token.line, token.column)
+                    ));
+                }
+            };
+            Ok(access_modifier)
+        } else {
+            Err(ParseError::new(
+                "Expected access modifier, found EOF".to_string(),
+                Position::new(0, 0)
+            ))
+        }
+    }
+
+    /// Parse class field with access modifier
+    fn parse_class_field(&mut self, access_modifier: AccessModifier, is_static: bool) -> Result<ClassField, ParseError> {
+        let field_token = self.expect(TokenType::Identifier(String::new()), "Expected field name")?;
+        let field_name = if let TokenType::Identifier(n) = field_token.token_type {
+            n
+        } else {
+            return Err(ParseError::new("Expected field name".to_string(),
+                Position::new(field_token.line, field_token.column)));
+        };
+
+        let field_position = Position::new(field_token.line, field_token.column);
+
+        self.expect(TokenType::Colon, "Expected ':' after field name")?;
+        let field_type = self.parse_type()?;
+
+        // Check for field initialization
+        let initializer = if self.match_token(TokenType::Assign) {
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
+
+        self.expect(TokenType::Semicolon, "Expected ';' after field declaration")?;
+
+        Ok(ClassField {
+            name: field_name,
+            type_annotation: field_type,
+            access_modifier,
+            is_static,
+            initializer,
+            position: field_position,
+        })
+    }
+
+    /// Parse constructor
+    fn parse_constructor(&mut self, class_name: &str, access_modifier: AccessModifier) -> Result<Constructor, ParseError> {
+        let name_token = self.expect(TokenType::Identifier(String::new()), "Expected constructor name")?;
+        let position = Position::new(name_token.line, name_token.column);
+
+        self.expect(TokenType::LeftParen, "Expected '(' after constructor name")?;
+
+        let mut parameters = Vec::new();
+        if !self.check(&TokenType::RightParen) {
+            loop {
+                let param_token = self.expect(TokenType::Identifier(String::new()), "Expected parameter name")?;
+                let param_name = if let TokenType::Identifier(n) = param_token.token_type {
+                    n
+                } else {
+                    return Err(ParseError::new("Expected parameter name".to_string(), position));
+                };
+
+                let param_position = Position::new(param_token.line, param_token.column);
+
+                self.expect(TokenType::Colon, "Expected ':' after parameter name")?;
+                let param_type = self.parse_type()?;
+
+                parameters.push(Parameter {
+                    name: param_name,
+                    type_annotation: param_type,
+                    position: param_position,
+                });
+
+                if self.match_token(TokenType::Comma) {
+                    continue;
+                } else if self.check(&TokenType::RightParen) {
+                    break;
+                } else {
+                    return Err(ParseError::new("Expected ',' or ')' in parameter list".to_string(), position));
+                }
+            }
+        }
+
+        self.expect(TokenType::RightParen, "Expected ')' after parameters")?;
+        let body = self.parse_block()?;
+
+        Ok(Constructor {
+            parameters,
+            body,
+            access_modifier,
+            position,
+        })
+    }
+
+    /// Parse destructor
+    fn parse_destructor(&mut self, class_name: &str) -> Result<Destructor, ParseError> {
+        let tilde_token = self.expect(TokenType::BitNot, "Expected '~'")?;
+        let position = Position::new(tilde_token.line, tilde_token.column);
+
+        let name_token = self.expect(TokenType::Identifier(String::new()), "Expected destructor name")?;
+        if let TokenType::Identifier(n) = name_token.token_type {
+            if n != class_name {
+                return Err(ParseError::new(
+                    format!("Destructor name '{}' must match class name '{}'", n, class_name),
+                    position
+                ));
+            }
+        }
+
+        self.expect(TokenType::LeftParen, "Expected '(' after destructor name")?;
+        self.expect(TokenType::RightParen, "Expected ')' after destructor name")?;
+        let body = self.parse_block()?;
+
+        Ok(Destructor {
+            body,
+            position,
+        })
+    }
+
+    /// Parse class method with access modifier and modifiers
+    fn parse_class_method(&mut self, access_modifier: AccessModifier, is_static: bool, is_virtual: bool, is_override: bool, is_abstract: bool) -> Result<ClassMethod, ParseError> {
+        let function = if is_abstract {
+            self.parse_abstract_function()?
+        } else {
+            self.parse_function()?
+        };
+        let position = function.position.clone();
+
+        Ok(ClassMethod {
+            function,
+            access_modifier,
+            is_static,
+            is_virtual,
+            is_override,
+            is_abstract,
+            position,
+        })
+    }
+
+    /// Parse class method with access modifier and modifiers, checking for constructor
+    fn parse_class_method_or_constructor(&mut self, class_name: &str, access_modifier: AccessModifier, is_static: bool, is_virtual: bool, is_override: bool, is_abstract: bool) -> Result<(Option<ClassMethod>, Option<Constructor>), ParseError> {
+        let function = if is_abstract {
+            self.parse_abstract_function()?
+        } else {
+            self.parse_function()?
+        };
+        let position = function.position.clone();
+
+        // Check if this is a constructor (method name matches class name)
+        if function.name == class_name && !is_static {
+            // This is a constructor
+            let constructor = Constructor {
+                parameters: function.parameters,
+                body: function.body,
+                access_modifier,
+                position,
+            };
+            Ok((None, Some(constructor)))
+        } else {
+            // This is a regular method
+            let method = ClassMethod {
+                function,
+                access_modifier,
+                is_static,
+                is_virtual,
+                is_override,
+                is_abstract,
+                position,
+            };
+            Ok((Some(method), None))
+        }
+    }
+
+    /// Parse lambda expression: |param1, param2| body
+    fn parse_lambda(&mut self) -> Result<Expression, ParseError> {
+        let pipe_token = self.expect(TokenType::Pipe, "Expected '|' for lambda")?;
+        let position = Position::new(pipe_token.line, pipe_token.column);
+
+        let mut parameters = Vec::new();
+
+        // Parse parameters
+        if !self.check(&TokenType::Pipe) {
+            loop {
+                let param_token = self.expect(TokenType::Identifier(String::new()), "Expected parameter name")?;
+                let param_name = if let TokenType::Identifier(n) = param_token.token_type {
+                    n
+                } else {
+                    return Err(ParseError::new("Expected parameter name".to_string(), position));
+                };
+
+                // Optional type annotation
+                let param_type = if self.check(&TokenType::Colon) {
+                    self.advance();
+                    self.parse_type()?
+                } else {
+                    TypeAnnotation::Auto // Infer type
+                };
+
+                parameters.push(Parameter {
+                    name: param_name,
+                    type_annotation: param_type,
+                    position: Position::new(param_token.line, param_token.column),
+                });
+
+                if self.check(&TokenType::Comma) {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+        }
+
+        self.expect(TokenType::Pipe, "Expected '|' after lambda parameters")?;
+
+        // Parse body expression
+        let body = Box::new(self.parse_expression()?);
+
+        Ok(Expression::Lambda {
+            parameters,
+            body,
+            position,
+        })
+    }
+
+    /// Parse simple expression for match (no object literals)
+    fn parse_match_expression(&mut self) -> Result<Expression, ParseError> {
+        // Parse a simple expression that doesn't include object literals
+        // This avoids the conflict with { } in match expressions
+        if let Some(token) = self.peek() {
+            let position = Position::new(token.line, token.column);
+
+            match &token.token_type {
+                TokenType::Identifier(name) => {
+                    let name = name.clone();
+                    self.advance();
+                    Ok(Expression::Identifier(name, position))
+                }
+                TokenType::Integer(value) => {
+                    let value = *value;
+                    self.advance();
+                    Ok(Expression::Integer(value, position))
+                }
+                TokenType::String(value) => {
+                    let value = value.clone();
+                    self.advance();
+                    Ok(Expression::String(value, position))
+                }
+                TokenType::Boolean(value) => {
+                    let value = *value;
+                    self.advance();
+                    Ok(Expression::Boolean(value, position))
+                }
+                TokenType::LeftParen => {
+                    self.advance();
+                    let expr = self.parse_expression()?;
+                    self.expect(TokenType::RightParen, "Expected ')' after expression")?;
+                    Ok(expr)
+                }
+                _ => {
+                    Err(ParseError::new(
+                        format!("Expected simple expression in match, found {:?}", token.token_type),
+                        position
+                    ))
+                }
+            }
+        } else {
+            Err(ParseError::new("Unexpected end of input in match expression".to_string(), Position::new(0, 0)))
+        }
+    }
+
+    /// Parse match expression: match expr { pattern => body, ... }
+    fn parse_match(&mut self) -> Result<Expression, ParseError> {
+        // Note: 'match' token has already been consumed in parse_primary
+        let position = if let Some(token) = self.peek() {
+            Position::new(token.line, token.column)
+        } else {
+            Position::new(0, 0)
+        };
+
+        // Parse the expression to match against (simple expression only)
+        let expression = Box::new(self.parse_match_expression()?);
+
+        self.expect(TokenType::LeftBrace, "Expected '{' after match expression")?;
+
+        let mut arms = Vec::new();
+
+        self.skip_newlines(); // Skip any newlines after '{'
+
+        while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
+            let pattern = self.parse_pattern()?;
+
+            // Optional guard
+            let guard = if self.check(&TokenType::If) {
+                self.advance();
+                Some(self.parse_expression()?)
+            } else {
+                None
+            };
+
+            self.expect(TokenType::FatArrow, "Expected '=>' after match pattern")?;
+
+            let body = self.parse_expression()?;
+            let arm_position = pattern.position().clone();
+
+            arms.push(MatchArm {
+                pattern,
+                guard,
+                body,
+                position: arm_position,
+            });
+
+            if self.check(&TokenType::Comma) {
+                self.advance();
+            } else if !self.check(&TokenType::RightBrace) {
+                return Err(ParseError::new("Expected ',' or '}' after match arm".to_string(), position));
+            }
+
+            self.skip_newlines(); // Skip newlines after each arm
+        }
+
+        self.expect(TokenType::RightBrace, "Expected '}' after match arms")?;
+
+        Ok(Expression::Match {
+            expression,
+            arms,
+            position,
+        })
+    }
+
+    /// Parse pattern for match expressions
+    fn parse_pattern(&mut self) -> Result<Pattern, ParseError> {
+        if let Some(token) = self.peek() {
+            let position = Position::new(token.line, token.column);
+
+            match &token.token_type {
+                TokenType::Identifier(name) => {
+                    let name = name.clone();
+                    self.advance();
+
+                    // Check for enum variant pattern: EnumName::Variant(pattern)
+                    if self.check(&TokenType::DoubleColon) {
+                        self.advance();
+                        let variant_token = self.expect(TokenType::Identifier(String::new()), "Expected variant name")?;
+                        let variant = if let TokenType::Identifier(v) = variant_token.token_type {
+                            v
+                        } else {
+                            return Err(ParseError::new("Expected variant name".to_string(), position));
+                        };
+
+                        let value = if self.check(&TokenType::LeftParen) {
+                            self.advance();
+                            let pattern = Box::new(self.parse_pattern()?);
+                            self.expect(TokenType::RightParen, "Expected ')' after variant pattern")?;
+                            Some(pattern)
+                        } else {
+                            None
+                        };
+
+                        Ok(Pattern::EnumVariant {
+                            enum_name: name,
+                            variant,
+                            value,
+                            position,
+                        })
+                    } else if name == "_" {
+                        // Wildcard pattern
+                        Ok(Pattern::Wildcard(position))
+                    } else {
+                        // Identifier pattern
+                        Ok(Pattern::Identifier(name, position))
+                    }
+                }
+                TokenType::Integer(_) | TokenType::Float(_) | TokenType::String(_) |
+                TokenType::True | TokenType::False | TokenType::Null => {
+                    // Literal pattern
+                    let expr = self.parse_primary()?;
+                    Ok(Pattern::Literal(expr))
+                }
+                TokenType::LeftParen => {
+                    // Tuple pattern: (a, b, c)
+                    self.advance();
+                    let mut patterns = Vec::new();
+
+                    if !self.check(&TokenType::RightParen) {
+                        loop {
+                            patterns.push(self.parse_pattern()?);
+
+                            if self.check(&TokenType::Comma) {
+                                self.advance();
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+
+                    self.expect(TokenType::RightParen, "Expected ')' after tuple pattern")?;
+                    Ok(Pattern::Tuple(patterns, position))
+                }
+                TokenType::LeftBracket => {
+                    // Array pattern: [a, b, c]
+                    self.advance();
+                    let mut patterns = Vec::new();
+
+                    if !self.check(&TokenType::RightBracket) {
+                        loop {
+                            patterns.push(self.parse_pattern()?);
+
+                            if self.check(&TokenType::Comma) {
+                                self.advance();
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+
+                    self.expect(TokenType::RightBracket, "Expected ']' after array pattern")?;
+                    Ok(Pattern::Array(patterns, position))
+                }
+                _ => {
+                    Err(ParseError::new(
+                        format!("Unexpected token in pattern: {:?}", token.token_type),
+                        position
+                    ))
+                }
+            }
+        } else {
+            Err(ParseError::new(
+                "Expected pattern, found EOF".to_string(),
+                Position::new(0, 0)
+            ))
+        }
+    }
+}
+
+impl Pattern {
+    pub fn position(&self) -> &Position {
+        match self {
+            Pattern::Wildcard(pos) => pos,
+            Pattern::Literal(expr) => expr.position(),
+            Pattern::Identifier(_, pos) => pos,
+            Pattern::EnumVariant { position, .. } => position,
+            Pattern::Tuple(_, pos) => pos,
+            Pattern::Array(_, pos) => pos,
+        }
     }
 }
 
@@ -1613,12 +3162,30 @@ mod tests {
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
-        
+
         let stmt = parser.parse_statement().unwrap();
         if let Statement::VarDeclaration { scope, name, type_annotation, .. } = stmt {
             assert!(matches!(scope, VarScope::Var));
             assert_eq!(name, "x");
             assert!(matches!(type_annotation, Some(TypeAnnotation::Int)));
+        } else {
+            panic!("Expected variable declaration");
+        }
+    }
+
+    #[test]
+    fn test_parse_variable_declaration_with_type_inference() {
+        let source = "var x := 42;";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+
+        let stmt = parser.parse_statement().unwrap();
+        if let Statement::VarDeclaration { scope, name, type_annotation, initializer, .. } = stmt {
+            assert!(matches!(scope, VarScope::Var));
+            assert_eq!(name, "x");
+            assert!(type_annotation.is_none()); // No explicit type annotation
+            assert!(initializer.is_some()); // Has initializer for type inference
         } else {
             panic!("Expected variable declaration");
         }

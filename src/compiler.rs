@@ -237,9 +237,18 @@ impl Compiler {
             bytecode_file.add_chunk(name, chunk);
         }
 
+        // Set class inheritance relationships
+        bytecode_file.set_class_inheritance(generator.get_class_inheritance().clone());
+
+        // Set class definitions
+        bytecode_file.set_class_definitions(generator.get_class_definitions().clone());
+
         // Set memoized functions
         bytecode_file.set_memo_functions(generator.get_memo_functions().clone());
-        
+
+        // Set library dependencies
+        bytecode_file.set_library_dependencies(generator.get_library_dependencies().clone());
+
         // Save bytecode file
         if let Err(e) = bytecode_file.save_to_file(&output_path) {
             messages.push(format!("Error saving bytecode file: {}", e));

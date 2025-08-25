@@ -1,3 +1,9 @@
 /target
+/doc
 /.*
-!/.github
+!/.git*
+/*-don't-see
+/*-dont-see
+**/target
+/test
+TECHNICAL*

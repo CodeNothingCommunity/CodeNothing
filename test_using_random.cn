@@ -1,0 +1,22 @@
+// 测试 using ns random 功能
+
+lib <math>;
+lib <io>;
+using ns random;
+
+fn main() {
+    std::println("测试随机数命名空间");
+    
+    // 设置随机种子
+    seed("12345");
+    std::println("随机种子已设置");
+    
+    // 生成随机数
+    var rand1 := random();
+    var rand2 := randint("1", "10");
+    var rand3 := uniform("0", "100");
+    
+    std::println("random() = " + rand1);
+    std::println("randint(1, 10) = " + rand2);
+    std::println("uniform(0, 100) = " + rand3);
+}

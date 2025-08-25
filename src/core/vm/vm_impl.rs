@@ -38,6 +38,20 @@ impl VirtualMachine {
             jit_engine: JitEngine::new(),
             instructions_executed: 0,
             debug_mode: false,
+            method_cache: HashMap::new(),
+            method_cache_hits: 0,
+            method_cache_misses: 0,
+            method_index: HashMap::new(),
+            method_index_dirty: true,
+            object_tracker: HashMap::new(),
+            next_object_id: 1,
+            leak_detection_threshold: 10, // Objects alive for 10+ GC cycles are suspicious
+            gc_cycle_count: 0,
+            object_registry: HashMap::new(),
+            class_inheritance: HashMap::new(),
+            class_definitions: HashMap::new(),
+            vtables: HashMap::new(),
+            execution_context: super::types::ExecutionContext::new(),
         }
     }
 
@@ -56,6 +70,17 @@ impl VirtualMachine {
         Self::with_memory_config(MemoryConfig::custom(initial_heap_mb, max_heap_mb, stack_mb))
     }
 
+    /// Create an unlimited VM (removes most safety limits)
+    /// ⚠️ WARNING: Use with caution - can consume all system memory!
+    pub fn unlimited() -> Self {
+        Self::with_memory_config(MemoryConfig::unlimited())
+    }
+
+    /// Create a deep recursion VM (optimized for recursive algorithms)
+    pub fn deep_recursion() -> Self {
+        Self::with_memory_config(MemoryConfig::deep_recursion())
+    }
+
     /// Enable or disable debug mode
     pub fn set_debug_mode(&mut self, enabled: bool) {
         self.debug_mode = enabled;
@@ -63,14 +88,24 @@ impl VirtualMachine {
 
     /// Add a chunk (function) to the VM
     pub fn add_chunk(&mut self, chunk: Chunk) -> usize {
+        let index = self.chunks.len();
+
+        // If this is the main chunk (index 0), initialize global memory
+        if index == 0 && chunk.global_count > 0 {
+            // Reserve space for global variables and initialize them with null values
+            if let Err(e) = self.memory.globals.reserve(chunk.global_count) {
+                eprintln!("Warning: Failed to initialize global variables: {}", e);
+            }
+        }
+
         self.chunks.push(chunk);
-        self.chunks.len() - 1
+        index
     }
 
     /// Execute a chunk
     pub fn execute(&mut self, chunk_index: usize) -> VMResult<Value> {
-        // Debug output when JIT debug is enabled
-        if self.jit_engine.debug {
+        // Debug output when debug mode is enabled
+        if self.debug_mode {
             println!("🔧 VM: execute() method called for chunk {}", chunk_index);
             println!("🔧 VM: chunks.len() = {}", self.chunks.len());
 
@@ -80,27 +115,29 @@ impl VirtualMachine {
             }
         }
 
-        if self.jit_engine.debug {
+        if self.debug_mode {
             println!("🔧 VM: execute() called for chunk {} (DEBUG MODE)", chunk_index);
         }
 
         if chunk_index >= self.chunks.len() {
-            println!("🔧 VM: ERROR - Invalid chunk index: {} >= {}", chunk_index, self.chunks.len());
+            if self.debug_mode {
+                println!("🔧 VM: ERROR - Invalid chunk index: {} >= {}", chunk_index, self.chunks.len());
+            }
             return Err(VMError::RuntimeError(format!("Invalid chunk index: {}", chunk_index)));
         }
 
-        if self.jit_engine.debug {
+        if self.debug_mode {
             println!("🔧 VM: Chunk index {} is valid, continuing execution", chunk_index);
         }
 
         let start_time = std::time::Instant::now();
-        if self.jit_engine.debug {
+        if self.debug_mode {
             println!("🔧 VM: About to record execution for chunk {}", chunk_index);
         }
 
         // Record execution for hot spot detection first
         self.record_jit_execution(chunk_index, 0);
-        if self.jit_engine.debug {
+        if self.debug_mode {
             println!("🔧 VM: Recorded execution for chunk {}", chunk_index);
             println!("🔧 VM: About to check if should compile chunk {}", chunk_index);
         }
@@ -121,17 +158,28 @@ impl VirtualMachine {
         self.ip = 0;
         self.locals = Some(LocalMemory::new(self.memory.config.locals_per_function));
 
-        if self.jit_engine.debug {
+        if self.debug_mode {
             println!("🔧 VM: About to call run() method");
         }
         let result = self.run();
-        if self.jit_engine.debug {
+        if self.debug_mode {
             println!("🔧 VM: run() method completed");
         }
 
         // Record execution for hot spot detection
         let execution_time = start_time.elapsed().as_micros() as u64;
         self.record_jit_execution(chunk_index, execution_time);
+
+        // Run memory leak detection after execution
+        if self.object_tracker.len() > 0 {
+            self.run_gc_cycle();
+            let (total, leaks, _) = self.get_memory_leak_stats();
+            if leaks > 0 {
+                println!("⚠️ VM: Execution completed with {} potential memory leaks out of {} objects", leaks, total);
+            } else if self.debug_mode {
+                println!("✅ VM: Execution completed with no memory leaks detected ({} objects tracked)", total);
+            }
+        }
 
         result
     }

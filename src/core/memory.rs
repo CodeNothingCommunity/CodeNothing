@@ -36,8 +36,8 @@ impl MemoryConfig {
         Self {
             initial_heap_size: 1024,        // 1K objects initially
             max_heap_size: 65536,           // 64K objects max (~512MB)
-            stack_size: 8192,               // 8K values (~64MB)
-            max_call_depth: 1024,           // 1K call frames
+            stack_size: 16384,              // 16K values (~128MB) - increased for deep recursion
+            max_call_depth: 10000,          // 10K call frames - increased for fibonacci(30)
             max_globals: 4096,              // 4K global variables
             locals_per_function: 256,       // 256 locals per function
             enable_monitoring: true,
@@ -62,8 +62,8 @@ impl MemoryConfig {
         Self {
             initial_heap_size: 8192,        // 8K objects initially
             max_heap_size: 1048576,         // 1M objects max (~8GB)
-            stack_size: 32768,              // 32K values (~256MB)
-            max_call_depth: 4096,           // 4K call frames
+            stack_size: 65536,              // 64K values (~512MB) - increased for deep recursion
+            max_call_depth: 100000,         // 100K call frames - much larger for complex recursion
             max_globals: 16384,             // 16K global variables
             locals_per_function: 512,       // 512 locals per function
             enable_monitoring: true,
@@ -87,6 +87,33 @@ impl MemoryConfig {
             max_call_depth: 1024,
             max_globals: 4096,
             locals_per_function: 256,
+            enable_monitoring: true,
+        }
+    }
+
+    /// Create unlimited memory configuration (for deep recursion and complex programs)
+    /// ⚠️ WARNING: This removes most safety limits - use with caution!
+    pub fn unlimited() -> Self {
+        Self {
+            initial_heap_size: 65536,          // 64K objects initially (512MB)
+            max_heap_size: usize::MAX / 1024,  // Practically unlimited heap
+            stack_size: usize::MAX / 1024,     // Practically unlimited stack
+            max_call_depth: usize::MAX / 1024, // Practically unlimited call depth
+            max_globals: usize::MAX / 1024,    // Practically unlimited globals
+            locals_per_function: 65536,        // 64K locals per function
+            enable_monitoring: false,          // Disable monitoring for performance
+        }
+    }
+
+    /// Create deep recursion configuration (optimized for recursive algorithms)
+    pub fn deep_recursion() -> Self {
+        Self {
+            initial_heap_size: 8192,           // 8K objects initially
+            max_heap_size: 1048576,            // 1M objects max (~8GB)
+            stack_size: 1048576,               // 1M values (~8GB stack)
+            max_call_depth: 1000000,           // 1M call frames - for deep recursion
+            max_globals: 16384,                // 16K global variables
+            locals_per_function: 1024,         // 1K locals per function
             enable_monitoring: true,
         }
     }
@@ -248,6 +275,24 @@ impl GlobalMemory {
     /// Get the number of global variables
     pub fn len(&self) -> usize {
         self.variables.len()
+    }
+
+    /// Reserve space for global variables and initialize them with null
+    pub fn reserve(&mut self, count: usize) -> Result<(), MemoryError> {
+        if self.variables.len() + count > self.max_variables {
+            return Err(MemoryError::new(format!(
+                "Global variable limit exceeded: {} + {} > {}",
+                self.variables.len(),
+                count,
+                self.max_variables
+            )));
+        }
+
+        // Add null values for the reserved space
+        for _ in 0..count {
+            self.variables.push(Value::Null);
+        }
+        Ok(())
     }
 }
 

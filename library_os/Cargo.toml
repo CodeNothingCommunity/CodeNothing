@@ -1,0 +1,14 @@
+[package]
+name = "cn_os_lib"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "os"
+crate-type = ["cdylib"]
+
+[dependencies]
+cn_common = { path = "../library_common" }
+sysinfo = "0.29.10"
+dirs = "5.0.1"
+hostname = "0.3.1" 

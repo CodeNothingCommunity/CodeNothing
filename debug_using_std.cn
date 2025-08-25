@@ -1,0 +1,8 @@
+// 调试 using ns std 功能
+
+lib <io>;
+using ns std;
+
+fn main() {
+    std::println("直接调用 std::println 应该工作");
+}

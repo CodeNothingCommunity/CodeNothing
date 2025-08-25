@@ -1,0 +1,13 @@
+[package]
+name = "cn_json_lib"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "json"
+crate-type = ["cdylib"]
+
+[dependencies]
+cn_common = { path = "../library_common" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0" 

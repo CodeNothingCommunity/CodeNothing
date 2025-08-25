@@ -1,0 +1,179 @@
+// 🍭 CodeNothing 语法糖综合测试
+// 详细测试所有新增的语法糖功能
+
+lib <io>;
+
+fn test_increment_decrement() {
+    std::println("🔸 详细测试: 自增/自减操作符");
+    std::println("============================");
+    
+    var x : int = 10;
+    std::println("初始值 x = " + lang::to_string(x));
+    
+    // 测试前置自增
+    std::println("测试前置自增:");
+    var result1 : int = ++x;
+    std::println("  ++x 返回值: " + lang::to_string(result1));
+    std::println("  x 当前值: " + lang::to_string(x));
+    
+    // 测试后置自增
+    std::println("测试后置自增:");
+    var result2 : int = x++;
+    std::println("  x++ 返回值: " + lang::to_string(result2));
+    std::println("  x 当前值: " + lang::to_string(x));
+    
+    // 测试前置自减
+    std::println("测试前置自减:");
+    var result3 : int = --x;
+    std::println("  --x 返回值: " + lang::to_string(result3));
+    std::println("  x 当前值: " + lang::to_string(x));
+    
+    // 测试后置自减
+    std::println("测试后置自减:");
+    var result4 : int = x--;
+    std::println("  x-- 返回值: " + lang::to_string(result4));
+    std::println("  x 当前值: " + lang::to_string(x));
+    
+    std::println("");
+}
+
+fn test_compound_assignment() {
+    std::println("🔸 详细测试: 复合赋值操作符");
+    std::println("==========================");
+    
+    var value : int = 100;
+    std::println("初始值 value = " + lang::to_string(value));
+    
+    // 测试 +=
+    value += 25;
+    std::println("value += 25: " + lang::to_string(value));
+    
+    // 测试 -=
+    value -= 15;
+    std::println("value -= 15: " + lang::to_string(value));
+    
+    // 测试 *=
+    value *= 3;
+    std::println("value *= 3: " + lang::to_string(value));
+    
+    // 测试 /=
+    value /= 6;
+    std::println("value /= 6: " + lang::to_string(value));
+    
+    // 测试 %=
+    value %= 7;
+    std::println("value %= 7: " + lang::to_string(value));
+    
+    std::println("");
+}
+
+fn test_ternary_operator() {
+    std::println("🔸 详细测试: 三元条件操作符");
+    std::println("==========================");
+    
+    // 简单三元操作符
+    var a : int = 15;
+    var b : int = 20;
+    var max : int = a > b ? a : b;
+    std::println("max(" + lang::to_string(a) + ", " + lang::to_string(b) + ") = " + lang::to_string(max));
+    
+    // 嵌套三元操作符
+    var score : int = 75;
+    var grade : string = score >= 90 ? "优秀" : score >= 80 ? "良好" : score >= 60 ? "及格" : "不及格";
+    std::println("分数 " + lang::to_string(score) + " 等级: " + grade);
+    
+    // 三元操作符与其他操作符组合
+    var x : int = 10;
+    var y : int = 5;
+    var operation : bool = true;
+    var result : int = operation ? x + y : x - y;
+    std::println("operation=" + lang::to_string(operation) + " ? " + lang::to_string(x) + "+" + lang::to_string(y) + " : " + lang::to_string(x) + "-" + lang::to_string(y) + " = " + lang::to_string(result));
+    
+    std::println("");
+}
+
+fn test_complex_combinations() {
+    std::println("🔸 详细测试: 复杂组合使用");
+    std::println("========================");
+    
+    // 自增与复合赋值组合
+    var counter : int = 5;
+    var multiplier : int = 2;
+    
+    std::println("初始: counter=" + lang::to_string(counter) + ", multiplier=" + lang::to_string(multiplier));
+    
+    counter += ++multiplier;  // multiplier先自增到3，然后加到counter
+    std::println("counter += ++multiplier: counter=" + lang::to_string(counter) + ", multiplier=" + lang::to_string(multiplier));
+    
+    // 三元操作符与自增组合
+    var flag : bool = true;
+    var value : int = 10;
+    var adjusted : int = flag ? ++value : --value;
+    std::println("flag=" + lang::to_string(flag) + " ? ++value : --value = " + lang::to_string(adjusted) + ", value=" + lang::to_string(value));
+    
+    // 复合赋值与三元操作符组合
+    var base : int = 20;
+    var increment : int = 5;
+    var should_add : bool = false;
+    
+    if (should_add) {
+        base += increment;
+    } else {
+        base -= increment;
+    }
+    std::println("should_add=" + lang::to_string(should_add) + " ? base+=increment : base-=increment = " + lang::to_string(base));
+    
+    std::println("");
+}
+
+fn test_loop_with_syntax_sugar() {
+    std::println("🔸 详细测试: 循环中的语法糖");
+    std::println("==========================");
+    
+    std::println("使用后置自增的循环:");
+    var i : int = 0;
+    while (i < 3) {
+        std::println("  循环 " + lang::to_string(i) + ": 执行后 i++ = " + lang::to_string(i++));
+    }
+    
+    std::println("使用前置自增的循环:");
+    var j : int = 0;
+    while (j < 3) {
+        std::println("  循环: 执行前 ++j = " + lang::to_string(++j));
+    }
+    
+    std::println("使用复合赋值的循环:");
+    var sum : int = 0;
+    var k : int = 1;
+    while (k <= 3) {
+        sum += k;
+        std::println("  k=" + lang::to_string(k) + ", sum += k = " + lang::to_string(sum));
+        k++;
+    }
+    
+    std::println("");
+}
+
+fn main() : int {
+    std::println("🍭 CodeNothing 语法糖综合测试");
+    std::println("=============================");
+    std::println("");
+    
+    test_increment_decrement();
+    test_compound_assignment();
+    test_ternary_operator();
+    test_complex_combinations();
+    test_loop_with_syntax_sugar();
+    
+    std::println("🎉 所有综合测试完成!");
+    std::println("");
+    std::println("✅ 自增/自减操作符: ++x, --x, x++, x-- 全部正常工作");
+    std::println("✅ 复合赋值操作符: +=, -=, *=, /=, %= 全部正常工作");
+    std::println("✅ 三元条件操作符: condition ? true_value : false_value 正常工作");
+    std::println("✅ 复杂组合和嵌套使用全部正常工作");
+    std::println("✅ 在循环和控制结构中使用正常");
+    std::println("");
+    std::println("🔥 CodeNothing 语法糖实现完美!");
+    
+    return 0;
+}

@@ -165,6 +165,18 @@ pub enum OpCode {
     /// Operand: method_index (u16), arg_count (u8)
     CallMethod = 0x71,
 
+    /// Call super method (parent class method)
+    /// Operand: method_index (u16), arg_count (u8)
+    CallSuper = 0x74,
+
+    /// Call virtual method (with dynamic dispatch)
+    /// Operand: method_index (u16), arg_count (u8)
+    CallVirtual = 0x75,
+
+    /// Call static method
+    /// Operand: method_index (u16), arg_count (u8)
+    CallStatic = 0x76,
+
     /// Return from function
     Return = 0x72,
 
@@ -198,6 +210,14 @@ pub enum OpCode {
     /// Cast to type
     /// Operand: type_index (u16)
     Cast = 0x86,
+
+    /// Load field from super class
+    /// Operand: field_index (u16)
+    SuperFieldLoad = 0x87,
+
+    /// Store value to super class field
+    /// Operand: field_index (u16)
+    SuperFieldStore = 0x88,
 
     // === Exception Handling ===
     /// Throw exception
@@ -252,10 +272,11 @@ impl OpCode {
             // 2 byte operands
             OpCode::Const | OpCode::LoadGlobal | OpCode::StoreGlobal | OpCode::LoadField | OpCode::StoreField
             | OpCode::Jump | OpCode::JumpIfFalse | OpCode::JumpIfTrue | OpCode::JumpIfNull | OpCode::JumpIfNotNull
-            | OpCode::NewObject | OpCode::NewArray | OpCode::CreateArray | OpCode::CreateObject | OpCode::TryStart | OpCode::Catch => 2,
+            | OpCode::NewObject | OpCode::NewArray | OpCode::CreateArray | OpCode::CreateObject | OpCode::TryStart | OpCode::Catch
+            | OpCode::SuperFieldLoad | OpCode::SuperFieldStore => 2,
 
             // 3 byte operands (function_index + arg_count)
-            OpCode::Call | OpCode::CallMethod => 3,
+            OpCode::Call | OpCode::CallMethod | OpCode::CallSuper | OpCode::CallVirtual | OpCode::CallStatic => 3,
         }
     }
 
@@ -319,6 +340,16 @@ impl Instruction {
         }
     }
 
+    /// Create instruction with u16 and u8 operands (for Call and CallMethod)
+    pub fn with_u16_u8(opcode: OpCode, operand1: u16, operand2: u8, line: u32) -> Self {
+        let bytes1 = operand1.to_le_bytes();
+        Self {
+            opcode,
+            operands: vec![bytes1[0], bytes1[1], operand2],
+            line,
+        }
+    }
+
     /// Create instruction with a single i16 operand
     pub fn with_i16(opcode: OpCode, operand: i16, line: u32) -> Self {
         let bytes = operand.to_le_bytes();
@@ -332,6 +363,11 @@ impl Instruction {
     /// Get u8 operand at index
     pub fn get_u8(&self, index: usize) -> Option<u8> {
         self.operands.get(index).copied()
+    }
+
+    /// Get u8 operand at index 2 (for CallMethod arg count)
+    pub fn get_arg_count(&self) -> Option<u8> {
+        self.operands.get(2).copied()
     }
 
     /// Get u16 operand starting at index
@@ -388,6 +424,7 @@ pub struct Chunk {
     pub instructions: Vec<Instruction>,
     pub constants: Vec<crate::core::value::Value>,
     pub name: String,
+    pub global_count: usize,  // Number of global variables needed
 }
 
 impl Chunk {
@@ -397,6 +434,7 @@ impl Chunk {
             instructions: Vec::new(),
             constants: Vec::new(),
             name,
+            global_count: 0,
         }
     }
 

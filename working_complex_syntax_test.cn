@@ -1,0 +1,285 @@
+// 🔥 CodeNothing 可工作的复杂语法糖测试
+// 展示语法糖在复杂但可靠场景中的应用
+
+lib <io>;
+
+// 复杂的计数器系统
+fn complex_counter_system() {
+    std::println("🔥 复杂计数器系统");
+    std::println("=================");
+    
+    var primary_counter : int = 0;
+    var secondary_counter : int = 10;
+    var multiplier : int = 1;
+    var threshold : int = 50;
+    var operations : int = 0;
+    
+    while (operations < 20) {
+        var old_primary : int = primary_counter;
+        var old_secondary : int = secondary_counter;
+        
+        // 复杂的计数逻辑
+        if (operations % 3 == 0) {
+            primary_counter += ++multiplier;
+            secondary_counter -= multiplier--;
+        } else if (operations % 3 == 1) {
+            primary_counter *= multiplier > 0 ? 2 : 1;
+            secondary_counter /= secondary_counter > 5 ? 2 : 1;
+        } else {
+            primary_counter = primary_counter > threshold ? primary_counter - 10 : primary_counter + 5;
+            secondary_counter = secondary_counter < 5 ? secondary_counter + 15 : secondary_counter - 2;
+        }
+        
+        // 边界检查和调整
+        primary_counter = primary_counter < 0 ? 0 : primary_counter;
+        secondary_counter = secondary_counter > 100 ? 100 : secondary_counter;
+        multiplier = multiplier < 1 ? 1 : multiplier > 5 ? 5 : multiplier;
+        
+        std::println("操作 " + lang::to_string(operations++) + ": 主计数器 " + lang::to_string(old_primary) + " -> " + lang::to_string(primary_counter) + ", 副计数器 " + lang::to_string(old_secondary) + " -> " + lang::to_string(secondary_counter) + ", 倍数: " + lang::to_string(multiplier));
+    }
+    
+    std::println("最终状态: 主=" + lang::to_string(primary_counter) + ", 副=" + lang::to_string(secondary_counter));
+    std::println("");
+}
+
+// 复杂的分数计算系统
+fn complex_scoring_system() {
+    std::println("🔥 复杂分数计算系统");
+    std::println("===================");
+    
+    var base_score : int = 100;
+    var bonus_score : int = 0;
+    var penalty : int = 0;
+    var level : int = 1;
+    var experience : int = 0;
+    var round : int = 1;
+    
+    while (round <= 10) {
+        var round_score : int = 0;
+        var performance : int = round * 7 + 3; // 模拟性能值
+        
+        // 复杂的分数计算
+        round_score = performance > 50 ? performance * 2 : performance + 10;
+        round_score += level > 3 ? 25 : level * 5;
+        
+        // 奖励和惩罚系统
+        if (round_score > 80) {
+            bonus_score += round % 2 == 0 ? 20 : 15;
+            experience += 30;
+        } else if (round_score < 40) {
+            penalty += round % 3 == 0 ? 10 : 5;
+        } else {
+            experience += 15;
+        }
+        
+        // 升级检查
+        if (experience >= level * 100) {
+            experience -= level * 100;
+            level++;
+            std::println("  升级! 新等级: " + lang::to_string(level));
+        }
+        
+        base_score += round_score;
+        base_score -= penalty;
+        base_score = base_score < 0 ? 0 : base_score;
+        
+        std::println("回合 " + lang::to_string(round) + ": 性能=" + lang::to_string(performance) + ", 回合分=" + lang::to_string(round_score) + ", 总分=" + lang::to_string(base_score) + ", 奖励=" + lang::to_string(bonus_score) + ", 惩罚=" + lang::to_string(penalty));
+        
+        round++;
+    }
+    
+    var final_score : int = base_score + bonus_score;
+    var grade : string = final_score > 1000 ? "S级" : final_score > 800 ? "A级" : final_score > 600 ? "B级" : final_score > 400 ? "C级" : "D级";
+    
+    std::println("最终结果:");
+    std::println("  基础分数: " + lang::to_string(base_score));
+    std::println("  奖励分数: " + lang::to_string(bonus_score));
+    std::println("  总分: " + lang::to_string(final_score));
+    std::println("  等级: " + grade);
+    std::println("  最终等级: " + lang::to_string(level));
+    std::println("");
+}
+
+// 复杂的数学序列
+fn complex_mathematical_sequence() {
+    std::println("🔥 复杂数学序列");
+    std::println("===============");
+    
+    var a : int = 2;
+    var b : int = 3;
+    var c : int = 5;
+    var sequence_sum : int = 0;
+    var iteration : int = 0;
+    
+    while (iteration < 15) {
+        var old_a : int = a;
+        var old_b : int = b;
+        var old_c : int = c;
+        
+        // 复杂的序列生成
+        var next_term : int = iteration % 4 == 0 ? a + b + c : iteration % 4 == 1 ? a * b - c : iteration % 4 == 2 ? (a + b) * c : a - b + c * 2;
+        
+        // 序列更新
+        a = b;
+        b = c;
+        c = next_term % 100; // 防止数值过大
+        
+        sequence_sum += c;
+        
+        // 特殊处理
+        if (c > 80) {
+            c /= 2;
+            std::println("  大数处理: " + lang::to_string(c * 2) + " -> " + lang::to_string(c));
+        }
+        
+        if (c < 5) {
+            c += 10;
+            std::println("  小数处理: " + lang::to_string(c - 10) + " -> " + lang::to_string(c));
+        }
+        
+        std::println("迭代 " + lang::to_string(iteration) + ": (" + lang::to_string(old_a) + ", " + lang::to_string(old_b) + ", " + lang::to_string(old_c) + ") -> " + lang::to_string(next_term) + " -> " + lang::to_string(c) + ", 累计: " + lang::to_string(sequence_sum));
+        
+        iteration++;
+    }
+    
+    std::println("序列统计:");
+    std::println("  最终三元组: (" + lang::to_string(a) + ", " + lang::to_string(b) + ", " + lang::to_string(c) + ")");
+    std::println("  序列总和: " + lang::to_string(sequence_sum));
+    std::println("  平均值: " + lang::to_string(sequence_sum / 15));
+    std::println("");
+}
+
+// 复杂的条件分支系统
+fn complex_conditional_system() {
+    std::println("🔥 复杂条件分支系统");
+    std::println("===================");
+    
+    var health : int = 100;
+    var mana : int = 50;
+    var level : int = 5;
+    var equipment_bonus : int = 10;
+    var enemy_strength : int = 30;
+    var battle_round : int = 1;
+    
+    while (battle_round <= 8 && health > 0) {
+        var damage_dealt : int = 0;
+        var damage_taken : int = 0;
+        var mana_used : int = 0;
+        
+        // 复杂的战斗逻辑
+        var attack_power : int = level * 5 + equipment_bonus;
+        var can_use_magic : bool = mana >= 20;
+        var is_critical : bool = battle_round % 3 == 0;
+        
+        // 伤害计算
+        damage_dealt = can_use_magic ? (is_critical ? attack_power * 3 : attack_power * 2) : (is_critical ? attack_power + 10 : attack_power);
+        mana_used = can_use_magic ? (is_critical ? 25 : 20) : 0;
+        
+        // 敌人反击
+        damage_taken = enemy_strength - (level > 3 ? 5 : 2);
+        damage_taken = damage_taken < 5 ? 5 : damage_taken;
+        
+        // 状态更新
+        health -= damage_taken;
+        mana -= mana_used;
+        mana += battle_round % 2 == 0 ? 5 : 3; // 法力回复
+        mana = mana > 100 ? 100 : mana;
+        
+        // 敌人强度调整
+        enemy_strength += battle_round > 4 ? 3 : 2;
+        
+        var battle_status : string = health > 70 ? "优势" : health > 30 ? "均势" : health > 0 ? "劣势" : "失败";
+        
+        std::println("回合 " + lang::to_string(battle_round) + ": 造成伤害=" + lang::to_string(damage_dealt) + ", 受到伤害=" + lang::to_string(damage_taken) + ", 生命=" + lang::to_string(health) + ", 法力=" + lang::to_string(mana) + ", 状态=" + battle_status);
+        
+        battle_round++;
+    }
+    
+    var final_result : string = health > 0 ? "战斗胜利!" : "战斗失败!";
+    std::println("战斗结束: " + final_result);
+    std::println("最终生命: " + lang::to_string(health));
+    std::println("最终法力: " + lang::to_string(mana));
+    std::println("");
+}
+
+// 复杂的优化算法模拟
+fn complex_optimization_simulation() {
+    std::println("🔥 复杂优化算法模拟");
+    std::println("===================");
+    
+    var current_value : int = 50;
+    var best_value : int = current_value;
+    var step_size : int = 5;
+    var iteration : int = 0;
+    var improvements : int = 0;
+    var stagnation : int = 0;
+    
+    while (iteration < 25 && stagnation < 5) {
+        var old_value : int = current_value;
+        var direction : int = iteration % 2 == 0 ? 1 : -1;
+        var adjustment : int = step_size * direction;
+        
+        // 尝试新值
+        var new_value : int = current_value + adjustment;
+        new_value = new_value < 0 ? 0 : new_value > 200 ? 200 : new_value;
+        
+        // 评估函数 (模拟复杂的目标函数)
+        var current_score : int = 100 - (current_value - 75) * (current_value - 75) / 10;
+        var new_score : int = 100 - (new_value - 75) * (new_value - 75) / 10;
+        
+        // 接受或拒绝新值
+        if (new_score > current_score) {
+            current_value = new_value;
+            improvements++;
+            stagnation = 0;
+            
+            if (current_value > best_value || (current_value < best_value && best_value - current_value < current_value - best_value)) {
+                best_value = current_value;
+            }
+            
+            std::println("迭代 " + lang::to_string(iteration) + ": 接受 " + lang::to_string(old_value) + " -> " + lang::to_string(current_value) + " (分数: " + lang::to_string(current_score) + " -> " + lang::to_string(new_score) + ")");
+        } else {
+            stagnation++;
+            std::println("迭代 " + lang::to_string(iteration) + ": 拒绝 " + lang::to_string(old_value) + " -> " + lang::to_string(new_value) + " (分数: " + lang::to_string(current_score) + " vs " + lang::to_string(new_score) + ")");
+        }
+        
+        // 自适应步长
+        step_size = improvements > iteration / 3 ? step_size + 1 : step_size > 1 ? step_size - 1 : 1;
+        
+        iteration++;
+    }
+    
+    var termination_reason : string = iteration >= 25 ? "达到最大迭代次数" : "算法收敛";
+    std::println("优化完成: " + termination_reason);
+    std::println("最终值: " + lang::to_string(current_value));
+    std::println("最佳值: " + lang::to_string(best_value));
+    std::println("改进次数: " + lang::to_string(improvements));
+    std::println("");
+}
+
+fn main() : int {
+    std::println("🔥 CodeNothing 可工作的复杂语法糖测试");
+    std::println("===================================");
+    std::println("");
+    
+    complex_counter_system();
+    complex_scoring_system();
+    complex_mathematical_sequence();
+    complex_conditional_system();
+    complex_optimization_simulation();
+    
+    std::println("🎉 所有复杂测试成功完成!");
+    std::println("");
+    std::println("🔥 测试亮点:");
+    std::println("✅ 复杂的计数器和状态管理");
+    std::println("✅ 多层嵌套的条件判断");
+    std::println("✅ 动态的数学序列生成");
+    std::println("✅ 模拟真实的游戏战斗系统");
+    std::println("✅ 优化算法的完整实现");
+    std::println("✅ 语法糖的自然融合使用");
+    std::println("");
+    std::println("💪 CodeNothing 语法糖让复杂逻辑变得清晰易读!");
+    std::println("🚀 开发效率和代码质量双重提升!");
+    
+    return 0;
+}

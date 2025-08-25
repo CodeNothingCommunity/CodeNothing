@@ -70,6 +70,10 @@ impl Stack {
     /// Pop a value from the stack
     #[inline(always)]
     pub fn pop(&mut self) -> Result<Value, StackUnderflowError> {
+        if self.values.is_empty() {
+            eprintln!("❌ STACK: Attempting to pop from empty stack! Stack size: {}", self.values.len());
+            return Err(StackUnderflowError);
+        }
         self.values.pop().ok_or(StackUnderflowError)
     }
 

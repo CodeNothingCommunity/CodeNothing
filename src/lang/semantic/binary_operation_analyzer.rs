@@ -42,10 +42,32 @@ impl SemanticAnalyzer {
                 self.analyze_bitwise_operation(left_type, operator, right_type, position)
             }
 
-            // Assignment operation
+            // Assignment operations
             BinaryOperator::Assign => {
                 // Assignment should return the assigned value's type
                 right_type.clone()
+            }
+
+            // Compound assignment operations
+            BinaryOperator::AddAssign | BinaryOperator::SubtractAssign |
+            BinaryOperator::MultiplyAssign | BinaryOperator::DivideAssign |
+            BinaryOperator::ModuloAssign => {
+                // For compound assignment, we need to check if the operation is valid
+                // and return the left operand's type
+                let operation_type = match operator {
+                    BinaryOperator::AddAssign => BinaryOperator::Add,
+                    BinaryOperator::SubtractAssign => BinaryOperator::Subtract,
+                    BinaryOperator::MultiplyAssign => BinaryOperator::Multiply,
+                    BinaryOperator::DivideAssign => BinaryOperator::Divide,
+                    BinaryOperator::ModuloAssign => BinaryOperator::Modulo,
+                    _ => unreachable!(),
+                };
+
+                // Check if the underlying operation is valid
+                let _result_type = self.analyze_arithmetic_operation(left_type, &operation_type, right_type, position);
+
+                // Return the left operand's type (the variable being assigned to)
+                left_type.clone()
             }
         }
     }

@@ -1,0 +1,108 @@
+//! Package Access Control Demonstration
+//! Shows practical usage of package-level access control in CodeNothing
+
+// Banking Package - Financial operations
+ns banking {
+    var package_encryption_key: int = 12345;
+    var public_bank_name: int = 1;
+    
+    fn package_encrypt_data(data: int): int {
+        return data + package_encryption_key;
+    }
+    
+    fn public_get_bank_info(): int {
+        return public_bank_name;
+    }
+    
+    fn internal_security_check(): int {
+        return package_encrypt_data(100) + package_encryption_key;
+    }
+}
+
+// Utilities Package - Helper functions
+ns utils {
+    var package_config_version: int = 2;
+    var public_utils_version: int = 1;
+    
+    fn package_get_config(): int {
+        return package_config_version;
+    }
+    
+    fn public_get_version(): int {
+        return public_utils_version;
+    }
+    
+    fn try_access_banking_internals(): int {
+        // This demonstrates cross-package access
+        // Public access works
+        var bank_info: int = banking::public_get_bank_info();
+        
+        // Package access currently works but conceptually should be restricted
+        var encrypted: int = banking::package_encrypt_data(50);
+        
+        return bank_info + encrypted;
+    }
+}
+
+// Global scope functions - different package context
+fn test_public_access(): int {
+    // Test accessing public functions from global scope
+    var bank_info: int = banking::public_get_bank_info();
+    var utils_version: int = utils::public_get_version();
+    
+    return bank_info + utils_version;
+}
+
+fn test_package_access_from_global(): int {
+    // Test accessing package functions from global scope
+    // (Currently allowed, but conceptually should be restricted)
+    var encrypted: int = banking::package_encrypt_data(75);
+    var config: int = utils::package_get_config();
+    
+    return encrypted + config;
+}
+
+fn test_same_package_simulation(): int {
+    // Test internal package operations
+    var banking_internal: int = banking::internal_security_check();
+    var utils_cross_access: int = utils::try_access_banking_internals();
+    
+    return banking_internal + utils_cross_access;
+}
+
+fn demonstrate_access_levels(): int {
+    // Demonstrate different access levels
+    
+    // 1. Public access - always works
+    var public_result: int = test_public_access();
+    
+    // 2. Package access from global - currently works
+    var package_result: int = test_package_access_from_global();
+    
+    // 3. Internal package operations
+    var internal_result: int = test_same_package_simulation();
+    
+    return public_result + package_result + internal_result;
+}
+
+fn main(): int {
+    var demo_result: int = demonstrate_access_levels();
+    
+    // Expected calculation:
+    // public_result = banking::public_get_bank_info() + utils::public_get_version()
+    //               = 1 + 1 = 2
+    //
+    // package_result = banking::package_encrypt_data(75) + utils::package_get_config()
+    //                = (75 + 12345) + 2 = 12420 + 2 = 12422
+    //
+    // internal_result = banking::internal_security_check() + utils::try_access_banking_internals()
+    //                 = (banking::package_encrypt_data(100) + package_encryption_key) + 
+    //                   (banking::public_get_bank_info() + banking::package_encrypt_data(50))
+    //                 = ((100 + 12345) + 12345) + (1 + (50 + 12345))
+    //                 = (12445 + 12345) + (1 + 12395)
+    //                 = 24790 + 12396 = 37186
+    //
+    // Total: 2 + 12422 + 37186 = 49610
+    
+    return demo_result;
+}

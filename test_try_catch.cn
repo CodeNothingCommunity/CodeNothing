@@ -1,0 +1,17 @@
+// 测试 try-catch 功能
+
+lib <io>;
+
+fn main() {
+    std::println("测试 try-catch 功能");
+    
+    // 测试基本的 try-catch
+    try {
+        var result := lang::to_int("abc");  // 这应该会抛出异常
+        std::println("不应该到达这里");
+    } catch {
+        std::println("捕获到异常！");
+    }
+    
+    std::println("程序继续执行");
+}

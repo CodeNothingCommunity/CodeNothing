@@ -1,0 +1,133 @@
+// CodeNothing 猜数字小游戏 - 语法糖优化版
+// 使用 math 库的随机数生成功能和 io 库的输入输出功能
+// 展示自增/自减、复合赋值、三元条件操作符等语法糖
+
+lib <math>;
+lib <io>;
+
+// 🍭 语法糖使用说明：
+// 1. 自增/自减操作符：attempts++, attempts--
+// 2. 复合赋值操作符：+=, -=, *=, /=, %=
+// 3. 三元条件操作符：condition ? true_value : false_value
+
+fn main() {
+    // 游戏欢迎界面
+    std::println("欢迎来到 CodeNothing 猜数字游戏！");
+    std::println("=====================================");
+    std::println("游戏规则：");
+    std::println("1. 系统会生成一个 1-100 之间的随机数");
+    std::println("2. 你需要猜出这个数字");
+    std::println("3. 系统会提示你猜的数字是大了还是小了");
+    std::println("4. 看看你能用几次猜中！");
+    std::println("=====================================");
+    std::println("");
+    
+    // 初始化随机数种子
+    random::seed();
+    
+    // 开始游戏
+    play_game();
+    
+    std::println("");
+    std::println("<?> 想再玩一局吗？(y/n): ");
+    var answer: string = std::input();
+    
+    if (answer == "y" || answer == "Y" || answer == "yes" || answer == "Yes") {
+        main(); // 递归调用重新开始游戏
+    }
+    
+    std::println("谢谢游玩！再见");
+}
+
+fn play_game() {
+    // 生成 1-100 之间的随机数 - 使用类型推断
+    var random_str := random::randint("1", "100");
+    var target_number := lang::to_int(random_str);
+    
+    std::println("我已经想好了一个 1-100 之间的数字！");
+    std::println("开始猜吧！");
+    std::println("");
+    
+    var attempts := 0;
+    var guessed := false;
+    var max_attempts := 10;
+    
+    while (!guessed && attempts < max_attempts) {
+        attempts++; // 使用后置自增语法糖
+        
+        // 使用类型推断简化代码
+        var prompt := "<?> 第 " + lang::to_string(attempts) + " 次猜测，请输入你的数字 (1-100): ";
+        std::print(prompt);
+        
+        var input := std::input();
+
+        // 使用 try-catch 处理输入错误
+        var guess := 0;
+        try {
+            guess = lang::to_int(input);
+        } catch {
+            std::println("[!] 请输入有效的数字！");
+            attempts--; // 使用后置自减语法糖，不计入无效尝试
+            continue;
+        }
+
+        if (guess < 1 || guess > 100) {
+            std::println("[!] 请输入 1-100 之间的数字！");
+            attempts--; // 使用后置自减语法糖，不计入无效尝试
+            continue;
+        }
+        
+        // 比较猜测结果
+        if (guess == target_number) {
+            guessed = true;
+            std::println("[V] 恭喜你！猜对了！");
+            
+            // 使用内置函数将数字转换为字符串
+            var answer_str := lang::to_string(target_number);
+            std::println("答案就是：" + answer_str);
+            
+            var attempts_msg := "你用了 " + lang::to_string(attempts) + " 次就猜中了！";
+            std::println(attempts_msg);
+            
+            // 根据尝试次数给出评价
+            give_performance_feedback(attempts);
+            
+        } else {
+            // 使用三元条件操作符简化提示信息
+            var hint := guess < target_number ? "[-] 太小了！再试试更大的数字" : "[+] 太大了！再试试更小的数字";
+            std::println(hint);
+
+            var remaining := max_attempts - attempts;
+            // 使用三元条件操作符简化条件显示
+            var remaining_msg := remaining > 0 ? "还有 " + lang::to_string(remaining) + " 次机会" : "";
+            if (remaining > 0) {
+                std::println(remaining_msg);
+            }
+        }
+        
+        std::println("");
+    }
+    
+    // 如果用完了所有机会还没猜中
+    if (!guessed) {
+        std::println("{:(} 很遗憾，你用完了所有 10 次机会！");
+        var answer_str: string = lang::to_string(target_number);
+        std::println("答案就是：" + answer_str);
+        std::println("下次再来挑战吧！");
+    }
+}
+
+fn give_performance_feedback(attempts: int) {
+    std::println("");
+    std::println("🏆 你的表现评价：");
+
+    // 使用嵌套三元条件操作符简化评价逻辑 (现在支持多行!)
+    var feedback := attempts == 1 ? "🌟 神级！一次就猜中了！你是天才吗？" :
+                   attempts <= 3 ? "🔥 优秀！你的直觉很准！" :
+                   attempts <= 5 ? "👍 不错！你很快就找到了答案！" :
+                   attempts <= 7 ? "😊 还可以！继续努力！" :
+                   "🤔 需要多练习！下次试试二分法？";
+
+    std::println(feedback);
+    std::println("💡 提示：使用二分法最多只需要 7 次就能猜中 1-100 的数字！");
+}

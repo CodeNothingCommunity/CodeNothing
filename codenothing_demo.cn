@@ -1,0 +1,78 @@
+// CodeNothing语言演示程序
+// 展示面向对象编程的核心功能
+
+// 基础类定义
+class Animal {
+    public name: string;
+    
+    public Animal(name: string) {
+        self.name = name;
+    }
+    
+    public fn get_name(self: Animal): string {
+        return self.name;
+    }
+    
+    public fn make_sound(self: Animal): string {
+        return "Generic animal sound";
+    }
+}
+
+// 继承和多态
+class Dog extends Animal {
+    public breed: string;
+    
+    public Dog(name: string, breed: string) {
+        super.Animal(name);
+        self.breed = breed;
+    }
+    
+    // 方法重写 - 展示多态性
+    public fn make_sound(self: Dog): string {
+        return "Woof! Woof!";
+    }
+    
+    public fn get_breed(self: Dog): string {
+        return self.breed;
+    }
+    
+    // super方法调用
+    public fn get_parent_sound(self: Dog): string {
+        return super.make_sound();
+    }
+}
+
+// 主程序 - 展示OOP功能
+fn main() {
+    lang::println("=== CodeNothing OOP演示程序 ===");
+
+    // 创建对象
+    lang::println("1. 创建对象...");
+    var animal: Animal = Animal("Generic");
+    var dog: Dog = Dog("Buddy", "Golden Retriever");
+    lang::println("   对象创建完成！");
+
+    // 多态性演示
+    lang::println("2. 多态性演示...");
+    var animal_ref: Animal = dog;
+    var dog_sound: string = animal_ref.make_sound(); // 调用Dog版本
+    var animal_sound: string = animal.make_sound();  // 调用Animal版本
+    lang::println("   多态调用: " + dog_sound);
+    lang::println("   普通调用: " + animal_sound);
+
+    // super调用演示
+    lang::println("3. Super调用演示...");
+    var parent_sound: string = dog.get_parent_sound();
+    lang::println("   Super调用结果: " + parent_sound);
+
+    // 基础方法调用
+    lang::println("4. 基础方法调用...");
+    var animal_name: string = animal.get_name();
+    var dog_name: string = dog.get_name();
+    var dog_breed: string = dog.get_breed();
+    lang::println("   动物名称: " + animal_name);
+    lang::println("   狗狗名称: " + dog_name);
+    lang::println("   狗狗品种: " + dog_breed);
+
+    lang::println("=== 演示完成！ ===");
+}

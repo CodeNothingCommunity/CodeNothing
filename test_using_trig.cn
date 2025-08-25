@@ -1,0 +1,17 @@
+// 测试 using ns trig 功能
+
+lib <math>;
+lib <io>;
+using ns trig;
+
+fn main() {
+    std::println("测试三角函数命名空间");
+    
+    // 现在可以直接使用 sin, cos 等函数而不需要 trig:: 前缀
+    var angle := "1.57";  // π/2 弧度，约90度
+    var sin_result := sin(angle);
+    var cos_result := cos(angle);
+    
+    std::println("sin(π/2) = " + sin_result);
+    std::println("cos(π/2) = " + cos_result);
+}

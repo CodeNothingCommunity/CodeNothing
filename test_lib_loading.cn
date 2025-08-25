@@ -1,0 +1,6 @@
+lib <io>;
+
+fn main() {
+    // 这应该工作
+    std::println("Direct call works");
+}

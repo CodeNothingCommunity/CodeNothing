@@ -1,0 +1,13 @@
+// 最简单的函数调用测试
+
+lib <io>;
+
+fn main() {
+    std::println("测试简单函数调用");
+    var result := add(3, 5);
+    std::println("add(3, 5) = " + lang::to_string(result));
+}
+
+fn add(a: int, b: int): int {
+    return a + b;
+}

@@ -40,7 +40,16 @@ pub struct ComcnFile {
     
     /// Global constants pool
     pub constants: Vec<Value>,
-    
+
+    /// Library dependencies (library names that need to be loaded at runtime)
+    pub library_dependencies: HashSet<String>,
+
+    /// Class inheritance relationships (child_class -> parent_class)
+    pub class_inheritance: HashMap<String, String>,
+
+    /// Class definitions for runtime type checking and method resolution
+    pub class_definitions: HashMap<String, crate::core::vm::types::ClassDefinition>,
+
     /// Metadata for debugging and optimization
     pub metadata: ComcnMetadata,
 }
@@ -81,6 +90,9 @@ impl ComcnFile {
             chunks: Vec::new(),
             function_map: HashMap::new(),
             constants: Vec::new(),
+            library_dependencies: HashSet::new(),
+            class_inheritance: HashMap::new(),
+            class_definitions: HashMap::new(),
             metadata: ComcnMetadata {
                 compiler_version: env!("CARGO_PKG_VERSION").to_string(),
                 optimization_level: 0,
@@ -109,6 +121,26 @@ impl ComcnFile {
     /// Get chunk by index
     pub fn get_chunk_by_index(&self, index: usize) -> Option<&Chunk> {
         self.chunks.get(index)
+    }
+
+    /// Set class inheritance relationships
+    pub fn set_class_inheritance(&mut self, inheritance: HashMap<String, String>) {
+        self.class_inheritance = inheritance;
+    }
+
+    /// Set class definitions
+    pub fn set_class_definitions(&mut self, definitions: HashMap<String, crate::core::vm::types::ClassDefinition>) {
+        self.class_definitions = definitions;
+    }
+
+    /// Add library dependency
+    pub fn add_library_dependency(&mut self, lib_name: String) {
+        self.library_dependencies.insert(lib_name);
+    }
+
+    /// Set library dependencies
+    pub fn set_library_dependencies(&mut self, dependencies: HashSet<String>) {
+        self.library_dependencies = dependencies;
     }
     
     /// Save bytecode file to disk

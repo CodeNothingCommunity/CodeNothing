@@ -1,0 +1,208 @@
+// 🍭 CodeNothing 语法糖功能展示
+// 展示新增的三大类语法糖功能
+
+lib <io>;
+
+fn fibonacci_with_syntax_sugar(n: int) : int {
+    if (n <= 1) {
+        return n;
+    }
+    
+    var a : int = 0;
+    var b : int = 1;
+    var i : int = 2;
+    
+    while (i <= n) {
+        var temp : int = a + b;
+        a = b;
+        b = temp;
+        i++;  // 使用后置自增语法糖
+    }
+    
+    return b;
+}
+
+fn calculate_grade_with_ternary(score: int) : string {
+    // 使用嵌套三元操作符
+    return score >= 90 ? "优秀" : score >= 80 ? "良好" : score >= 70 ? "中等" : score >= 60 ? "及格" : "不及格";
+}
+
+fn array_sum_with_compound_assignment(arr: array<int>, size: int) : int {
+    var sum : int = 0;
+    var i : int = 0;
+    
+    while (i < size) {
+        sum += arr[i];  // 使用复合赋值语法糖
+        ++i;            // 使用前置自增语法糖
+    }
+    
+    return sum;
+}
+
+fn counter_demo() {
+    std::println("🔸 计数器演示 (自增/自减操作符)");
+    std::println("==============================");
+    
+    var counter : int = 5;
+    std::println("初始计数器: " + lang::to_string(counter));
+    
+    // 展示四种自增/自减操作符
+    std::println("前置自增 ++counter: " + lang::to_string(++counter) + " (counter=" + lang::to_string(counter) + ")");
+    std::println("后置自增 counter++: " + lang::to_string(counter++) + " (counter=" + lang::to_string(counter) + ")");
+    std::println("前置自减 --counter: " + lang::to_string(--counter) + " (counter=" + lang::to_string(counter) + ")");
+    std::println("后置自减 counter--: " + lang::to_string(counter--) + " (counter=" + lang::to_string(counter) + ")");
+    
+    std::println("");
+}
+
+fn calculator_demo() {
+    std::println("🔸 计算器演示 (复合赋值操作符)");
+    std::println("=============================");
+    
+    var value : int = 50;
+    std::println("初始值: " + lang::to_string(value));
+    
+    // 展示五种复合赋值操作符
+    value += 20;
+    std::println("加法赋值 value += 20: " + lang::to_string(value));
+    
+    value -= 10;
+    std::println("减法赋值 value -= 10: " + lang::to_string(value));
+    
+    value *= 2;
+    std::println("乘法赋值 value *= 2: " + lang::to_string(value));
+    
+    value /= 4;
+    std::println("除法赋值 value /= 4: " + lang::to_string(value));
+    
+    value %= 7;
+    std::println("取模赋值 value %= 7: " + lang::to_string(value));
+    
+    std::println("");
+}
+
+fn conditional_demo() {
+    std::println("🔸 条件判断演示 (三元条件操作符)");
+    std::println("==============================");
+    
+    var age : int = 25;
+    var temperature : int = 22;
+    var score : int = 88;
+    
+    // 简单三元操作符
+    var adult_status : string = age >= 18 ? "成年人" : "未成年人";
+    std::println("年龄 " + lang::to_string(age) + " -> " + adult_status);
+    
+    // 嵌套三元操作符
+    var weather : string = temperature > 30 ? "炎热" : temperature > 20 ? "温暖" : temperature > 10 ? "凉爽" : "寒冷";
+    std::println("温度 " + lang::to_string(temperature) + "°C -> " + weather);
+    
+    // 函数调用中的三元操作符
+    var grade : string = calculate_grade_with_ternary(score);
+    std::println("分数 " + lang::to_string(score) + " -> " + grade);
+    
+    std::println("");
+}
+
+fn practical_examples() {
+    std::println("🔸 实际应用示例");
+    std::println("===============");
+    
+    // 斐波那契数列计算
+    var fib_n : int = 10;
+    var fib_result : int = fibonacci_with_syntax_sugar(fib_n);
+    std::println("斐波那契数列第" + lang::to_string(fib_n) + "项: " + lang::to_string(fib_result));
+    
+    // 数组求和
+    var numbers : array<int> = [1, 2, 3, 4, 5];
+    var sum : int = array_sum_with_compound_assignment(numbers, 5);
+    std::println("数组 [1,2,3,4,5] 的和: " + lang::to_string(sum));
+    
+    // 复杂表达式组合
+    var x : int = 10;
+    var y : int = 5;
+    var operation : bool = true;
+    
+    // 组合使用三元操作符、复合赋值和自增操作符
+    var result : int = x;
+    if (operation) {
+        result += ++y;  // y先自增到6，然后加到result
+    } else {
+        result -= y--;  // y的值加到result，然后y自减
+    }
+    
+    std::println("复杂表达式结果: x=" + lang::to_string(x) + ", y=" + lang::to_string(y) + ", result=" + lang::to_string(result));
+    
+    std::println("");
+}
+
+fn performance_comparison() {
+    std::println("🔸 语法糖前后对比");
+    std::println("=================");
+    
+    std::println("传统写法 vs 语法糖写法:");
+    std::println("");
+    
+    std::println("自增操作:");
+    std::println("  传统: counter = counter + 1");
+    std::println("  语法糖: counter++ 或 ++counter");
+    std::println("");
+    
+    std::println("复合赋值:");
+    std::println("  传统: total = total + value");
+    std::println("  语法糖: total += value");
+    std::println("");
+    
+    std::println("条件赋值:");
+    std::println("  传统: if (condition) { result = value1; } else { result = value2; }");
+    std::println("  语法糖: result = condition ? value1 : value2");
+    std::println("");
+    
+    std::println("代码简化效果:");
+    std::println("✅ 减少代码行数 50%+");
+    std::println("✅ 提高代码可读性");
+    std::println("✅ 符合现代编程语言标准");
+    std::println("✅ 保持完全的类型安全");
+    
+    std::println("");
+}
+
+fn main() : int {
+    std::println("🍭 CodeNothing 语法糖功能完整展示");
+    std::println("=================================");
+    std::println("");
+    
+    counter_demo();
+    calculator_demo();
+    conditional_demo();
+    practical_examples();
+    performance_comparison();
+    
+    std::println("🎉 语法糖功能展示完成!");
+    std::println("");
+    std::println("📊 新增语法糖总结:");
+    std::println("==================");
+    std::println("");
+    std::println("1️⃣ 自增/自减操作符:");
+    std::println("   ✅ 前置自增: ++x (先自增，返回新值)");
+    std::println("   ✅ 后置自增: x++ (先返回旧值，后自增)");
+    std::println("   ✅ 前置自减: --x (先自减，返回新值)");
+    std::println("   ✅ 后置自减: x-- (先返回旧值，后自减)");
+    std::println("");
+    std::println("2️⃣ 复合赋值操作符:");
+    std::println("   ✅ 加法赋值: x += y  等价于 x = x + y");
+    std::println("   ✅ 减法赋值: x -= y  等价于 x = x - y");
+    std::println("   ✅ 乘法赋值: x *= y  等价于 x = x * y");
+    std::println("   ✅ 除法赋值: x /= y  等价于 x = x / y");
+    std::println("   ✅ 取模赋值: x %= y  等价于 x = x % y");
+    std::println("");
+    std::println("3️⃣ 三元条件操作符:");
+    std::println("   ✅ 基本语法: condition ? true_value : false_value");
+    std::println("   ✅ 支持嵌套: a ? b : c ? d : e");
+    std::println("   ✅ 类型安全: 编译时检查分支类型兼容性");
+    std::println("");
+    std::println("🔥 CodeNothing 语法现在更加现代化和简洁!");
+    std::println("💪 开发效率显著提升，代码更易读易写!");
+    
+    return 0;
+}

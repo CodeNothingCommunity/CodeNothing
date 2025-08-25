@@ -56,5 +56,91 @@ impl VirtualMachine {
         self.ip = 0;
         self.current_chunk = None;
         self.instructions_executed = 0;
+
+        // Reset performance tracking
+        self.method_cache.clear();
+        self.method_cache_hits = 0;
+        self.method_cache_misses = 0;
+        self.method_index.clear();
+        self.method_index_dirty = true;
+        self.object_tracker.clear();
+        self.next_object_id = 1;
+        self.gc_cycle_count = 0;
+        self.object_registry.clear();
+    }
+
+    /// Get memory usage information (public version)
+    pub fn get_memory_info(&self) -> MemoryInfo {
+        self.memory_info()
+    }
+
+    /// Print comprehensive performance and memory report
+    pub fn print_performance_report(&self) {
+        println!("\n🔧 ===== CodeNothing VM Performance Report =====");
+
+        // Method cache statistics
+        let (cache_hits, cache_misses, hit_rate) = self.get_method_cache_stats();
+        println!("📊 Method Lookup Performance:");
+        println!("   Cache hits: {}", cache_hits);
+        println!("   Cache misses: {}", cache_misses);
+        println!("   Hit rate: {:.2}%", hit_rate);
+        println!("   Method index entries: {}", self.method_index.len());
+
+        // Object lifecycle statistics
+        let (total_objects, suspected_leaks, leak_percentage) = self.get_object_lifecycle_stats();
+        println!("📊 Object Lifecycle:");
+        println!("   Total objects created: {}", total_objects);
+        println!("   Suspected leaks: {}", suspected_leaks);
+        println!("   Leak percentage: {:.2}%", leak_percentage);
+        println!("   GC cycles: {}", self.gc_cycle_count);
+
+        // Memory statistics
+        let memory_stats = self.get_memory_info();
+        println!("📊 Memory Usage:");
+        println!("   Stack: {}/{} ({:.1}%)",
+                memory_stats.stack_usage.current,
+                memory_stats.stack_usage.max,
+                memory_stats.stack_usage.percentage);
+        println!("   Heap: {}/{} ({:.1}%)",
+                memory_stats.heap_usage.current,
+                memory_stats.heap_usage.max,
+                memory_stats.heap_usage.percentage);
+        println!("   Globals: {}/{} ({:.1}%)",
+                memory_stats.globals_usage.current,
+                memory_stats.globals_usage.max,
+                memory_stats.globals_usage.percentage);
+
+        // Performance recommendations
+        self.print_performance_recommendations(hit_rate, leak_percentage);
+
+        println!("🔧 ============================================\n");
+    }
+
+    /// Print performance recommendations based on statistics
+    fn print_performance_recommendations(&self, cache_hit_rate: f64, leak_percentage: f64) {
+        println!("💡 Performance Recommendations:");
+
+        if cache_hit_rate < 80.0 {
+            println!("   ⚠️ Low method cache hit rate ({:.1}%) - consider optimizing method lookup patterns", cache_hit_rate);
+        } else {
+            println!("   ✅ Good method cache hit rate ({:.1}%)", cache_hit_rate);
+        }
+
+        if leak_percentage > 10.0 {
+            println!("   ⚠️ High memory leak percentage ({:.1}%) - review object lifecycle management", leak_percentage);
+        } else if leak_percentage > 5.0 {
+            println!("   ⚠️ Moderate memory leak percentage ({:.1}%) - monitor object creation patterns", leak_percentage);
+        } else {
+            println!("   ✅ Low memory leak percentage ({:.1}%)", leak_percentage);
+        }
+
+        let memory_info = self.get_memory_info();
+        if memory_info.stack_usage.percentage > 80.0 {
+            println!("   ⚠️ High stack usage ({:.1}%) - consider reducing recursion depth", memory_info.stack_usage.percentage);
+        }
+
+        if memory_info.heap_usage.percentage > 80.0 {
+            println!("   ⚠️ High heap usage ({:.1}%) - consider running garbage collection", memory_info.heap_usage.percentage);
+        }
     }
 }

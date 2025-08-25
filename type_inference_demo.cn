@@ -1,0 +1,75 @@
+// 🎯 CodeNothing 类型推断功能完整演示
+// 展示 := 操作符的各种用法
+
+lib <io>;
+
+fn main() {
+    std::println("🚀 CodeNothing 类型推断功能演示");
+    std::println("=====================================");
+    
+    // 1. 基本类型推断
+    std::println("1. 基本类型推断:");
+    var number := 42;                    // 推断为 int
+    var message := "Hello, World!";      // 推断为 string
+    var flag := true;                    // 推断为 bool
+    var pi := 3.14159;                   // 推断为 float
+    
+    std::println("   number (int): " + lang::to_string(number));
+    std::println("   message (string): " + message);
+    std::println("   flag (bool): " + lang::to_string(flag));
+    std::println("   pi (float): " + lang::to_string(pi));
+    std::println("");
+    
+    // 2. 表达式类型推断
+    std::println("2. 表达式类型推断:");
+    var sum := 10 + 20;                  // 推断为 int
+    var product := 3.5 * 2.0;            // 推断为 float
+    var greeting := "Hello, " + "CodeNothing!"; // 推断为 string
+    var comparison := 5 > 3;             // 推断为 bool
+    
+    std::println("   sum: " + lang::to_string(sum));
+    std::println("   product: " + lang::to_string(product));
+    std::println("   greeting: " + greeting);
+    std::println("   comparison: " + lang::to_string(comparison));
+    std::println("");
+    
+    // 3. 混合使用显式类型和类型推断
+    std::println("3. 混合使用:");
+    var explicit_var: int = 100;         // 显式类型
+    var inferred_var := 200;             // 类型推断
+    var result: int = explicit_var + inferred_var; // 显式类型
+    
+    std::println("   explicit_var: " + lang::to_string(explicit_var));
+    std::println("   inferred_var: " + lang::to_string(inferred_var));
+    std::println("   result: " + lang::to_string(result));
+    std::println("");
+    
+    // 4. 在不同作用域中使用
+    std::println("4. 作用域中的类型推断:");
+    if (flag) {
+        var local_var := "在 if 块中";
+        std::println("   " + local_var);
+    }
+    
+    var counter := 0;
+    while (counter < 3) {
+        var loop_var := "循环第 " + lang::to_string(counter + 1) + " 次";
+        std::println("   " + loop_var);
+        counter = counter + 1;
+    }
+    std::println("");
+    
+    // 5. 函数调用结果的类型推断
+    std::println("5. 函数调用结果推断:");
+    var calculated := calculate_value();
+    std::println("   calculated: " + lang::to_string(calculated));
+    
+    std::println("=====================================");
+    std::println("✅ 类型推断演示完成！");
+}
+
+fn calculate_value() : int {
+    var base := 10;      // 类型推断
+    var multiplier := 5; // 类型推断
+    return base * multiplier;
+}

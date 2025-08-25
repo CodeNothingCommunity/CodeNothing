@@ -1,0 +1,16 @@
+// 最简单的递归测试
+
+lib <io>;
+
+fn main() {
+    std::println("测试简单递归");
+    var result := countdown(3);
+    std::println("countdown(3) = " + lang::to_string(result));
+}
+
+fn countdown(n: int): int {
+    if (n <= 0) {
+        return 0;
+    }
+    return countdown(n - 1) + 1;
+}

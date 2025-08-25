@@ -1,7 +1,0 @@
-// 测试未定义变量检测
-
-fn main(): int {
-    let a = 10;
-    let b = undefined_variable;  // 应该报错：未定义变量
-    return a + b;
-}

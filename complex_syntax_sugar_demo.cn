@@ -1,0 +1,238 @@
+// 🔥 CodeNothing 复杂语法糖演示
+// 展示语法糖在复杂但合理的场景中的应用
+
+lib <io>;
+
+// 复杂的计算器模拟
+fn advanced_calculator() {
+    std::println("🔥 高级计算器模拟");
+    std::println("=================");
+    
+    var accumulator : int = 100;
+    var operand : int = 5;
+    var operation_count : int = 0;
+    var error_count : int = 0;
+    
+    std::println("初始累加器: " + lang::to_string(accumulator));
+    
+    // 复杂的计算序列
+    while (operation_count < 10) {
+        var old_accumulator : int = accumulator;
+        
+        // 根据操作次数选择不同的操作
+        if (operation_count % 4 == 0) {
+            accumulator += operand++;
+            std::println("操作 " + lang::to_string(operation_count) + ": 加法 " + lang::to_string(old_accumulator) + " += " + lang::to_string(operand-1) + " = " + lang::to_string(accumulator));
+        } else if (operation_count % 4 == 1) {
+            accumulator -= --operand;
+            std::println("操作 " + lang::to_string(operation_count) + ": 减法 " + lang::to_string(old_accumulator) + " -= " + lang::to_string(operand) + " = " + lang::to_string(accumulator));
+        } else if (operation_count % 4 == 2) {
+            accumulator *= operand > 3 ? 2 : 3;
+            std::println("操作 " + lang::to_string(operation_count) + ": 乘法 " + lang::to_string(old_accumulator) + " *= " + lang::to_string(operand > 3 ? 2 : 3) + " = " + lang::to_string(accumulator));
+        } else {
+            accumulator /= operand < 8 ? 2 : 4;
+            std::println("操作 " + lang::to_string(operation_count) + ": 除法 " + lang::to_string(old_accumulator) + " /= " + lang::to_string(operand < 8 ? 2 : 4) + " = " + lang::to_string(accumulator));
+        }
+        
+        // 错误检查
+        if (accumulator < 0) {
+            error_count++;
+            accumulator = accumulator < -100 ? 0 : -accumulator;
+            std::println("  错误修正: 负值处理");
+        }
+        
+        // 溢出检查
+        if (accumulator > 1000) {
+            accumulator %= 1000;
+            std::println("  溢出处理: 取模1000");
+        }
+        
+        operation_count++;
+    }
+    
+    std::println("最终结果: " + lang::to_string(accumulator));
+    std::println("错误次数: " + lang::to_string(error_count));
+    std::println("");
+}
+
+// 复杂的数组处理
+fn advanced_array_processing() {
+    std::println("🔥 高级数组处理");
+    std::println("===============");
+    
+    var numbers : array<int> = [10, 25, 7, 42, 18, 33, 9, 56, 14, 71];
+    var processed : array<int> = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    var statistics : array<int> = [0, 0, 0]; // [sum, max, min]
+    
+    var i : int = 0;
+    statistics[2] = 1000; // 初始化最小值
+    
+    while (i < 10) {
+        var current : int = numbers[i];
+        var factor : int = i % 3 == 0 ? 2 : i % 3 == 1 ? 3 : 1;
+        
+        // 复杂的处理逻辑
+        processed[i] = current > 30 ? current * factor : current + factor;
+        processed[i] += i % 2 == 0 ? ++factor : factor--;
+        
+        // 统计计算
+        statistics[0] += processed[i]; // sum
+        statistics[1] = processed[i] > statistics[1] ? processed[i] : statistics[1]; // max
+        statistics[2] = processed[i] < statistics[2] ? processed[i] : statistics[2]; // min
+        
+        std::println("索引 " + lang::to_string(i) + ": " + lang::to_string(current) + " -> " + lang::to_string(processed[i]) + " (因子: " + lang::to_string(factor) + ")");
+        
+        i++;
+    }
+    
+    std::println("统计结果:");
+    std::println("  总和: " + lang::to_string(statistics[0]));
+    std::println("  最大值: " + lang::to_string(statistics[1]));
+    std::println("  最小值: " + lang::to_string(statistics[2]));
+    std::println("  平均值: " + lang::to_string(statistics[0] / 10));
+    std::println("");
+}
+
+// 复杂的状态机
+fn complex_state_machine() {
+    std::println("🔥 复杂状态机");
+    std::println("=============");
+    
+    var state : int = 0;
+    var energy : int = 100;
+    var score : int = 0;
+    var transitions : int = 0;
+    var max_transitions : int = 15;
+    
+    while (transitions < max_transitions && energy > 0) {
+        var old_state : int = state;
+        var old_energy : int = energy;
+        var old_score : int = score;
+        
+        // 状态转换逻辑
+        if (state == 0) {
+            state = energy > 80 ? 1 : 2;
+            energy -= 10;
+        } else if (state == 1) {
+            state = score > 50 ? 3 : 0;
+            energy -= 15;
+            score += 20;
+        } else if (state == 2) {
+            state = energy < 30 ? 0 : 1;
+            energy -= 5;
+            score += 10;
+        } else if (state == 3) {
+            state = transitions % 3 == 0 ? 0 : 2;
+            energy -= 20;
+            score += 30;
+        }
+        
+        // 能量回复机制
+        energy += state == 2 ? 5 : 0;
+        energy = energy > 100 ? 100 : energy;
+        
+        // 分数奖励
+        var bonus : int = transitions % 5 == 0 ? 25 : 0;
+        score += bonus;
+        
+        std::println("转换 " + lang::to_string(transitions++) + ": 状态 " + lang::to_string(old_state) + " -> " + lang::to_string(state) + ", 能量 " + lang::to_string(old_energy) + " -> " + lang::to_string(energy) + ", 分数 " + lang::to_string(old_score) + " -> " + lang::to_string(score));
+    }
+    
+    var final_status : string = energy > 0 ? "成功完成" : "能量耗尽";
+    std::println("状态机结束: " + final_status);
+    std::println("最终状态: " + lang::to_string(state));
+    std::println("最终分数: " + lang::to_string(score));
+    std::println("");
+}
+
+// 复杂的数学运算
+fn complex_mathematics() {
+    std::println("🔥 复杂数学运算");
+    std::println("===============");
+    
+    var a : int = 12;
+    var b : int = 8;
+    var c : int = 5;
+    var d : int = 3;
+    
+    std::println("初始值: a=" + lang::to_string(a) + ", b=" + lang::to_string(b) + ", c=" + lang::to_string(c) + ", d=" + lang::to_string(d));
+    
+    // 复杂的数学表达式序列
+    var result1 : int = ++a * b-- + c;
+    std::println("表达式1: ++a * b-- + c = " + lang::to_string(result1));
+    std::println("  变量状态: a=" + lang::to_string(a) + ", b=" + lang::to_string(b) + ", c=" + lang::to_string(c));
+    
+    var result2 : int = a > b ? a + c : b * d;
+    std::println("表达式2: a > b ? a + c : b * d = " + lang::to_string(result2));
+    
+    a += result1 > 50 ? 10 : 5;
+    b *= result2 < 30 ? 2 : 1;
+    c -= a > 20 ? 3 : 1;
+    d += b % 2 == 0 ? 4 : 2;
+    
+    std::println("复合赋值后: a=" + lang::to_string(a) + ", b=" + lang::to_string(b) + ", c=" + lang::to_string(c) + ", d=" + lang::to_string(d));
+    
+    // 最终复杂计算
+    var final_result : int = (a + b) * (c > d ? c : d) + (a % b) - (c * d);
+    std::println("最终结果: (a + b) * (c > d ? c : d) + (a % b) - (c * d) = " + lang::to_string(final_result));
+    std::println("");
+}
+
+// 复杂的循环嵌套
+fn complex_nested_loops() {
+    std::println("🔥 复杂嵌套循环");
+    std::println("===============");
+    
+    var total : int = 0;
+    var operations : int = 0;
+    var max_operations : int = 50;
+    
+    var i : int = 1;
+    while (i <= 5 && operations < max_operations) {
+        var j : int = 1;
+        while (j <= 3 && operations < max_operations) {
+            var product : int = i * j;
+            var increment : int = product > 6 ? ++product : product + 2;
+            
+            total += increment;
+            operations++;
+            
+            std::println("循环 i=" + lang::to_string(i) + ", j=" + lang::to_string(j) + ": product=" + lang::to_string(i*j) + ", increment=" + lang::to_string(increment) + ", total=" + lang::to_string(total));
+            
+            j++;
+        }
+        i++;
+    }
+    
+    std::println("嵌套循环完成:");
+    std::println("  总计: " + lang::to_string(total));
+    std::println("  操作次数: " + lang::to_string(operations));
+    std::println("  平均值: " + lang::to_string(total / operations));
+    std::println("");
+}
+
+fn main() : int {
+    std::println("🔥 CodeNothing 复杂语法糖演示");
+    std::println("=============================");
+    std::println("");
+    
+    advanced_calculator();
+    advanced_array_processing();
+    complex_state_machine();
+    complex_mathematics();
+    complex_nested_loops();
+    
+    std::println("🎉 所有复杂演示完成!");
+    std::println("");
+    std::println("🔥 演示特点:");
+    std::println("✅ 实际可用的复杂逻辑");
+    std::println("✅ 语法糖的合理组合使用");
+    std::println("✅ 复杂但清晰的代码结构");
+    std::println("✅ 高级算法和数据处理");
+    std::println("✅ 状态机和控制流");
+    std::println("✅ 数学运算和循环嵌套");
+    std::println("");
+    std::println("💪 CodeNothing 语法糖让复杂逻辑变得简洁优雅!");
+    
+    return 0;
+}

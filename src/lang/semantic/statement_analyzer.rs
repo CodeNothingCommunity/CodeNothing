@@ -10,7 +10,7 @@ impl SemanticAnalyzer {
         match statement {
             Statement::VarDeclaration { scope: _, name, type_annotation, initializer, position } => {
                 let declared_type = type_annotation.as_ref()
-                    .map(|t| Type::from(t.clone()));
+                    .map(|t| self.resolve_type_annotation(t));
                 
                 let inferred_type = if let Some(init) = initializer {
                     Some(self.analyze_expression(init))
@@ -20,9 +20,10 @@ impl SemanticAnalyzer {
                 
                 let final_type = match (declared_type, inferred_type) {
                     (Some(declared), Some(inferred)) => {
-                        if !self.inference.can_unify(&declared, &inferred) {
+                        // Check if inferred type can be assigned to declared type (for polymorphism)
+                        if !self.inference.can_unify_with_env(&inferred, &declared, Some(&self.type_env)) {
                             self.add_error(TypeError::new(
-                                format!("Type mismatch: declared type '{}' but got '{}'", 
+                                format!("Type mismatch: declared type '{}' but got '{}'",
                                        declared, inferred),
                                 position.clone(),
                             ));
@@ -59,7 +60,12 @@ impl SemanticAnalyzer {
             
             Statement::Return { value, position } => {
                 let return_type = if let Some(val) = value {
-                    self.analyze_expression(val)
+                    // Set expected type for the return expression
+                    let old_expected = self.expected_type.clone();
+                    self.expected_type = self.current_function_return_type.clone();
+                    let result = self.analyze_expression(val);
+                    self.expected_type = old_expected;
+                    result
                 } else {
                     Type::Void
                 };
@@ -67,8 +73,8 @@ impl SemanticAnalyzer {
                 if let Some(expected_return_type) = &self.current_function_return_type {
                     if !self.inference.can_unify(expected_return_type, &return_type) {
                         self.add_error(TypeError::new(
-                            format!("Return type mismatch: expected '{}' but got '{}'",
-                                   expected_return_type, return_type),
+                            format!("Return type mismatch: expected '{}' but got '{}' (expected: {:?}, actual: {:?})",
+                                   expected_return_type, return_type, expected_return_type, return_type),
                             position.clone(),
                         ));
                     }
@@ -222,6 +228,59 @@ impl SemanticAnalyzer {
                 if !matches!(expr_type, Type::String) {
                     // For now, we only support string exceptions
                     // In the future, we might support custom exception types
+                }
+            }
+
+            Statement::LibImport { library_name, import_type, position } => {
+                if self.debug_mode {
+                    println!("🔧 Semantic: Processing library import: {} ({:?})", library_name, import_type);
+                }
+
+                // Try to load the library and get its namespaces
+                match crate::library_loader::get_library_namespaces(library_name) {
+                    Ok(namespaces) => {
+                        if self.debug_mode {
+                            println!("🔧 Semantic: Library '{}' provides namespaces: {:?}", library_name, namespaces);
+                        }
+
+                        // Register each namespace from the library
+                        for namespace in namespaces {
+                            self.type_env.define_namespace(namespace.clone());
+                            if self.debug_mode {
+                                println!("🔧 Semantic: Registered namespace '{}' from library '{}'", namespace, library_name);
+                            }
+
+                            // Register all functions from this library in this namespace
+                            if let Ok(functions) = crate::library_loader::get_library_functions(library_name) {
+                                for function_name in functions {
+                                    // Extract the function name without namespace prefix
+                                    if let Some((ns, func)) = function_name.split_once("::") {
+                                        if ns == namespace {
+                                            // Register the function in the namespace
+                                            // Create a special marker type for library functions
+                                            // We'll use a custom type to indicate this is a library function
+                                            let function_type = Type::LibraryFunction {
+                                                return_type: Box::new(Type::String),
+                                            };
+                                            if let Err(e) = self.type_env.define_in_namespace(&namespace, func.to_string(), function_type) {
+                                                if self.debug_mode {
+                                                    println!("🔧 Semantic: Failed to register function '{}' in namespace '{}': {}", func, namespace, e);
+                                                }
+                                            } else if self.debug_mode {
+                                                println!("🔧 Semantic: Registered function '{}' in namespace '{}'", func, namespace);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        self.add_error(TypeError::new(
+                            format!("Failed to load library '{}': {}", library_name, e),
+                            position.clone(),
+                        ));
+                    }
                 }
             }
 

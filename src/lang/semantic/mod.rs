@@ -18,6 +18,8 @@ pub mod declaration_analyzer;
 pub mod statement_analyzer;
 pub mod expression_analyzer;
 pub mod binary_operation_analyzer;
+pub mod access_control;
+pub mod vtable;
 pub mod tests;
 
 // Re-export main types and functions

@@ -1,0 +1,6 @@
+lib <io>;
+using ns std;
+
+fn main() {
+    println("Hello");
+}

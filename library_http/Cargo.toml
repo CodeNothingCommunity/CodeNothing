@@ -1,0 +1,13 @@
+[package]
+name = "cn_http_lib"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "http"
+crate-type = ["cdylib"]
+
+[dependencies]
+cn_common = { path = "../library_common" }
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+url = "2.3" 

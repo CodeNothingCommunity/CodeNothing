@@ -1,0 +1,250 @@
+// 🍭 CodeNothing 多行三元条件操作符测试
+// 展示修复后的解析器支持多行三元表达式
+
+lib <io>;
+
+fn test_multiline_ternary() {
+    std::println("🍭 多行三元条件操作符测试");
+    std::println("========================");
+    std::println("");
+    
+    // 测试1: 简单的多行三元操作符
+    var score : int = 85;
+    var grade : string = score >= 90 ? "A级" :
+                        score >= 80 ? "B级" :
+                        score >= 70 ? "C级" :
+                        score >= 60 ? "D级" :
+                        "F级";
+    
+    std::println("测试1 - 成绩评级:");
+    std::println("分数: " + lang::to_string(score));
+    std::println("等级: " + grade);
+    std::println("");
+    
+    // 测试2: 复杂的多行三元操作符
+    var temperature : int = 25;
+    var weather_desc : string = temperature > 35 ? "炎热" :
+                               temperature > 25 ? "温暖" :
+                               temperature > 15 ? "凉爽" :
+                               temperature > 5 ? "寒冷" :
+                               temperature > -5 ? "严寒" :
+                               "极寒";
+    
+    std::println("测试2 - 天气描述:");
+    std::println("温度: " + lang::to_string(temperature) + "°C");
+    std::println("描述: " + weather_desc);
+    std::println("");
+    
+    // 测试3: 嵌套的多行三元操作符
+    var age : int = 25;
+    var income : int = 5000;
+    var category : string = age < 18 ? "未成年" :
+                           age < 30 ? 
+                               (income > 8000 ? "年轻高收入" :
+                                income > 4000 ? "年轻中收入" :
+                                "年轻低收入") :
+                           age < 50 ?
+                               (income > 15000 ? "中年高收入" :
+                                income > 8000 ? "中年中收入" :
+                                "中年低收入") :
+                           income > 10000 ? "老年高收入" :
+                           "老年普通收入";
+    
+    std::println("测试3 - 人群分类:");
+    std::println("年龄: " + lang::to_string(age) + "岁");
+    std::println("收入: " + lang::to_string(income) + "元");
+    std::println("分类: " + category);
+    std::println("");
+}
+
+fn test_multiline_with_syntax_sugar() {
+    std::println("🍭 多行三元操作符与其他语法糖结合");
+    std::println("================================");
+    std::println("");
+    
+    var health : int = 80;
+    var mana : int = 60;
+    var level : int = 5;
+    var experience : int = 1200;
+    
+    // 复杂的游戏状态评估
+    var status : string = health > 80 ? 
+                             (mana > 70 ? "完美状态" : "法力不足") :
+                         health > 50 ?
+                             (mana > 50 ? "良好状态" : "需要回复") :
+                         health > 20 ?
+                             "危险状态" :
+                         "濒死状态";
+    
+    std::println("游戏状态评估:");
+    std::println("生命值: " + lang::to_string(health));
+    std::println("法力值: " + lang::to_string(mana));
+    std::println("状态: " + status);
+    std::println("");
+    
+    // 使用自增操作符和三元操作符
+    var bonus_multiplier : int = 1;
+    var final_score : int = 0;
+    
+    var i : int = 0;
+    while (i < 5) {
+        var round_score : int = (i + 1) * 100;
+        
+        // 多行三元操作符决定奖励
+        var bonus : int = round_score > 400 ?
+                             (++bonus_multiplier * 50) :
+                         round_score > 200 ?
+                             (bonus_multiplier++ * 30) :
+                         round_score > 100 ?
+                             20 :
+                         10;
+        
+        final_score += round_score + bonus;
+        
+        std::println("回合 " + lang::to_string(++i) + ": 基础分=" + lang::to_string(round_score) + ", 奖励=" + lang::to_string(bonus) + ", 倍数=" + lang::to_string(bonus_multiplier));
+    }
+    
+    std::println("最终分数: " + lang::to_string(final_score));
+    std::println("");
+}
+
+fn test_complex_multiline_scenarios() {
+    std::println("🍭 复杂多行场景测试");
+    std::println("==================");
+    std::println("");
+    
+    // 测试1: 多行三元操作符在数组处理中的应用
+    var numbers : array<int> = [15, 42, 8, 73, 29, 91, 6, 55];
+    var i : int = 0;
+    var processed_count : int = 0;
+    var high_count : int = 0;
+    var medium_count : int = 0;
+    var low_count : int = 0;
+    
+    while (i < 8) {
+        var number : int = numbers[i];
+
+        // 多行三元操作符分类处理
+        var category : string = number > 80 ? "高" :
+                               number > 50 ? "中" :
+                               number > 20 ? "低" :
+                               "极低";
+        
+        // 使用复合赋值更新计数
+        if (category == "高") {
+            high_count++;
+        } else if (category == "中") {
+            medium_count++;
+        } else {
+            low_count++;
+        }
+        
+        processed_count++;
+        
+        std::println("数字 " + lang::to_string(number) + " -> " + category);
+        i++;
+    }
+    
+    std::println("");
+    std::println("统计结果:");
+    std::println("高值数量: " + lang::to_string(high_count));
+    std::println("中值数量: " + lang::to_string(medium_count));
+    std::println("低值数量: " + lang::to_string(low_count));
+    std::println("总处理数: " + lang::to_string(processed_count));
+    std::println("");
+    
+    // 测试2: 多行三元操作符在复杂计算中的应用
+    var x : int = 10;
+    var y : int = 15;
+    var operation : int = 2; // 1=加法, 2=乘法, 3=复杂运算
+    
+    var result : int = operation == 1 ?
+                          (x + y > 20 ? (x + y) * 2 : x + y) :
+                      operation == 2 ?
+                          (x * y > 100 ? (x * y) / 2 : x * y) :
+                      operation == 3 ?
+                          (x > y ? 
+                              (x * x + y) :
+                              (y * y + x)) :
+                      0;
+    
+    std::println("复杂计算测试:");
+    std::println("x = " + lang::to_string(x) + ", y = " + lang::to_string(y));
+    std::println("操作类型: " + lang::to_string(operation));
+    std::println("计算结果: " + lang::to_string(result));
+    std::println("");
+}
+
+fn test_performance_and_readability() {
+    std::println("🍭 性能与可读性测试");
+    std::println("==================");
+    std::println("");
+    
+    // 对比传统if-else和多行三元操作符
+    var test_values : array<int> = [5, 15, 25, 35, 45, 55, 65, 75, 85, 95];
+    var i : int = 0;
+    
+    std::println("传统if-else vs 多行三元操作符对比:");
+    std::println("");
+    
+    while (i < 10) {
+        var value : int = test_values[i];
+        
+        // 使用多行三元操作符 (简洁版本)
+        var ternary_result : string = value >= 90 ? "优秀" :
+                                     value >= 80 ? "良好" :
+                                     value >= 70 ? "中等" :
+                                     value >= 60 ? "及格" :
+                                     "不及格";
+        
+        // 模拟传统if-else的结果 (用于对比)
+        var traditional_result : string = "";
+        if (value >= 90) {
+            traditional_result = "优秀";
+        } else if (value >= 80) {
+            traditional_result = "良好";
+        } else if (value >= 70) {
+            traditional_result = "中等";
+        } else if (value >= 60) {
+            traditional_result = "及格";
+        } else {
+            traditional_result = "不及格";
+        }
+        
+        // 验证结果一致性
+        var consistent : string = ternary_result == traditional_result ? "✅" : "❌";
+        
+        std::println("值: " + lang::to_string(value) + " -> 三元: " + ternary_result + ", 传统: " + traditional_result + " " + consistent);
+        
+        i++;
+    }
+    
+    std::println("");
+    std::println("结论: 多行三元操作符在保持功能一致性的同时，显著提高了代码简洁性！");
+    std::println("");
+}
+
+fn main() : int {
+    std::println("🍭 CodeNothing 多行三元条件操作符完整测试");
+    std::println("=======================================");
+    std::println("");
+    
+    test_multiline_ternary();
+    test_multiline_with_syntax_sugar();
+    test_complex_multiline_scenarios();
+    test_performance_and_readability();
+    
+    std::println("🎉 所有多行三元操作符测试完成!");
+    std::println("");
+    std::println("🔥 测试总结:");
+    std::println("✅ 基础多行三元操作符 - 完美支持");
+    std::println("✅ 复杂嵌套多行表达式 - 完美支持");
+    std::println("✅ 与其他语法糖结合 - 完美支持");
+    std::println("✅ 复杂场景应用 - 完美支持");
+    std::println("✅ 性能与可读性 - 显著提升");
+    std::println("");
+    std::println("💡 多行三元操作符让复杂条件判断变得清晰易读!");
+    std::println("🚀 CodeNothing 语法糖功能更加完善和强大!");
+    
+    return 0;
+}

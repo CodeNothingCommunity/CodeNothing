@@ -1,0 +1,18 @@
+lib <io>;
+
+fn main() {
+    // 测试不同数量的参数
+    
+    // 1个参数
+    std::println("Test 1 param");
+    
+    // 2个参数 - 但是 println 只接受1个参数，这里测试多个参数会如何处理
+    // std::printf("Test %s %s", "param1", "param2");
+    
+    // 测试大量参数的函数调用
+    test_many_params(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+}
+
+fn test_many_params(a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: int, i: int, j: int) {
+    std::println("Function with 10 parameters called successfully!");
+}

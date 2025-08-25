@@ -20,6 +20,7 @@ pub enum VMError {
     UndefinedVariable(String),
     InvalidJump(String),
     RuntimeError(String),
+    AccessViolation(String),
 }
 
 impl fmt::Display for VMError {
@@ -36,6 +37,7 @@ impl fmt::Display for VMError {
             VMError::UndefinedVariable(name) => write!(f, "Undefined variable: {}", name),
             VMError::InvalidJump(msg) => write!(f, "Invalid jump: {}", msg),
             VMError::RuntimeError(msg) => write!(f, "Runtime error: {}", msg),
+            VMError::AccessViolation(msg) => write!(f, "Access violation: {}", msg),
         }
     }
 }

@@ -1,0 +1,10 @@
+[package]
+name = "cn_common"
+version = "0.1.0"
+edition = "2021"
+
+# 编译为动态库
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies] 

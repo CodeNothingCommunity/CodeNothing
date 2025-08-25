@@ -55,9 +55,14 @@ impl VirtualMachine {
 
     /// Execute a single instruction
     pub(super) fn execute_instruction(&mut self, instruction: &Instruction) -> VMResult<ExecutionResult> {
-        // Debug: Log all instructions when JIT debug is enabled
-        if self.jit_engine.debug {
+        // Debug: Log all instructions when debug mode is enabled
+        if self.debug_mode {
             println!("🔧 VM: execute_instruction - opcode: {:?}", instruction.opcode);
+        }
+
+        // Debug: Print instruction execution when debug mode is enabled
+        if self.debug_mode {
+            println!("🔧 VM: Executing {:?} (IP: {}, stack size: {})", instruction.opcode, self.ip, self.stack.len());
         }
 
         match instruction.opcode {
@@ -103,7 +108,7 @@ impl VirtualMachine {
             OpCode::LoadLocal | OpCode::StoreLocal | OpCode::LoadGlobal | OpCode::StoreGlobal |
             OpCode::CreateArray | OpCode::CreateObject | OpCode::LoadField | OpCode::StoreField |
             OpCode::LoadIndex | OpCode::StoreIndex | OpCode::NewObject | OpCode::NewArray |
-            OpCode::ArrayLength => {
+            OpCode::ArrayLength | OpCode::SuperFieldLoad | OpCode::SuperFieldStore => {
                 self.execute_memory_instruction(instruction)
             }
 
@@ -115,7 +120,8 @@ impl VirtualMachine {
             }
 
             // Function operations
-            OpCode::Call | OpCode::Return | OpCode::ReturnValue | OpCode::CallMethod => {
+            OpCode::Call | OpCode::Return | OpCode::ReturnValue | OpCode::CallMethod
+            | OpCode::CallSuper | OpCode::CallVirtual | OpCode::CallStatic => {
                 self.execute_function_instruction(instruction)
             }
 
@@ -175,19 +181,83 @@ impl VirtualMachine {
     }
 
     fn execute_dup(&mut self) -> VMResult<ExecutionResult> {
+        if self.stack.len() == 0 {
+            println!("❌ VM: STACK UNDERFLOW at Dup instruction!");
+            println!("❌ VM: IP: {}, Call stack depth: {}", self.ip, self.call_stack.depth());
+            if let Some(chunk) = &self.current_chunk {
+                println!("❌ VM: Current chunk: {}", chunk.name);
+            }
+            self.print_call_stack_trace();
+            return Err(VMError::StackUnderflow);
+        }
         self.stack.dup().map_err(|_| VMError::StackUnderflow)?;
         self.ip += 1;
         Ok(ExecutionResult::Continue)
     }
 
+    /// Print detailed call stack trace for debugging
+    fn print_call_stack_trace(&self) {
+        println!("📋 VM: Call Stack Trace:");
+        if self.call_stack.is_empty() {
+            println!("   (empty call stack)");
+        } else {
+            for (i, frame) in self.call_stack.frames().iter().enumerate() {
+                println!("   [{}] {} -> return to IP: {}", i, frame.function_name, frame.return_address);
+            }
+        }
+
+        println!("📋 VM: Current State:");
+        println!("   Stack size: {}", self.stack.len());
+        println!("   IP: {}", self.ip);
+        if let Some(chunk) = &self.current_chunk {
+            println!("   Current chunk: {} ({} instructions)", chunk.name, chunk.instructions.len());
+            if self.ip < chunk.instructions.len() {
+                println!("   Current instruction: {:?}", chunk.instructions[self.ip]);
+            }
+        }
+    }
+
     fn execute_pop(&mut self) -> VMResult<ExecutionResult> {
-        self.stack.pop()?;
+        if self.debug_mode || self.jit_engine.debug {
+            println!("🔧 VM: Pop - stack size before: {}, IP: {}", self.stack.len(), self.ip);
+            if let Some(chunk) = &self.current_chunk {
+                println!("🔧 VM: Pop - in chunk: {}", chunk.name);
+            }
+        }
+        if self.stack.len() == 0 {
+            println!("❌ VM: STACK UNDERFLOW at Pop instruction!");
+            println!("❌ VM: IP: {}, Call stack depth: {}", self.ip, self.call_stack.depth());
+            if let Some(chunk) = &self.current_chunk {
+                println!("❌ VM: Current chunk: {}", chunk.name);
+            }
+            self.print_call_stack_trace();
+            return Err(VMError::StackUnderflow);
+        }
+        let popped = self.stack.pop()?;
+        if self.debug_mode || self.jit_engine.debug {
+            println!("🔧 VM: Pop - popped value: {:?}", popped);
+        }
         self.ip += 1;
         Ok(ExecutionResult::Continue)
     }
 
     fn execute_swap(&mut self) -> VMResult<ExecutionResult> {
+        if self.debug_mode {
+            println!("🔧 VM: Swap - before: stack size {}", self.stack.len());
+            if self.stack.len() >= 2 {
+                println!("🔧 VM: Swap - top: {:?}, second: {:?}",
+                         self.stack.peek().unwrap(),
+                         self.stack.peek_at(1).unwrap());
+            }
+        }
         self.stack.swap()?;
+        if self.debug_mode {
+            if self.stack.len() >= 2 {
+                println!("🔧 VM: Swap - after: top: {:?}, second: {:?}",
+                         self.stack.peek().unwrap(),
+                         self.stack.peek_at(1).unwrap());
+            }
+        }
         self.ip += 1;
         Ok(ExecutionResult::Continue)
     }
@@ -482,16 +552,7 @@ impl VirtualMachine {
             .ok_or_else(|| VMError::InvalidOperand(format!("Invalid type index: {}", type_index)))?;
 
         if let Value::String(type_name_str) = type_name {
-            let is_instance = match type_name_str.as_str() {
-                "int" => matches!(value, Value::Int(_)),
-                "float" => matches!(value, Value::Float(_)),
-                "string" => matches!(value, Value::String(_)),
-                "bool" => matches!(value, Value::Bool(_)),
-                "array" => matches!(value, Value::Array(_)),
-                "object" => matches!(value, Value::Object(_)),
-                "null" => matches!(value, Value::Null),
-                _ => false, // Unknown type
-            };
+            let is_instance = self.check_is_instance(&value, type_name_str.as_str())?;
             self.stack.push(Value::Bool(is_instance))?;
         } else {
             return Err(VMError::TypeMismatch("Type name must be a string".to_string()));
@@ -499,6 +560,51 @@ impl VirtualMachine {
 
         self.ip += 1;
         Ok(ExecutionResult::Continue)
+    }
+
+    /// Check if a value is an instance of a given type (including inheritance and interfaces)
+    fn check_is_instance(&self, value: &Value, type_name: &str) -> VMResult<bool> {
+        match type_name {
+            // Basic types
+            "int" => Ok(matches!(value, Value::Int(_))),
+            "float" => Ok(matches!(value, Value::Float(_))),
+            "string" => Ok(matches!(value, Value::String(_))),
+            "bool" => Ok(matches!(value, Value::Bool(_))),
+            "array" => Ok(matches!(value, Value::Array(_))),
+            "object" => Ok(matches!(value, Value::Object(_))),
+            "null" => Ok(matches!(value, Value::Null)),
+
+            // Class and interface types
+            _ => {
+                if let Value::Object(obj) = value {
+                    // Get the object's class name
+                    if let Some(Value::String(class_name)) = obj.get("__class__") {
+                        let class_name_str = class_name.as_str();
+
+                        // Check if it's the exact same class
+                        if class_name_str == type_name {
+                            return Ok(true);
+                        }
+
+                        // Check if it's a subclass (inheritance)
+                        if self.is_subclass(class_name_str, type_name) {
+                            return Ok(true);
+                        }
+
+                        // Check if it implements the interface
+                        if self.implements_interface(class_name_str, type_name) {
+                            return Ok(true);
+                        }
+
+                        return Ok(false);
+                    }
+                }
+
+                // For non-object values, check if type_name is a known class/interface
+                // If so, return false; otherwise, it's an unknown type
+                Ok(false)
+            }
+        }
     }
 
     fn execute_cast(&mut self, instruction: &Instruction) -> VMResult<ExecutionResult> {
@@ -539,7 +645,20 @@ impl VirtualMachine {
                 },
                 "string" => Value::String(std::rc::Rc::new(value.to_string())),
                 "bool" => Value::Bool(value.is_truthy()),
-                _ => return Err(VMError::TypeMismatch(format!("Unknown cast type: {}", type_name_str))),
+
+                // For class/interface types, check if the cast is valid
+                _ => {
+                    if let Value::Object(_) = value {
+                        // Check if the cast is valid using is_instance logic
+                        if self.check_is_instance(&value, type_name_str.as_str())? {
+                            value // Valid cast, return the same object
+                        } else {
+                            return Err(VMError::TypeMismatch(format!("Cannot cast object to '{}'", type_name_str)));
+                        }
+                    } else {
+                        return Err(VMError::TypeMismatch(format!("Unknown cast type: {}", type_name_str)));
+                    }
+                }
             };
             self.stack.push(result)?;
         } else {

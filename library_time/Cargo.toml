@@ -1,0 +1,12 @@
+[package]
+name = "cn_time_lib"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "time"
+crate-type = ["cdylib"]
+
+[dependencies]
+cn_common = { path = "../library_common" }
+chrono = "0.4" 

@@ -1,0 +1,12 @@
+[package]
+name = "cn_io_lib"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "io"
+crate-type = ["cdylib"]
+
+[dependencies]
+libc = "0.2"
+cn_common = { path = "../library_common" } 

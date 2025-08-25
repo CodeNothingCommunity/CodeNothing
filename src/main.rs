@@ -4,6 +4,7 @@ mod lang;
 mod compiler;
 mod executor;
 mod jit;
+mod library_loader;
 
 
 use core::{
@@ -41,6 +42,7 @@ fn main() {
     let mut jit_threshold: Option<u32> = None;
     let mut aggressive_jit = false;
     let mut jit_debug = false;
+    let mut debug = false;
     let mut show_stats = false;
 
     let mut i = 1;
@@ -82,6 +84,14 @@ fn main() {
                     println!("--heap requires two arguments: <initial_mb> <max_mb>");
                     return;
                 }
+            }
+            "--unlimited" => {
+                memory_config = MemoryConfig::unlimited();
+                println!("⚠️  WARNING: Using unlimited memory mode - can consume all system memory!");
+            }
+            "--deep-recursion" => {
+                memory_config = MemoryConfig::deep_recursion();
+                println!("🔄 Using deep recursion mode - optimized for recursive algorithms");
             }
             "--help" | "-h" => {
                 show_help = true;
@@ -132,6 +142,9 @@ fn main() {
             "--jit-debug" => {
                 jit_debug = true;
             }
+            "--debug" => {
+                debug = true;
+            }
             "--stats" => {
                 show_stats = true;
             }
@@ -177,7 +190,10 @@ fn main() {
                 println!("Memory Configuration: {}", memory_config.memory_usage_string());
             }
 
-            match compile_and_run_file(&file_path, memory_config, verbose, jit_enabled, jit_threshold, aggressive_jit, jit_debug, show_stats) {
+            // Set library debug mode based on debug flag
+            crate::library_loader::set_library_debug_mode(debug);
+
+            match compile_and_run_file(&file_path, memory_config, verbose, jit_enabled, jit_threshold, aggressive_jit, jit_debug, debug, show_stats) {
                 Ok(()) => {
                     if verbose {
                         println!("Program executed successfully.");
@@ -194,6 +210,9 @@ fn main() {
 
     // Check if REPL mode is requested
     if repl_mode {
+        // Set library debug mode based on debug flag
+        crate::library_loader::set_library_debug_mode(debug);
+
         println!("Starting CodeNothing VM REPL...");
         println!("Memory Configuration: {}", memory_config.memory_usage_string());
         let mut repl = Repl::new();
@@ -202,6 +221,8 @@ fn main() {
     }
 
     // Default: Run demo program
+    // Set library debug mode based on debug flag
+    crate::library_loader::set_library_debug_mode(debug);
     run_demo_program(memory_config, jit_enabled, jit_threshold, aggressive_jit, verbose, show_stats);
 }
 
@@ -262,16 +283,17 @@ fn run_demo_program(memory_config: MemoryConfig, jit_enabled: bool, jit_threshol
         }
     }
 
-    // Print VM statistics only if requested
+    // Print VM statistics and performance report if requested
     if show_stats || verbose {
         println!("\n{}", vm.stats());
+        vm.print_performance_report();
     }
 
     println!("\nTry running with --repl for interactive mode!");
 }
 
 /// Compile and run a CodeNothing source file
-fn compile_and_run_file(file_path: &str, memory_config: MemoryConfig, verbose: bool, jit_enabled: bool, jit_threshold: Option<u32>, aggressive_jit: bool, jit_debug: bool, show_stats: bool) -> Result<(), String> {
+fn compile_and_run_file(file_path: &str, memory_config: MemoryConfig, verbose: bool, jit_enabled: bool, jit_threshold: Option<u32>, aggressive_jit: bool, jit_debug: bool, debug: bool, show_stats: bool) -> Result<(), String> {
     // Read source file
     if verbose {
         println!("Reading source file: {}", file_path);
@@ -308,6 +330,8 @@ fn compile_and_run_file(file_path: &str, memory_config: MemoryConfig, verbose: b
         println!("3. Semantic analysis...");
     }
     let mut analyzer = SemanticAnalyzer::new();
+    // Set debug mode for semantic analysis
+    analyzer.set_debug_mode(debug);
     analyzer.analyze_program(&program).map_err(|errors| {
         let error_messages: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
         format!("Semantic errors:\n{}", error_messages.join("\n"))
@@ -321,6 +345,8 @@ fn compile_and_run_file(file_path: &str, memory_config: MemoryConfig, verbose: b
         println!("4. Code generation...");
     }
     let mut generator = CodeGenerator::new();
+    // Set debug mode for code generation
+    generator.set_debug_mode(debug);
     // Pass the type environment from semantic analysis to code generation
     generator.set_type_environment(analyzer.get_type_environment().clone());
     let chunks = generator.generate_program(&program).map_err(|errors| {
@@ -342,9 +368,48 @@ fn compile_and_run_file(file_path: &str, memory_config: MemoryConfig, verbose: b
     // Create VM with specified memory configuration
     let mut vm = VirtualMachine::with_memory_config(memory_config);
 
-    // Configure JIT
+    // Register class inheritance relationships
+    for (child_class, parent_class) in generator.get_class_inheritance() {
+        vm.register_class_inheritance(child_class.clone(), parent_class.clone());
+        if verbose {
+            println!("  Registered inheritance: {} extends {}", child_class, parent_class);
+        }
+    }
+
+    // Register class definitions
+    for (class_name, class_def) in generator.get_class_definitions() {
+        vm.register_class_definition(class_def.clone());
+        if verbose {
+            println!("  Registered class definition: {}", class_name);
+        }
+    }
+
+    // Build VTables for all classes
+    for class_name in generator.get_class_definitions().keys() {
+        if let Err(e) = vm.build_vtable(class_name) {
+            if verbose {
+                println!("  Warning: Failed to build VTable for '{}': {}", class_name, e);
+            }
+        } else if verbose {
+            println!("  Built VTable for class: {}", class_name);
+        }
+    }
+
+    // Validate that all concrete classes implement required abstract methods
+    for class_name in generator.get_class_definitions().keys() {
+        if let Err(e) = vm.validate_concrete_class(class_name) {
+            if verbose {
+                println!("  Warning: Abstract method validation failed for '{}': {}", class_name, e);
+            }
+        } else if verbose {
+            println!("  Validated concrete class: {}", class_name);
+        }
+    }
+
+    // Configure JIT and debug mode
     vm.set_jit_enabled(jit_enabled);
     vm.set_jit_debug(jit_debug);
+    vm.set_debug_mode(debug);
     if aggressive_jit {
         vm.enable_aggressive_jit();
     } else if let Some(threshold) = jit_threshold {
@@ -385,9 +450,10 @@ fn compile_and_run_file(file_path: &str, memory_config: MemoryConfig, verbose: b
                 println!("   Execution completed successfully");
             }
 
-            // Print VM statistics only if requested
+            // Print VM statistics and performance report if requested
             if show_stats || verbose {
                 println!("\n{}", vm.stats());
+                vm.print_performance_report();
             }
 
             Ok(())
@@ -415,19 +481,24 @@ fn print_help() {
     println!("  --memory, -m <config>       Set memory configuration");
     println!("                              Options: small, default, large");
     println!("  --heap <initial> <max>      Set custom heap size in MB");
+    println!("  --unlimited                 Use unlimited memory mode (⚠️ WARNING: Can use all system memory!)");
+    println!("  --deep-recursion            Use deep recursion mode (optimized for recursive algorithms)");
     println!("  --jit                       Enable JIT compilation (default)");
     println!("  --no-jit                    Disable JIT compilation");
     println!("  --jit-threshold <count>     Set JIT compilation threshold (default: 50)");
     println!("  --aggressive-jit            Enable aggressive JIT mode (threshold: 5)");
     println!("  --jit-debug                 Show JIT compilation debug output");
+    println!("  --debug                     Show VM execution debug output");
     println!("  --stats                     Show VM statistics after execution");
     println!("  --verbose, --log, -v        Show detailed compilation steps and stats");
     println!("  --help, -h                  Show this help message");
     println!();
     println!("MEMORY CONFIGURATIONS:");
-    println!("  small    - For embedded/testing (~32MB max)");
-    println!("  default  - Balanced configuration (~512MB max)");
-    println!("  large    - For production/server (~8GB max)");
+    println!("  small         - For embedded/testing (~32MB max)");
+    println!("  default       - Balanced configuration (~512MB max)");
+    println!("  large         - For production/server (~8GB max)");
+    println!("  unlimited     - No memory limits (⚠️ WARNING: Can consume all system memory!)");
+    println!("  deep-recursion - Optimized for deep recursive algorithms (~8GB, 1M call depth)");
     println!();
     println!("EXAMPLES:");
     println!("  CodeNothing hello.cn        # Compile and run hello.cn (quiet mode)");
@@ -444,6 +515,8 @@ fn print_help() {
     println!("  CodeNothing --aggressive-jit hello.cn   # Use aggressive JIT mode");
     println!("  CodeNothing --jit-debug hello.cn        # Show JIT debug output");
     println!("  CodeNothing --stats hello.cn            # Show VM statistics");
+    println!("  CodeNothing --unlimited fibonacci.cn    # Run with unlimited memory for deep recursion");
+    println!("  CodeNothing --deep-recursion fib30.cn   # Run with deep recursion optimization");
     println!();
 }
 

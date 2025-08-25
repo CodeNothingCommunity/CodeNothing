@@ -1,0 +1,35 @@
+// 测试 := 类型推断功能
+
+lib <io>;
+
+fn main() {
+    std::println("🧪 测试 CodeNothing 类型推断功能");
+    std::println("================================");
+    
+    // 测试整数类型推断
+    var number := 42;
+    std::println("整数推断: " + lang::to_string(number));
+    
+    // 测试字符串类型推断
+    var message := "Hello, CodeNothing!";
+    std::println("字符串推断: " + message);
+    
+    // 测试布尔类型推断
+    var flag := true;
+    if (flag) {
+        std::println("布尔推断: true");
+    }
+    
+    // 测试浮点数类型推断
+    var pi := 3.14;
+    std::println("浮点数推断: " + lang::to_string(pi));
+    
+    // 混合使用显式类型和类型推断
+    var explicit_int: int = 100;
+    var inferred_int := 200;
+    var sum: int = explicit_int + inferred_int;
+    std::println("混合使用结果: " + lang::to_string(sum));
+    
+    std::println("================================");
+    std::println("✅ 类型推断测试完成！");
+}

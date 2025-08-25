@@ -61,7 +61,7 @@ impl VirtualMachine {
         // This is a simplified implementation - in practice, you'd need more sophisticated
         // parameter passing and return value handling
 
-        if self.jit_engine.debug {
+        if self.debug_mode {
             println!("🔧 VM: try_jit_execute called for chunk {}", chunk_index);
         }
 
@@ -82,7 +82,7 @@ impl VirtualMachine {
             }
         }
 
-        if self.jit_engine.debug {
+        if self.debug_mode {
             println!("🔧 VM: try_jit_execute returning None (no JIT function available)");
         }
         None

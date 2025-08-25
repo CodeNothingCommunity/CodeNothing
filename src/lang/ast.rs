@@ -30,6 +30,17 @@ pub enum TypeAnnotation {
     Null,
     Custom(String),        // User-defined types
     Void,                  // Void type for functions with no return value
+    Enum(String),          // Enum type
+    Trait(String),         // Trait type
+    Generic {              // Generic type with parameters
+        name: String,
+        parameters: Vec<TypeAnnotation>,
+    },
+    TypeParameter(String), // Generic type parameter (e.g., T, U, K, V)
+    Function {             // Function type for closures
+        parameters: Vec<TypeAnnotation>,
+        return_type: Box<TypeAnnotation>,
+    },
 }
 
 impl fmt::Display for TypeAnnotation {
@@ -49,6 +60,25 @@ impl fmt::Display for TypeAnnotation {
             TypeAnnotation::Null => write!(f, "null"),
             TypeAnnotation::Custom(name) => write!(f, "{}", name),
             TypeAnnotation::Void => write!(f, "void"),
+            TypeAnnotation::Enum(name) => write!(f, "{}", name),
+            TypeAnnotation::Trait(name) => write!(f, "{}", name),
+            TypeAnnotation::Generic { name, parameters } => {
+                write!(f, "{}<", name)?;
+                for (i, param) in parameters.iter().enumerate() {
+                    if i > 0 { write!(f, ", ")?; }
+                    write!(f, "{}", param)?;
+                }
+                write!(f, ">")
+            },
+            TypeAnnotation::Function { parameters, return_type } => {
+                write!(f, "|")?;
+                for (i, param) in parameters.iter().enumerate() {
+                    if i > 0 { write!(f, ", ")?; }
+                    write!(f, "{}", param)?;
+                }
+                write!(f, "| -> {}", return_type)
+            },
+            TypeAnnotation::TypeParameter(name) => write!(f, "{}", name),
         }
     }
 }
@@ -126,6 +156,79 @@ pub enum Expression {
         end: Box<Expression>,
         position: Position,
     },
+
+    // Lambda/Closure expression
+    Lambda {
+        parameters: Vec<Parameter>,
+        body: Box<Expression>,
+        position: Position,
+    },
+
+    // Match expression
+    Match {
+        expression: Box<Expression>,
+        arms: Vec<MatchArm>,
+        position: Position,
+    },
+
+    // Ternary conditional expression (condition ? true_expr : false_expr)
+    Ternary {
+        condition: Box<Expression>,
+        true_expr: Box<Expression>,
+        false_expr: Box<Expression>,
+        position: Position,
+    },
+
+    // Enum variant construction
+    EnumVariant {
+        enum_name: String,
+        variant: String,
+        value: Option<Box<Expression>>,
+        position: Position,
+    },
+
+    // Class instantiation
+    ClassInstantiation {
+        class_name: String,
+        arguments: Vec<Expression>,
+        position: Position,
+    },
+
+    // Super method call
+    SuperCall {
+        method_name: String,
+        arguments: Vec<Expression>,
+        position: Position,
+    },
+
+    // Super field access
+    SuperFieldAccess {
+        field_name: String,
+        position: Position,
+    },
+
+    // Method call on object
+    MethodCall {
+        object: Box<Expression>,
+        method_name: String,
+        arguments: Vec<Expression>,
+        position: Position,
+    },
+
+    // Static method call (ClassName::method_name)
+    StaticMethodCall {
+        class_name: String,
+        method_name: String,
+        arguments: Vec<Expression>,
+        position: Position,
+    },
+
+    // Static field access (ClassName::field_name)
+    StaticFieldAccess {
+        class_name: String,
+        field_name: String,
+        position: Position,
+    },
 }
 
 impl Expression {
@@ -146,6 +249,16 @@ impl Expression {
             Expression::ArrayAccess { position, .. } => position,
             Expression::FieldAccess { position, .. } => position,
             Expression::Range { position, .. } => position,
+            Expression::Lambda { position, .. } => position,
+            Expression::Match { position, .. } => position,
+            Expression::Ternary { position, .. } => position,
+            Expression::EnumVariant { position, .. } => position,
+            Expression::ClassInstantiation { position, .. } => position,
+            Expression::SuperCall { position, .. } => position,
+            Expression::SuperFieldAccess { position, .. } => position,
+            Expression::MethodCall { position, .. } => position,
+            Expression::StaticMethodCall { position, .. } => position,
+            Expression::StaticFieldAccess { position, .. } => position,
         }
     }
 }
@@ -181,6 +294,13 @@ pub enum BinaryOperator {
 
     // Assignment
     Assign,
+
+    // Compound assignment
+    AddAssign,      // +=
+    SubtractAssign, // -=
+    MultiplyAssign, // *=
+    DivideAssign,   // /=
+    ModuloAssign,   // %=
 }
 
 /// Unary operators
@@ -189,6 +309,12 @@ pub enum UnaryOperator {
     Minus,
     Not,
     BitNot, // Bitwise NOT (~)
+
+    // Increment/Decrement
+    PreIncrement,   // ++x
+    PostIncrement,  // x++
+    PreDecrement,   // --x
+    PostDecrement,  // x--
 }
 
 /// Statements
@@ -243,6 +369,8 @@ pub enum Statement {
         body: Box<Statement>,
         position: Position,
     },
+
+
     
     // Block statements
     Block {
@@ -275,6 +403,20 @@ pub enum Statement {
         value: Expression,
         position: Position,
     },
+
+    // Library import statements
+    LibImport {
+        library_name: String,
+        import_type: LibImportType, // System library (<>) or local library ("")
+        position: Position,
+    },
+}
+
+/// Library import type
+#[derive(Debug, Clone, PartialEq)]
+pub enum LibImportType {
+    System,  // lib <library_name>; - from interpreter directory
+    Local,   // lib "library_name"; - from current directory
 }
 
 impl Statement {
@@ -293,6 +435,7 @@ impl Statement {
             Statement::Try { position, .. } => position,
             Statement::Throw { position, .. } => position,
             Statement::ForRange { position, .. } => position,
+            Statement::LibImport { position, .. } => position,
         }
     }
 }
@@ -340,12 +483,178 @@ pub struct NamespaceDeclaration {
     pub position: Position,
 }
 
+/// Enum variant
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnumVariant {
+    pub name: String,
+    pub value: Option<Expression>, // Optional associated value
+    pub position: Position,
+}
+
+/// Enum declarations
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnumDeclaration {
+    pub name: String,
+    pub variants: Vec<EnumVariant>,
+    pub position: Position,
+}
+
+/// Struct field
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructField {
+    pub name: String,
+    pub type_annotation: TypeAnnotation,
+    pub position: Position,
+}
+
+/// Struct declarations
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructDeclaration {
+    pub name: String,
+    pub fields: Vec<StructField>,
+    pub position: Position,
+}
+
+/// Class field with access modifier
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClassField {
+    pub name: String,
+    pub type_annotation: TypeAnnotation,
+    pub access_modifier: AccessModifier,
+    pub is_static: bool,
+    pub initializer: Option<Expression>,  // Field initialization expression
+    pub position: Position,
+}
+
+/// Access modifiers for class members
+#[derive(Debug, Clone, PartialEq)]
+pub enum AccessModifier {
+    Public,
+    Private,
+    Protected,
+    Package,  // Package-level access (visible within the same package/namespace)
+}
+
+/// Constructor declaration
+#[derive(Debug, Clone, PartialEq)]
+pub struct Constructor {
+    pub parameters: Vec<Parameter>,
+    pub body: Statement,
+    pub access_modifier: AccessModifier,
+    pub position: Position,
+}
+
+/// Destructor declaration
+#[derive(Debug, Clone, PartialEq)]
+pub struct Destructor {
+    pub body: Statement,
+    pub position: Position,
+}
+
+/// Class method with access modifier
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClassMethod {
+    pub function: FunctionDeclaration,
+    pub access_modifier: AccessModifier,
+    pub is_static: bool,
+    pub is_virtual: bool,
+    pub is_override: bool,  // 是否重写父类方法
+    pub is_abstract: bool,  // 是否为抽象方法
+    pub position: Position,
+}
+
+/// Generic parameter for classes and functions
+#[derive(Debug, Clone, PartialEq)]
+pub struct GenericParameter {
+    pub name: String,
+    pub bounds: Vec<String>,  // 类型约束，如 T: Drawable + Movable
+    pub position: Position,
+}
+
+/// Class declarations
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClassDeclaration {
+    pub name: String,
+    pub generic_parameters: Vec<GenericParameter>,  // 泛型参数
+    pub base_class: Option<String>,  // 父类名称
+    pub implemented_traits: Vec<String>,  // 实现的接口/trait列表
+    pub is_abstract: bool,  // 是否为抽象类
+    pub friend_classes: Vec<String>,  // 友元类列表
+    pub fields: Vec<ClassField>,
+    pub constructor: Option<Constructor>,
+    pub destructor: Option<Destructor>,
+    pub methods: Vec<ClassMethod>,
+    pub nested_classes: Vec<ClassDeclaration>,  // 内部类
+    pub position: Position,
+}
+
+/// Trait method signature
+#[derive(Debug, Clone, PartialEq)]
+pub struct TraitMethod {
+    pub name: String,
+    pub parameters: Vec<Parameter>,
+    pub return_type: Option<TypeAnnotation>,
+    pub default_body: Option<Statement>, // Optional default implementation
+    pub is_required: bool,  // 是否必须实现（没有默认实现时为true）
+    pub position: Position,
+}
+
+/// Trait declarations (interfaces)
+#[derive(Debug, Clone, PartialEq)]
+pub struct TraitDeclaration {
+    pub name: String,
+    pub super_traits: Vec<String>,  // 继承的父接口
+    pub methods: Vec<TraitMethod>,
+    pub default_methods: Vec<TraitMethod>,  // 带默认实现的方法
+    pub associated_types: Vec<String>,  // 关联类型
+    pub position: Position,
+}
+
+/// Implementation declarations
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImplDeclaration {
+    pub trait_name: Option<String>, // None for inherent impl, Some for trait impl
+    pub type_name: String,
+    pub methods: Vec<FunctionDeclaration>,
+    pub position: Position,
+}
+
+/// Match arm for pattern matching
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchArm {
+    pub pattern: Pattern,
+    pub guard: Option<Expression>, // Optional guard condition
+    pub body: Expression,
+    pub position: Position,
+}
+
+/// Patterns for match expressions
+#[derive(Debug, Clone, PartialEq)]
+pub enum Pattern {
+    Wildcard(Position),                    // _
+    Literal(Expression),                   // 42, "hello", true
+    Identifier(String, Position),          // x
+    EnumVariant {                         // Color::Red(value)
+        enum_name: String,
+        variant: String,
+        value: Option<Box<Pattern>>,
+        position: Position,
+    },
+    Tuple(Vec<Pattern>, Position),        // (a, b, c)
+    Array(Vec<Pattern>, Position),        // [a, b, c]
+}
+
 /// Items that can appear in a namespace
 #[derive(Debug, Clone, PartialEq)]
 pub enum NamespaceItem {
     Function(FunctionDeclaration),
     Variable(Statement), // VarDeclaration
     Namespace(NamespaceDeclaration), // Nested namespace
+    Enum(EnumDeclaration),
+    Struct(StructDeclaration),
+    Class(ClassDeclaration),
+    Trait(TraitDeclaration),
+    Impl(ImplDeclaration),
 }
 
 /// Using declarations
@@ -386,6 +695,12 @@ pub enum Declaration {
     Using(UsingDeclaration),
     Variable(Statement), // Global variable declaration
     Memo(MemoDeclaration), // 记忆化声明
+    Enum(EnumDeclaration),
+    Struct(StructDeclaration),
+    Class(ClassDeclaration),
+    Trait(TraitDeclaration),
+    Impl(ImplDeclaration),
+    LibImport(Statement), // Library import statement
 }
 
 /// Complete program
@@ -467,6 +782,12 @@ impl AstPrinter {
             Declaration::Using(using) => format!("using ns {};", using.namespace),
             Declaration::Variable(stmt) => self.print_statement(stmt),
             Declaration::Memo(memo) => format!("memo {{ ... }}"), // 简化打印
+            Declaration::Enum(enum_decl) => format!("enum {} {{ ... }}", enum_decl.name),
+            Declaration::Struct(struct_decl) => format!("struct {} {{ ... }}", struct_decl.name),
+            Declaration::Class(class_decl) => format!("class {} {{ ... }}", class_decl.name),
+            Declaration::Trait(trait_decl) => format!("trait {} {{ ... }}", trait_decl.name),
+            Declaration::Impl(impl_decl) => format!("impl {} {{ ... }}", impl_decl.type_name),
+            Declaration::LibImport(stmt) => self.print_statement(stmt),
         }
     }
     

@@ -1,0 +1,42 @@
+// 复杂测试 - 第一步：深度嵌套
+
+lib <io>;
+
+fn test_deep_nesting() {
+    std::println("🔸 测试: 深度嵌套模式匹配");
+    std::println("========================");
+    
+    var level1 : int = 1;
+    var level2 : int = 2;
+    var level3 : int = 3;
+    
+    var result : string = match level1 {
+        1 => match level2 {
+            1 => "1-1",
+            2 => match level3 {
+                1 => "1-2-1",
+                2 => "1-2-2", 
+                3 => "1-2-3 (三层嵌套)",
+                _ => "1-2-其他",
+            },
+            _ => "1-其他",
+        },
+        2 => "第二层",
+        _ => "其他层",
+    };
+    
+    std::println("深度嵌套结果: " + result);
+}
+
+fn main() : int {
+    std::println("🚀 CodeNothing 复杂测试 - 第一步");
+    std::println("===============================");
+    std::println("");
+    
+    test_deep_nesting();
+    
+    std::println("");
+    std::println("✅ 深度嵌套测试完成!");
+    
+    return 0;
+}

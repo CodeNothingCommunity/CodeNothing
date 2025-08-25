@@ -4,6 +4,13 @@
 
 use std::fmt;
 
+/// 字符串插值的组成部分
+#[derive(Debug, Clone, PartialEq)]
+pub enum InterpolationPart {
+    Text(String),       // 普通文本
+    Expression(String), // 表达式 ${...}
+}
+
 /// Token types in CodeNothing language
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
@@ -11,6 +18,7 @@ pub enum TokenType {
     Integer(i64),
     Float(f64),
     String(String),
+    InterpolatedString(Vec<InterpolationPart>), // 字符串插值
     Boolean(bool),
     Null,
     
@@ -24,6 +32,7 @@ pub enum TokenType {
     Fn,         // fn
     Ns,         // ns
     Using,      // using
+    Lib,        // lib
     Return,     // return
     If,         // if
     Else,       // else
@@ -41,6 +50,28 @@ pub enum TokenType {
     True,       // true
     False,      // false
     Memo,       // memo
+    Enum,       // enum
+    Struct,     // struct
+    Class,      // class
+    Trait,      // trait
+    Impl,       // impl
+    Match,      // match
+    When,       // when (类似 match 但语法不同)
+    Lambda,     // lambda (optional, we'll use |x| syntax)
+
+    // Access modifiers
+    Public,     // public
+    Private,    // private
+    Protected,  // protected
+    Package,    // package
+    Static,     // static
+    Virtual,    // virtual
+    Override,   // override
+    Abstract,   // abstract
+    Friend,     // friend
+    Extends,    // extends
+    Implements, // implements
+    Super,      // super
     
     // Types
     Int,        // int
@@ -60,6 +91,7 @@ pub enum TokenType {
     Divide,     // /
     Modulo,     // %
     Assign,     // =
+    ColonAssign, // := for type inference
     Equal,      // ==
     NotEqual,   // !=
     Less,       // <
@@ -70,6 +102,17 @@ pub enum TokenType {
     Or,         // ||
     Not,        // !
     Range,      // ...
+
+    // Increment/Decrement operators
+    PlusPlus,   // ++
+    MinusMinus, // --
+
+    // Compound assignment operators
+    PlusEqual,     // +=
+    MinusEqual,    // -=
+    MultiplyEqual, // *=
+    DivideEqual,   // /=
+    ModuloEqual,   // %=
 
     // Bitwise operators
     BitAnd,     // &
@@ -92,7 +135,10 @@ pub enum TokenType {
     DoubleColon, // ::
     Dot,        // .
     Question,   // ?
-    
+    Pipe,       // | (for lambda parameters)
+    Arrow,      // -> (for lambda return type)
+    FatArrow,   // => (for match expressions)
+
     // Special
     Newline,
     Eof,
@@ -281,6 +327,7 @@ impl Lexer {
             "fn" => TokenType::Fn,
             "ns" => TokenType::Ns,
             "using" => TokenType::Using,
+            "lib" => TokenType::Lib,
             "return" => TokenType::Return,
             "if" => TokenType::If,
             "else" => TokenType::Else,
@@ -298,6 +345,24 @@ impl Lexer {
             "true" => TokenType::True,
             "false" => TokenType::False,
             "memo" => TokenType::Memo,
+            "enum" => TokenType::Enum,
+            "struct" => TokenType::Struct,
+            "class" => TokenType::Class,
+            "trait" => TokenType::Trait,
+            "impl" => TokenType::Impl,
+            "match" => TokenType::Match,
+            "public" => TokenType::Public,
+            "private" => TokenType::Private,
+            "protected" => TokenType::Protected,
+            "package" => TokenType::Package,
+            "static" => TokenType::Static,
+            "virtual" => TokenType::Virtual,
+            "override" => TokenType::Override,
+            "abstract" => TokenType::Abstract,
+            "friend" => TokenType::Friend,
+            "extends" => TokenType::Extends,
+            "implements" => TokenType::Implements,
+            "super" => TokenType::Super,
             "int" => TokenType::Int,
             "long" => TokenType::Long,
             "float" => TokenType::Float32,
@@ -333,30 +398,67 @@ impl Lexer {
                         return self.next_token(); // Skip comment and get next token
                     } else {
                         self.advance();
-                        TokenType::Divide
+                        if self.peek() == Some('=') {
+                            self.advance();
+                            TokenType::DivideEqual
+                        } else {
+                            TokenType::Divide
+                        }
                     }
                 }
                 '+' => {
                     self.advance();
-                    TokenType::Plus
+                    if self.peek() == Some('+') {
+                        self.advance();
+                        TokenType::PlusPlus
+                    } else if self.peek() == Some('=') {
+                        self.advance();
+                        TokenType::PlusEqual
+                    } else {
+                        TokenType::Plus
+                    }
                 }
                 '-' => {
                     self.advance();
-                    TokenType::Minus
+                    if self.peek() == Some('>') {
+                        self.advance();
+                        TokenType::Arrow
+                    } else if self.peek() == Some('-') {
+                        self.advance();
+                        TokenType::MinusMinus
+                    } else if self.peek() == Some('=') {
+                        self.advance();
+                        TokenType::MinusEqual
+                    } else {
+                        TokenType::Minus
+                    }
                 }
                 '*' => {
                     self.advance();
-                    TokenType::Multiply
+                    if self.peek() == Some('=') {
+                        self.advance();
+                        TokenType::MultiplyEqual
+                    } else {
+                        TokenType::Multiply
+                    }
                 }
                 '%' => {
                     self.advance();
-                    TokenType::Modulo
+                    if self.peek() == Some('=') {
+                        self.advance();
+                        TokenType::ModuloEqual
+                    } else {
+                        TokenType::Modulo
+                    }
                 }
                 '=' => {
                     self.advance();
                     if self.peek() == Some('=') {
                         self.advance();
                         TokenType::Equal
+                    } else if self.peek() == Some('>') {
+                        self.advance();
+                        TokenType::FatArrow
                     } else {
                         TokenType::Assign
                     }
@@ -457,6 +559,9 @@ impl Lexer {
                     if self.peek() == Some(':') {
                         self.advance();
                         TokenType::DoubleColon
+                    } else if self.peek() == Some('=') {
+                        self.advance();
+                        TokenType::ColonAssign
                     } else {
                         TokenType::Colon
                     }

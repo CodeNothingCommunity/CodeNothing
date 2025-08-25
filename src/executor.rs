@@ -100,6 +100,37 @@ impl Executor {
             }
         };
         
+        // Load required libraries
+        if !bytecode.library_dependencies.is_empty() {
+            if self.options.verbose {
+                messages.push(format!("Loading {} required libraries...", bytecode.library_dependencies.len()));
+            }
+
+            for lib_name in &bytecode.library_dependencies {
+                if self.options.verbose {
+                    messages.push(format!("  Loading library: {}", lib_name));
+                }
+
+                // Pre-load the library to ensure it's available at runtime
+                match crate::library_loader::load_library(lib_name) {
+                    Ok(_) => {
+                        if self.options.verbose {
+                            messages.push(format!("  ✅ Library '{}' loaded successfully", lib_name));
+                        }
+                    }
+                    Err(e) => {
+                        messages.push(format!("❌ Failed to load required library '{}': {}", lib_name, e));
+                        return ExecuteResult {
+                            success: false,
+                            exit_code: -1,
+                            messages,
+                            execution_time_ms: start_time.elapsed().as_millis(),
+                        };
+                    }
+                }
+            }
+        }
+
         if self.options.verbose {
             messages.push("Initializing virtual machine...".to_string());
         }
@@ -156,6 +187,40 @@ impl Executor {
         let memo_functions = bytecode.get_memo_functions();
         if self.options.debug {
             println!("🔧 MEMO: Found {} memo functions in bytecode", memo_functions.len());
+        }
+
+        // Register class inheritance relationships
+        for (child_class, parent_class) in &bytecode.class_inheritance {
+            vm.register_class_inheritance(child_class.clone(), parent_class.clone());
+            if self.options.verbose {
+                messages.push(format!("  Registered inheritance: {} extends {}", child_class, parent_class));
+            }
+        }
+
+        // Register class definitions
+        for (class_name, class_def) in &bytecode.class_definitions {
+            vm.register_class_definition(class_def.clone());
+            if self.options.verbose {
+                messages.push(format!("  Registered class definition: {}", class_name));
+            }
+        }
+
+        // Build VTables for all classes
+        for class_name in bytecode.class_definitions.keys() {
+            if let Err(e) = vm.build_vtable(class_name) {
+                messages.push(format!("  Warning: Failed to build VTable for '{}': {}", class_name, e));
+            } else if self.options.verbose {
+                messages.push(format!("  Built VTable for class: {}", class_name));
+            }
+        }
+
+        // Validate that all concrete classes implement required abstract methods
+        for class_name in bytecode.class_definitions.keys() {
+            if let Err(e) = vm.validate_concrete_class(class_name) {
+                messages.push(format!("  Warning: Abstract method validation failed for '{}': {}", class_name, e));
+            } else if self.options.verbose {
+                messages.push(format!("  Validated concrete class: {}", class_name));
+            }
         }
         for memo_func_name in memo_functions {
             if self.options.debug {

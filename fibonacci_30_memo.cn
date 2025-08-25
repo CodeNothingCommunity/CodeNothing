@@ -7,7 +7,7 @@ fn main() : int {
     let memo_result : int = fibonacci(30);
     println("F(30) = " + to_string(memo_result));
 
-    return memo_result; // F(30) = 55
+    return memo_result; // F(30) = 832040
 }
 
 memo{
