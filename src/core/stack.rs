@@ -47,7 +47,7 @@ impl Stack {
     /// Create a new stack with the specified maximum size
     pub fn new(max_size: usize) -> Self {
         Self {
-            values: Vec::with_capacity(max_size.min(1024)), // Pre-allocate reasonable amount
+            values: Vec::with_capacity(max_size.min(8192)), // Pre-allocate more for better performance
             max_size,
         }
     }

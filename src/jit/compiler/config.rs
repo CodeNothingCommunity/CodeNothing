@@ -20,7 +20,7 @@ impl Default for JitConfig {
         Self {
             optimization_level: OptimizationLevel::Aggressive,
             debug_info: false,
-            max_function_size: 10000,
+            max_function_size: 50000, // Allow larger functions to be compiled
             enable_inlining: true,  // Enable inlining for better performance
         }
     }

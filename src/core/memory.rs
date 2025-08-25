@@ -31,16 +31,16 @@ pub struct MemoryConfig {
 }
 
 impl MemoryConfig {
-    /// Create default memory configuration (conservative)
+    /// Create default memory configuration (optimized for performance)
     pub fn default() -> Self {
         Self {
-            initial_heap_size: 1024,        // 1K objects initially
-            max_heap_size: 65536,           // 64K objects max (~512MB)
-            stack_size: 16384,              // 16K values (~128MB) - increased for deep recursion
-            max_call_depth: 10000,          // 10K call frames - increased for fibonacci(30)
-            max_globals: 4096,              // 4K global variables
-            locals_per_function: 256,       // 256 locals per function
-            enable_monitoring: true,
+            initial_heap_size: 2048,        // 2K objects initially (more pre-allocation)
+            max_heap_size: 131072,          // 128K objects max (~1GB)
+            stack_size: 32768,              // 32K values (~256MB) - increased for deep recursion
+            max_call_depth: 50000,          // 50K call frames - much higher for fibonacci(30)
+            max_globals: 8192,              // 8K global variables
+            locals_per_function: 512,       // 512 locals per function
+            enable_monitoring: false,       // Disable monitoring for better performance
         }
     }
 

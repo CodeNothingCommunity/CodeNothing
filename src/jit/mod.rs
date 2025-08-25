@@ -93,7 +93,7 @@ impl JitEngine {
             native_functions: HashMap::new(),
             stats: JitStats::default(),
             enabled: true,
-            jit_threshold: 50, // Original threshold
+            jit_threshold: 10, // Aggressive threshold for better performance
             debug: false,
             compilation_status: HashMap::new(),
         }
