@@ -1,0 +1,39 @@
+// 🚀 CodeNothing 高级语法糖简单测试
+// 逐步测试新功能
+
+lib <io>;
+
+fn test_basic_features() {
+    std::println("🔥 基础功能测试");
+    std::println("==============");
+    
+    // 测试基础字符串插值
+    var name : string = "CodeNothing";
+    var simple_msg : string = "Hello, ${name}!";
+    std::println("字符串插值测试: " + simple_msg);
+    
+    // 测试空值合并操作符
+    var value1 : string = "有值";
+    var value2 : string = "默认值";
+    var result : string = value1 ?? value2;
+    std::println("空值合并测试: " + result);
+    
+    // 测试简单的 when 表达式
+    var score : int = 85;
+    var grade : string = when { score >= 80 => "B", else => "C" };
+    std::println("when 表达式测试: " + grade);
+    
+    std::println("");
+}
+
+fn main() : int {
+    std::println("🚀 CodeNothing 高级语法糖简单测试");
+    std::println("===============================");
+    std::println("");
+    
+    test_basic_features();
+    
+    std::println("🎉 简单测试完成!");
+    
+    return 0;
+}

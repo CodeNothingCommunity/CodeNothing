@@ -232,10 +232,10 @@ impl VirtualMachine {
             VMError::RuntimeError("Call stack overflow".to_string())
         })?;
 
-        // Create new local memory for the function - use minimal capacity
-        let mut new_locals = LocalMemory::new(1); // Fibonacci only needs 1 local variable
+        // Create new local memory for the function - optimized capacity
+        let mut new_locals = LocalMemory::new(params.len().max(4)); // Pre-allocate for common cases
 
-        // Store parameters in local variables
+        // Store parameters in local variables (optimized)
         for (i, param_value) in params.into_iter().enumerate() {
             new_locals.set(i, param_value)?;
         }

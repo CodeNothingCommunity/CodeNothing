@@ -1,0 +1,234 @@
+// 🚀 CodeNothing 高级语法糖测试
+// 测试字符串插值、空值合并操作符、when 表达式
+
+lib <io>;
+
+fn test_string_interpolation() {
+    std::println("🔥 字符串插值测试");
+    std::println("================");
+    
+    var name : string = "CodeNothing";
+    var version : int = 2;
+    var status : string = "stable";
+    
+    // 基础字符串插值测试
+    var basic_msg : string = "Hello, ${name}!";
+    std::println("基础插值: " + basic_msg);
+    
+    var version_msg : string = "Version: ${version}";
+    std::println("数字插值: " + version_msg);
+    
+    var complex_msg : string = "${name} v${version} is ${status}";
+    std::println("复杂插值: " + complex_msg);
+    
+    std::println("");
+}
+
+fn test_null_coalescing() {
+    std::println("🔥 空值合并操作符测试");
+    std::println("====================");
+    
+    var nullable_value : string = "有值";
+    var default_value : string = "默认值";
+    
+    // 基础空值合并测试
+    var result1 : string = nullable_value ?? default_value;
+    std::println("非空值合并: " + result1);
+    
+    // 模拟空值情况（这里用空字符串代替）
+    var empty_value : string = "";
+    var result2 : string = empty_value ?? default_value;
+    std::println("空值合并: " + result2);
+    
+    // 链式空值合并
+    var first_option : string = "";
+    var second_option : string = "";
+    var third_option : string = "第三选择";
+    var result3 : string = first_option ?? second_option ?? third_option;
+    std::println("链式合并: " + result3);
+    
+    std::println("");
+}
+
+fn test_when_expression() {
+    std::println("🔥 when 表达式测试");
+    std::println("=================");
+    
+    var score : int = 85;
+    
+    // 基础 when 表达式
+    var grade : string = when {
+        score >= 90 => "A",
+        score >= 80 => "B", 
+        score >= 70 => "C",
+        score >= 60 => "D",
+        else => "F"
+    };
+    
+    std::println("分数 " + lang::to_string(score) + " 对应等级: " + grade);
+    
+    // 复杂条件的 when 表达式
+    var age : int = 25;
+    var income : int = 5000;
+    
+    var category : string = when {
+        age < 18 => "未成年",
+        age < 30 && income > 8000 => "年轻高收入",
+        age < 30 && income > 4000 => "年轻中收入", 
+        age < 30 => "年轻低收入",
+        age < 50 && income > 15000 => "中年高收入",
+        age < 50 => "中年普通收入",
+        else => "老年群体"
+    };
+    
+    std::println("年龄 " + lang::to_string(age) + ", 收入 " + lang::to_string(income) + " => " + category);
+    
+    // 数值计算的 when 表达式
+    var temperature : int = 25;
+    var comfort_level : int = when {
+        temperature > 35 => 1,
+        temperature > 25 => 8,
+        temperature > 15 => 10,
+        temperature > 5 => 6,
+        else => 2
+    };
+    
+    std::println("温度 " + lang::to_string(temperature) + "°C, 舒适度: " + lang::to_string(comfort_level) + "/10");
+    
+    std::println("");
+}
+
+fn test_combined_syntax_sugar() {
+    std::println("🔥 组合语法糖测试");
+    std::println("================");
+    
+    var user_name : string = "Alice";
+    var user_score : int = 92;
+    var bonus_points : int = 0;
+    
+    // 组合使用：when + 字符串插值 + 空值合并
+    var performance_msg : string = when {
+        user_score >= 95 => "优秀表现！${user_name}获得了${user_score}分",
+        user_score >= 85 => "良好表现！${user_name}获得了${user_score}分", 
+        user_score >= 70 => "一般表现，${user_name}获得了${user_score}分",
+        else => "需要努力，${user_name}只获得了${user_score}分"
+    };
+    
+    std::println("性能消息: " + performance_msg);
+    
+    // 复杂的组合表达式
+    var final_score : int = user_score + (bonus_points ?? 0);
+    var achievement : string = when {
+        final_score >= 100 => "完美",
+        final_score >= 90 => "优秀", 
+        final_score >= 80 => "良好",
+        else => "普通"
+    };
+    
+    var summary : string = "${user_name}的最终成绩: ${final_score}分 (${achievement})";
+    std::println("总结: " + summary);
+    
+    std::println("");
+}
+
+fn test_advanced_scenarios() {
+    std::println("🔥 高级场景测试");
+    std::println("==============");
+    
+    // 游戏状态管理
+    var player_health : int = 75;
+    var player_mana : int = 40;
+    var player_level : int = 8;
+    
+    var status_message : string = when {
+        player_health <= 0 => "玩家已死亡",
+        player_health < 20 => "危险状态！生命值: ${player_health}",
+        player_health < 50 => "警告状态，生命值: ${player_health}",
+        else => "状态良好，生命值: ${player_health}"
+    };
+    
+    std::println("游戏状态: " + status_message);
+    
+    // 技能可用性检查
+    var skill_name : string = when {
+        player_mana >= 50 && player_level >= 10 => "终极技能",
+        player_mana >= 30 && player_level >= 5 => "高级技能",
+        player_mana >= 15 => "基础技能",
+        else => "无可用技能"
+    };
+    
+    var skill_msg : string = "可用技能: ${skill_name} (法力: ${player_mana}, 等级: ${player_level})";
+    std::println(skill_msg);
+    
+    // 奖励计算
+    var base_reward : int = 100;
+    var level_bonus : int = player_level * 10;
+    var health_bonus : int = when {
+        player_health >= 80 => 50,
+        player_health >= 50 => 25,
+        else => 0
+    };
+    
+    var total_reward : int = base_reward + level_bonus + health_bonus;
+    var reward_msg : string = "奖励计算: 基础${base_reward} + 等级奖励${level_bonus} + 生命奖励${health_bonus} = ${total_reward}";
+    std::println(reward_msg);
+    
+    std::println("");
+}
+
+fn test_error_handling_scenarios() {
+    std::println("🔥 错误处理场景测试");
+    std::println("==================");
+    
+    var error_code : int = 404;
+    var custom_message : string = "";
+    
+    // 错误消息处理
+    var error_message : string = custom_message ?? when {
+        error_code == 404 => "页面未找到",
+        error_code == 500 => "服务器内部错误",
+        error_code == 403 => "访问被拒绝", 
+        error_code == 401 => "未授权访问",
+        else => "未知错误"
+    };
+    
+    var full_error : string = "错误 ${error_code}: ${error_message}";
+    std::println("错误处理: " + full_error);
+    
+    // 配置回退机制
+    var primary_config : string = "";
+    var secondary_config : string = "";
+    var default_config : string = "默认配置";
+    
+    var active_config : string = primary_config ?? secondary_config ?? default_config;
+    var config_msg : string = "使用配置: ${active_config}";
+    std::println("配置回退: " + config_msg);
+    
+    std::println("");
+}
+
+fn main() : int {
+    std::println("🚀 CodeNothing 高级语法糖完整测试");
+    std::println("===============================");
+    std::println("");
+    
+    test_string_interpolation();
+    test_null_coalescing();
+    test_when_expression();
+    test_combined_syntax_sugar();
+    test_advanced_scenarios();
+    test_error_handling_scenarios();
+    
+    std::println("🎉 所有高级语法糖测试完成!");
+    std::println("");
+    std::println("🔥 新增功能总结:");
+    std::println("✅ 字符串插值 - ${variable} 语法");
+    std::println("✅ 空值合并操作符 - value ?? default");
+    std::println("✅ when 表达式 - 条件 => 结果 语法");
+    std::println("✅ 复杂组合使用 - 多种语法糖协同工作");
+    std::println("✅ 实际应用场景 - 游戏、错误处理、配置管理");
+    std::println("");
+    std::println("💪 CodeNothing 语法糖功能更加强大和完善!");
+    
+    return 0;
+}

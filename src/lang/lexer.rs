@@ -135,6 +135,7 @@ pub enum TokenType {
     DoubleColon, // ::
     Dot,        // .
     Question,   // ?
+    DoubleQuestion, // ?? (null coalescing operator)
     Pipe,       // | (for lambda parameters)
     Arrow,      // -> (for lambda return type)
     FatArrow,   // => (for match expressions)
@@ -317,6 +318,114 @@ impl Lexer {
         
         Err("Unterminated string literal".to_string())
     }
+
+    /// Read interpolated string literal (支持 ${expression} 语法)
+    fn read_interpolated_string(&mut self) -> Result<Vec<InterpolationPart>, String> {
+        let mut parts = Vec::new();
+        let mut current_text = String::new();
+        self.advance(); // Skip opening quote
+
+        while let Some(ch) = self.peek() {
+            if ch == '"' {
+                // 结束字符串
+                if !current_text.is_empty() {
+                    parts.push(InterpolationPart::Text(current_text));
+                }
+                self.advance(); // Skip closing quote
+                return Ok(parts);
+            } else if ch == '$' && self.peek_ahead(1) == Some('{') {
+                // 开始插值表达式
+                if !current_text.is_empty() {
+                    parts.push(InterpolationPart::Text(current_text));
+                    current_text = String::new();
+                }
+
+                self.advance(); // Skip $
+                self.advance(); // Skip {
+
+                // 读取表达式直到 }
+                let mut expression = String::new();
+                let mut brace_count = 1;
+
+                while let Some(expr_ch) = self.peek() {
+                    if expr_ch == '{' {
+                        brace_count += 1;
+                    } else if expr_ch == '}' {
+                        brace_count -= 1;
+                        if brace_count == 0 {
+                            self.advance(); // Skip closing }
+                            break;
+                        }
+                    }
+                    expression.push(expr_ch);
+                    self.advance();
+                }
+
+                if brace_count > 0 {
+                    return Err("Unterminated interpolation expression".to_string());
+                }
+
+                parts.push(InterpolationPart::Expression(expression));
+            } else if ch == '\\' {
+                // 处理转义字符
+                self.advance();
+                if let Some(escaped) = self.advance() {
+                    match escaped {
+                        'n' => current_text.push('\n'),
+                        't' => current_text.push('\t'),
+                        'r' => current_text.push('\r'),
+                        '\\' => current_text.push('\\'),
+                        '"' => current_text.push('"'),
+                        '$' => current_text.push('$'),
+                        _ => {
+                            current_text.push('\\');
+                            current_text.push(escaped);
+                        }
+                    }
+                }
+            } else {
+                current_text.push(ch);
+                self.advance();
+            }
+        }
+
+        Err("Unterminated interpolated string literal".to_string())
+    }
+
+    /// 检查字符串是否包含插值表达式
+    fn contains_interpolation(&self) -> bool {
+        let mut pos = self.position + 1; // Skip opening quote
+        let mut in_escape = false;
+
+        while pos < self.input.len() {
+            let ch = self.input[pos];
+
+            if in_escape {
+                in_escape = false;
+                pos += 1;
+                continue;
+            }
+
+            if ch == '\\' {
+                in_escape = true;
+                pos += 1;
+                continue;
+            }
+
+            if ch == '"' {
+                // 到达字符串结尾
+                break;
+            }
+
+            if ch == '$' && pos + 1 < self.input.len() && self.input[pos + 1] == '{' {
+                return true;
+            }
+
+            pos += 1;
+        }
+
+        false
+    }
     
     /// Convert identifier to keyword or return identifier token
     fn identifier_to_token(&self, identifier: &str) -> TokenType {
@@ -351,6 +460,7 @@ impl Lexer {
             "trait" => TokenType::Trait,
             "impl" => TokenType::Impl,
             "match" => TokenType::Match,
+            "when" => TokenType::When,
             "public" => TokenType::Public,
             "private" => TokenType::Private,
             "protected" => TokenType::Protected,
@@ -579,12 +689,26 @@ impl Lexer {
                 }
                 '?' => {
                     self.advance();
-                    TokenType::Question
+                    // Check for null coalescing operator ??
+                    if self.peek() == Some('?') {
+                        self.advance(); // consume second ?
+                        TokenType::DoubleQuestion
+                    } else {
+                        TokenType::Question
+                    }
                 }
                 '"' => {
-                    match self.read_string() {
-                        Ok(s) => TokenType::String(s),
-                        Err(e) => return Err(e),
+                    // 先检查是否包含插值表达式
+                    if self.contains_interpolation() {
+                        match self.read_interpolated_string() {
+                            Ok(parts) => TokenType::InterpolatedString(parts),
+                            Err(e) => return Err(e),
+                        }
+                    } else {
+                        match self.read_string() {
+                            Ok(s) => TokenType::String(s),
+                            Err(e) => return Err(e),
+                        }
                     }
                 }
                 _ if ch.is_ascii_digit() => self.read_number(),

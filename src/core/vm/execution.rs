@@ -9,21 +9,46 @@ use super::{
     types::{VirtualMachine, ExecutionResult},
 };
 
+/// Branch prediction hint for unlikely conditions
+#[inline(always)]
+fn unlikely(b: bool) -> bool {
+    #[cold]
+    fn cold() {}
+    if b { cold() }
+    b
+}
+
 impl VirtualMachine {
-    /// Main execution loop
+    /// Main execution loop (optimized)
     pub(super) fn run(&mut self) -> VMResult<Value> {
+        // Cache chunk reference to avoid repeated lookups
+        let mut instruction_count = 0u64;
+
         loop {
-            if self.debug_mode {
+            // Only do debug output if explicitly enabled
+            if unlikely(self.debug_mode) {
                 self.print_debug_info();
             }
 
             let instruction = self.fetch_instruction()?;
-            self.instructions_executed += 1;
+            instruction_count += 1;
+
+            // Update instructions_executed less frequently for better performance
+            if unlikely(instruction_count & 0xFF == 0) {
+                self.instructions_executed += 256;
+            }
 
             match self.execute_instruction(&instruction)? {
                 ExecutionResult::Continue => continue,
-                ExecutionResult::Return(value) => return Ok(value),
-                ExecutionResult::Halt => return Ok(Value::Null),
+                ExecutionResult::Return(value) => {
+                    // Update final instruction count
+                    self.instructions_executed += instruction_count & 0xFF;
+                    return Ok(value);
+                },
+                ExecutionResult::Halt => {
+                    self.instructions_executed += instruction_count & 0xFF;
+                    return Ok(Value::Null);
+                },
             }
         }
     }
@@ -53,40 +78,134 @@ impl VirtualMachine {
         }
     }
 
-    /// Execute a single instruction
+    /// Execute a single instruction (optimized dispatch)
+    #[inline(always)]
     pub(super) fn execute_instruction(&mut self, instruction: &Instruction) -> VMResult<ExecutionResult> {
-        // Debug: Log all instructions when debug mode is enabled
-        if self.debug_mode {
-            println!("🔧 VM: execute_instruction - opcode: {:?}", instruction.opcode);
-        }
-
-        // Debug: Print instruction execution when debug mode is enabled
-        if self.debug_mode {
+        // Only do debug output if explicitly enabled (branch prediction optimization)
+        if unlikely(self.debug_mode) {
             println!("🔧 VM: Executing {:?} (IP: {}, stack size: {})", instruction.opcode, self.ip, self.stack.len());
         }
 
+        // Use optimized dispatch table for better branch prediction
+        self.execute_instruction_optimized(instruction)
+    }
+
+    /// Optimized instruction execution with better branch prediction
+    #[inline(always)]
+    fn execute_instruction_optimized(&mut self, instruction: &Instruction) -> VMResult<ExecutionResult> {
+        // Fast path for most common instructions in recursive functions
         match instruction.opcode {
-            // Stack operations
-            OpCode::Const => self.execute_const(instruction),
-            OpCode::Null => self.execute_null(),
-            OpCode::True => self.execute_true(),
-            OpCode::False => self.execute_false(),
+            // Most frequent operations first for better branch prediction
+            OpCode::LoadLocal => {
+                // Inline local variable loading
+                let index = instruction.operands[0] as usize;
+                if let Some(locals) = &self.locals {
+                    if let Ok(value) = locals.get(index) {
+                        self.stack.push(value.clone())?;
+                        self.ip += 1;
+                        return Ok(ExecutionResult::Continue);
+                    }
+                }
+                self.execute_memory_instruction(instruction)
+            },
+            OpCode::Call => return self.execute_function_instruction(instruction),
+            OpCode::ReturnValue => return self.execute_function_instruction(instruction),
+            OpCode::JumpIfFalse => return self.execute_control_flow_instruction(instruction),
+            _ => {
+                // Fallback to full instruction set
+                match instruction.opcode {
+            // Stack operations (inlined for performance)
+            OpCode::Const => {
+                // Inline const loading for better performance
+                let index = ((instruction.operands[0] as u16) << 8) | (instruction.operands[1] as u16);
+                if let Some(chunk) = &self.current_chunk {
+                    if let Some(value) = chunk.constants.get(index as usize) {
+                        self.stack.push(value.clone())?;
+                        self.ip += 1;
+                        return Ok(ExecutionResult::Continue);
+                    }
+                }
+                self.execute_const(instruction)
+            },
+            OpCode::Null => {
+                self.stack.push(Value::Null)?;
+                self.ip += 1;
+                Ok(ExecutionResult::Continue)
+            },
+            OpCode::True => {
+                self.stack.push(Value::Bool(true))?;
+                self.ip += 1;
+                Ok(ExecutionResult::Continue)
+            },
+            OpCode::False => {
+                self.stack.push(Value::Bool(false))?;
+                self.ip += 1;
+                Ok(ExecutionResult::Continue)
+            },
             OpCode::Dup => self.execute_dup(),
             OpCode::Pop => self.execute_pop(),
             OpCode::Swap => self.execute_swap(),
 
-            // Arithmetic operations
-            OpCode::Add => self.execute_add(),
-            OpCode::Sub => self.execute_sub(),
+            // Arithmetic operations (inlined for hot paths)
+            OpCode::Add => {
+                // Inline addition for better performance
+                let b = self.stack.pop()?;
+                let a = self.stack.pop()?;
+                let result = match (&a, &b) {
+                    (Value::Int(x), Value::Int(y)) => Value::Int(x + y),
+                    _ => a.add(&b).map_err(|e| VMError::TypeMismatch(e))?,
+                };
+                self.stack.push(result)?;
+                self.ip += 1;
+                Ok(ExecutionResult::Continue)
+            },
+            OpCode::Sub => {
+                // Inline subtraction for better performance
+                let b = self.stack.pop()?;
+                let a = self.stack.pop()?;
+                let result = match (&a, &b) {
+                    (Value::Int(x), Value::Int(y)) => Value::Int(x - y),
+                    _ => a.sub(&b).map_err(|e| VMError::TypeMismatch(e))?,
+                };
+                self.stack.push(result)?;
+                self.ip += 1;
+                Ok(ExecutionResult::Continue)
+            },
             OpCode::Mul => self.execute_mul(),
             OpCode::Div => self.execute_div(),
             OpCode::Mod => self.execute_mod(),
             OpCode::Neg => self.execute_neg(),
 
-            // Comparison operations
-            OpCode::Eq => self.execute_eq(),
-            OpCode::Ne => self.execute_ne(),
-            OpCode::Lt => self.execute_lt(),
+            // Comparison operations (inlined for hot paths)
+            OpCode::Eq => {
+                let b = self.stack.pop()?;
+                let a = self.stack.pop()?;
+                let result = Value::Bool(a.eq(&b));
+                self.stack.push(result)?;
+                self.ip += 1;
+                Ok(ExecutionResult::Continue)
+            },
+            OpCode::Ne => {
+                let b = self.stack.pop()?;
+                let a = self.stack.pop()?;
+                let result = Value::Bool(!a.eq(&b));
+                self.stack.push(result)?;
+                self.ip += 1;
+                Ok(ExecutionResult::Continue)
+            },
+            OpCode::Lt => {
+                let b = self.stack.pop()?;
+                let a = self.stack.pop()?;
+                let result = match (&a, &b) {
+                    (Value::Int(x), Value::Int(y)) => Value::Bool(x < y),
+                    (Value::Float(x), Value::Float(y)) => Value::Bool(x < y),
+                    (Value::String(x), Value::String(y)) => Value::Bool(x < y),
+                    _ => Value::Bool(false), // Default for incomparable types
+                };
+                self.stack.push(result)?;
+                self.ip += 1;
+                Ok(ExecutionResult::Continue)
+            },
             OpCode::Le => self.execute_le(),
             OpCode::Gt => self.execute_gt(),
             OpCode::Ge => self.execute_ge(),
@@ -136,6 +255,8 @@ impl VirtualMachine {
             OpCode::Debug => self.execute_debug(),
 
             _ => Err(VMError::InvalidInstruction(format!("Unimplemented instruction: {:?}", instruction.opcode)))
+                }
+            }
         }
     }
 

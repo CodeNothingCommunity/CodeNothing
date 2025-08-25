@@ -6,6 +6,15 @@
 use crate::core::value::Value;
 use std::fmt;
 
+/// Branch prediction hint for unlikely conditions
+#[inline(always)]
+fn unlikely(b: bool) -> bool {
+    #[cold]
+    fn cold() {}
+    if b { cold() }
+    b
+}
+
 /// Stack overflow error
 #[derive(Debug, Clone)]
 pub struct StackOverflowError;
@@ -57,24 +66,36 @@ impl Stack {
         Self::new(8192) // 8K values should be plenty for most programs
     }
 
-    /// Push a value onto the stack
+    /// Push a value onto the stack (optimized)
     #[inline(always)]
     pub fn push(&mut self, value: Value) -> Result<(), StackOverflowError> {
-        if self.values.len() >= self.max_size {
+        if unlikely(self.values.len() >= self.max_size) {
             return Err(StackOverflowError);
         }
         self.values.push(value);
         Ok(())
     }
 
-    /// Pop a value from the stack
+    /// Push a value onto the stack without bounds checking (unsafe but fast)
+    #[inline(always)]
+    pub unsafe fn push_unchecked(&mut self, value: Value) {
+        self.values.push(value);
+    }
+
+    /// Pop a value from the stack (optimized)
     #[inline(always)]
     pub fn pop(&mut self) -> Result<Value, StackUnderflowError> {
-        if self.values.is_empty() {
+        if unlikely(self.values.is_empty()) {
             eprintln!("❌ STACK: Attempting to pop from empty stack! Stack size: {}", self.values.len());
             return Err(StackUnderflowError);
         }
-        self.values.pop().ok_or(StackUnderflowError)
+        Ok(self.values.pop().unwrap())
+    }
+
+    /// Pop a value from the stack without bounds checking (unsafe but fast)
+    #[inline(always)]
+    pub unsafe fn pop_unchecked(&mut self) -> Value {
+        self.values.pop().unwrap_unchecked()
     }
 
     /// Peek at the top value without removing it

@@ -1086,7 +1086,7 @@ impl Parser {
 
     /// Parse ternary conditional expression (condition ? true_expr : false_expr)
     fn parse_ternary(&mut self) -> Result<Expression, ParseError> {
-        let expr = self.parse_logical_or()?;
+        let expr = self.parse_null_coalescing()?;
 
         if self.match_token(TokenType::Question) {
             let position = expr.position().clone();
@@ -1103,6 +1103,23 @@ impl Parser {
                 false_expr: Box::new(false_expr),
                 position,
             });
+        }
+
+        Ok(expr)
+    }
+
+    /// Parse null coalescing expression (left ?? right)
+    fn parse_null_coalescing(&mut self) -> Result<Expression, ParseError> {
+        let mut expr = self.parse_logical_or()?;
+
+        while self.match_token(TokenType::DoubleQuestion) {
+            let position = expr.position().clone();
+            let right = self.parse_logical_or()?;
+            expr = Expression::NullCoalescing {
+                left: Box::new(expr),
+                right: Box::new(right),
+                position,
+            };
         }
 
         Ok(expr)
@@ -1586,6 +1603,11 @@ impl Parser {
                     self.advance();
                     Ok(Expression::String(value, position))
                 }
+                TokenType::InterpolatedString(parts) => {
+                    let parts = parts.clone();
+                    self.advance();
+                    Ok(Expression::InterpolatedString(parts, position))
+                }
                 TokenType::True => {
                     self.advance();
                     Ok(Expression::Boolean(true, position))
@@ -1799,6 +1821,11 @@ impl Parser {
                     // Match expression: match expr { ... }
                     self.advance(); // consume 'match' token
                     self.parse_match()
+                }
+                TokenType::When => {
+                    // When expression: when { condition => expr, ... }
+                    self.advance(); // consume 'when' token
+                    self.parse_when()
                 }
                 _ => {
                     Err(ParseError::new(
@@ -3014,6 +3041,56 @@ impl Parser {
         })
     }
 
+    /// Parse when expression: when { condition => expr, condition => expr, else => expr }
+    fn parse_when(&mut self) -> Result<Expression, ParseError> {
+        let position = if let Some(token) = self.peek() {
+            Position::new(token.line, token.column)
+        } else {
+            Position::new(0, 0)
+        };
+
+        self.expect(TokenType::LeftBrace, "Expected '{' after 'when'")?;
+
+        let mut arms = Vec::new();
+        let mut else_expr = None;
+
+        while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
+            if self.match_token(TokenType::Else) {
+                // else => expression
+                self.expect(TokenType::FatArrow, "Expected '=>' after 'else'")?;
+                else_expr = Some(Box::new(self.parse_expression()?));
+
+                // Optional comma before closing brace
+                self.match_token(TokenType::Comma);
+                break;
+            } else {
+                // condition => expression
+                let condition = self.parse_expression()?;
+                self.expect(TokenType::FatArrow, "Expected '=>' after when condition")?;
+                let body = self.parse_expression()?;
+
+                arms.push(crate::lang::ast::WhenArm {
+                    condition,
+                    body,
+                    position: position.clone(),
+                });
+
+                // Optional comma
+                if !self.match_token(TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+
+        self.expect(TokenType::RightBrace, "Expected '}' after when expression")?;
+
+        Ok(Expression::When {
+            arms,
+            else_expr,
+            position,
+        })
+    }
+
     /// Parse pattern for match expressions
     fn parse_pattern(&mut self) -> Result<Pattern, ParseError> {
         if let Some(token) = self.peek() {
@@ -3130,6 +3207,8 @@ impl Pattern {
             Pattern::Array(_, pos) => pos,
         }
     }
+
+
 }
 
 #[cfg(test)]

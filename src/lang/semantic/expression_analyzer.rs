@@ -11,6 +11,17 @@ impl SemanticAnalyzer {
             Expression::Integer(_, _) => Type::Int,
             Expression::Float(_, _) => Type::Float(64), // Default to 64-bit float
             Expression::String(_, _) => Type::String,
+            Expression::InterpolatedString(parts, position) => {
+                // 分析插值字符串中的表达式
+                for part in parts {
+                    if let crate::lang::lexer::InterpolationPart::Expression(expr_str) = part {
+                        // 这里需要解析表达式字符串并分析类型
+                        // 暂时简化处理，假设所有插值表达式都是有效的
+                        // TODO: 实现完整的表达式解析和类型检查
+                    }
+                }
+                Type::String // 插值字符串的结果总是字符串类型
+            }
             Expression::Boolean(_, _) => Type::Bool,
             Expression::Null(_) => Type::Null,
             
@@ -430,6 +441,72 @@ impl SemanticAnalyzer {
                 } else {
                     true_type
                 }
+            }
+
+            Expression::NullCoalescing { left, right, position } => {
+                let left_type = self.analyze_expression(left);
+                let right_type = self.analyze_expression(right);
+
+                // 左侧可以是任何类型（包括可能为 null 的类型）
+                // 右侧应该与左侧兼容，或者是左侧的非空版本
+                if !left_type.is_compatible_with(&right_type) && !right_type.is_compatible_with(&left_type) {
+                    self.add_error(TypeError::new(
+                        format!("Null coalescing operands have incompatible types: '{}' and '{}'",
+                               left_type, right_type),
+                        position.clone(),
+                    ));
+                    Type::Unknown
+                } else {
+                    // 返回右侧类型，因为它是非空的保证
+                    right_type
+                }
+            }
+
+            Expression::When { arms, else_expr, position } => {
+                let mut result_type = Type::Unknown;
+                let mut first_arm = true;
+
+                // 分析所有 when 分支
+                for arm in arms {
+                    let condition_type = self.analyze_expression(&arm.condition);
+                    let body_type = self.analyze_expression(&arm.body);
+
+                    // 条件必须是布尔类型
+                    if !matches!(condition_type, Type::Bool) {
+                        self.add_error(TypeError::new(
+                            format!("When condition must be boolean, got '{}'", condition_type),
+                            arm.position.clone(),
+                        ));
+                    }
+
+                    // 检查分支类型兼容性
+                    if first_arm {
+                        result_type = body_type;
+                        first_arm = false;
+                    } else if !result_type.is_compatible_with(&body_type) {
+                        self.add_error(TypeError::new(
+                            format!("When branches have incompatible types: '{}' and '{}'",
+                                   result_type, body_type),
+                            arm.position.clone(),
+                        ));
+                        result_type = Type::Unknown;
+                    }
+                }
+
+                // 分析 else 分支（如果存在）
+                if let Some(else_expr) = else_expr {
+                    let else_type = self.analyze_expression(else_expr);
+                    if !result_type.is_compatible_with(&else_type) {
+                        self.add_error(TypeError::new(
+                            format!("When else branch has incompatible type: expected '{}', got '{}'",
+                                   result_type, else_type),
+                            position.clone(),
+                        ));
+                        result_type = Type::Unknown;
+                    }
+                }
+
+                result_type
             }
 
             Expression::EnumVariant { enum_name, variant: _, value, position } => {

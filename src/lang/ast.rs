@@ -99,6 +99,7 @@ pub enum Expression {
     Integer(i64, Position),
     Float(f64, Position),
     String(String, Position),
+    InterpolatedString(Vec<crate::lang::lexer::InterpolationPart>, Position), // 字符串插值
     Boolean(bool, Position),
     Null(Position),
     Array(Vec<Expression>, Position), // Array literal
@@ -176,6 +177,20 @@ pub enum Expression {
         condition: Box<Expression>,
         true_expr: Box<Expression>,
         false_expr: Box<Expression>,
+        position: Position,
+    },
+
+    // Null coalescing expression (left ?? right)
+    NullCoalescing {
+        left: Box<Expression>,
+        right: Box<Expression>,
+        position: Position,
+    },
+
+    // When expression (类似 match 但语法不同)
+    When {
+        arms: Vec<WhenArm>,
+        else_expr: Option<Box<Expression>>,
         position: Position,
     },
 
@@ -259,6 +274,9 @@ impl Expression {
             Expression::MethodCall { position, .. } => position,
             Expression::StaticMethodCall { position, .. } => position,
             Expression::StaticFieldAccess { position, .. } => position,
+            Expression::InterpolatedString(_, position) => position,
+            Expression::NullCoalescing { position, .. } => position,
+            Expression::When { position, .. } => position,
         }
     }
 }
@@ -625,6 +643,14 @@ pub struct MatchArm {
     pub pattern: Pattern,
     pub guard: Option<Expression>, // Optional guard condition
     pub body: Expression,
+    pub position: Position,
+}
+
+/// When arm for when expressions (条件 => 表达式)
+#[derive(Debug, Clone, PartialEq)]
+pub struct WhenArm {
+    pub condition: Expression,  // 条件表达式
+    pub body: Expression,       // 结果表达式
     pub position: Position,
 }
 

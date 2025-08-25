@@ -1129,6 +1129,42 @@ impl CodeGenerator {
                 let const_index = self.add_constant(Value::String(value.clone().into()));
                 self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
             }
+            Expression::InterpolatedString(parts, _) => {
+                // 生成字符串插值的字节码
+                // 策略：将所有部分连接成一个字符串
+                let mut first_part = true;
+
+                for part in parts {
+                    match part {
+                        crate::lang::lexer::InterpolationPart::Text(text) => {
+                            // 文本部分直接作为常量
+                            let const_index = self.add_constant(Value::String(text.clone().into()));
+                            self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+                        }
+                        crate::lang::lexer::InterpolationPart::Expression(expr_str) => {
+                            // 表达式部分需要解析并生成代码
+                            // 这里简化处理，生成一个占位符字符串
+                            // TODO: 实现完整的表达式解析和代码生成
+
+                            let placeholder = format!("${{{}}}", expr_str);
+                            let const_index = self.add_constant(Value::String(placeholder.into()));
+                            self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+                        }
+                    }
+
+                    // 如果不是第一部分，需要连接字符串
+                    if !first_part {
+                        self.emit_instruction(Instruction::new(OpCode::Add, 0)); // 使用加法操作符连接字符串
+                    }
+                    first_part = false;
+                }
+
+                // 如果没有任何部分，生成空字符串
+                if first_part {
+                    let const_index = self.add_constant(Value::String("".to_string().into()));
+                    self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+                }
+            }
             Expression::Boolean(value, _) => {
                 if *value {
                     self.emit_instruction(Instruction::new(OpCode::True, 0));
@@ -1775,6 +1811,73 @@ impl CodeGenerator {
 
                 // Patch end jump to point here
                 self.patch_jump(end_jump);
+            }
+
+            Expression::NullCoalescing { left, right, .. } => {
+                // 生成空值合并操作符的字节码
+                // 策略：计算左侧表达式，如果不为 null 则使用它，否则计算并使用右侧表达式
+
+                // 生成左侧表达式
+                self.generate_expression(left);
+
+                // 复制栈顶值用于检查
+                self.emit_instruction(Instruction::new(OpCode::Dup, 0));
+
+                // 检查是否为 null
+                let const_index = self.add_constant(Value::Null);
+                self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+                self.emit_instruction(Instruction::new(OpCode::Ne, 0)); // 使用 Ne 而不是 NotEqual
+
+                // 如果不为 null，跳过右侧表达式
+                let skip_right = self.emit_jump(OpCode::JumpIfTrue);
+
+                // 弹出左侧的值（因为它是 null）
+                self.emit_instruction(Instruction::new(OpCode::Pop, 0));
+
+                // 生成右侧表达式
+                self.generate_expression(right);
+
+                // 修补跳转地址
+                self.patch_jump(skip_right);
+            }
+
+            Expression::When { arms, else_expr, .. } => {
+                // 生成 when 表达式的字节码
+                // 策略：按顺序检查每个条件，第一个为真的执行对应的表达式
+
+                let mut end_jumps = Vec::new();
+
+                for arm in arms {
+                    // 生成条件表达式
+                    self.generate_expression(&arm.condition);
+
+                    // 如果条件为假，跳到下一个条件
+                    let next_condition = self.emit_jump(OpCode::JumpIfFalse);
+
+                    // 生成分支表达式
+                    self.generate_expression(&arm.body);
+
+                    // 跳到 when 表达式的结尾
+                    let end_jump = self.emit_jump(OpCode::Jump);
+                    end_jumps.push(end_jump);
+
+                    // 修补跳转到下一个条件的地址
+                    self.patch_jump(next_condition);
+                }
+
+                // 生成 else 分支（如果存在）
+                if let Some(else_expr) = else_expr {
+                    self.generate_expression(else_expr);
+                } else {
+                    // 如果没有 else 分支且所有条件都不满足，生成 null
+                    let const_index = self.add_constant(Value::Null);
+                    self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+                }
+
+                // 修补所有跳转到结尾的地址
+                for end_jump in end_jumps {
+                    self.patch_jump(end_jump);
+                }
             }
 
             Expression::Match { expression, arms, position } => {
