@@ -509,6 +509,55 @@ impl SemanticAnalyzer {
                 result_type
             }
 
+            Expression::ArrowFunction { parameters, return_type, body, position } => {
+                // Create a new scope for the arrow function
+                self.type_env.push_scope();
+
+                // Add parameters to the scope
+                let mut param_types = Vec::new();
+                for param in parameters {
+                    let param_type = self.resolve_type_annotation(&param.type_annotation);
+                    param_types.push(param_type.clone());
+                    self.type_env.define_variable(param.name.clone(), param_type);
+                }
+
+                // Analyze function body and determine return type
+                let inferred_return_type = match body {
+                    crate::lang::ast::ArrowFunctionBody::Expression(expr) => {
+                        self.analyze_expression(expr)
+                    }
+                    crate::lang::ast::ArrowFunctionBody::Block(statements) => {
+                        let mut last_type = Type::Void;
+                        for stmt in statements {
+                            // For now, we'll analyze statements but not track return types properly
+                            // This would need more sophisticated control flow analysis
+                            last_type = Type::Void; // Simplified
+                        }
+                        last_type
+                    }
+                };
+
+                // Check return type compatibility if specified
+                if let Some(specified_return_type) = return_type {
+                    let specified_type = self.resolve_type_annotation(specified_return_type);
+                    if !specified_type.is_compatible_with(&inferred_return_type) {
+                        self.add_error(TypeError::new(
+                            format!("Arrow function return type mismatch: expected '{}', got '{}'",
+                                   specified_type, inferred_return_type),
+                            position.clone(),
+                        ));
+                    }
+                }
+
+                self.type_env.pop_scope();
+
+                // Return function type
+                Type::Function {
+                    parameters: param_types,
+                    return_type: Box::new(inferred_return_type),
+                }
+            }
+
             Expression::EnumVariant { enum_name, variant: _, value, position } => {
                 // Check if enum exists
                 let enum_type_opt = self.type_env.get_type(enum_name).cloned();

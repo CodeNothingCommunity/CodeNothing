@@ -1,0 +1,21 @@
+// 🚀 CodeNothing 简单箭头函数测试
+// 测试基础箭头函数语法
+
+lib <io>;
+
+fn main() : int {
+    std::println("🚀 CodeNothing 简单箭头函数测试");
+    std::println("=============================");
+    
+    // 先测试普通变量声明
+    var x : int = 5;
+    std::println("普通变量: " + lang::to_string(x));
+    
+    // 测试简单的箭头函数
+    var double = x => x * 2;
+    std::println("箭头函数: " + lang::to_string(double));
+    
+    std::println("测试完成!");
+    
+    return 0;
+}

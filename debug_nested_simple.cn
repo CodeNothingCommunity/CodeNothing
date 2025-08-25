@@ -1,0 +1,24 @@
+// 测试简单的嵌套箭头函数
+lib <io>;
+
+fn main() : int {
+    std::println("测试嵌套箭头函数");
+    
+    // 先测试返回括号表达式
+    var return_parens = (x: int) => (x + 1);
+    std::println("返回括号表达式: " + lang::to_string(return_parens));
+
+    // 测试在括号内定义箭头函数
+    var inner_arrow = ((x: int) => x * 2);
+    std::println("括号内箭头函数: " + lang::to_string(inner_arrow));
+
+    // 测试真正的嵌套箭头函数
+    var nested_arrow = (x: int) => ((y: int) => x + y);
+    std::println("嵌套箭头函数: " + lang::to_string(nested_arrow));
+
+    // 测试没有括号的嵌套箭头函数
+    var nested_no_parens = (x: int) => (y: int) => x + y;
+    std::println("无括号嵌套: " + lang::to_string(nested_no_parens));
+    
+    return 0;
+}

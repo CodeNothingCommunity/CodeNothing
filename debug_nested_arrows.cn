@@ -1,0 +1,12 @@
+// 测试嵌套箭头函数
+lib <io>;
+
+fn main() : int {
+    std::println("测试嵌套箭头函数");
+    
+    // 测试箭头函数返回箭头函数
+    var create_multiplier = (factor: int) => (x: int) => x * factor;
+    std::println("嵌套箭头函数: " + lang::to_string(create_multiplier));
+    
+    return 0;
+}

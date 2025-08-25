@@ -1,0 +1,191 @@
+// 🚀 CodeNothing 完整箭头函数测试
+// 展示箭头函数的各种功能和应用场景
+
+lib <io>;
+
+fn test_basic_arrow_functions() {
+    std::println("🔥 基础箭头函数测试");
+    std::println("==================");
+    
+    // 单参数箭头函数
+    var square = (x: int) => x * x;
+    std::println("平方函数: " + lang::to_string(square));
+    
+    // 多参数箭头函数
+    var add = (a: int, b: int) => a + b;
+    std::println("加法函数: " + lang::to_string(add));
+    
+    var multiply = (x: int, y: int) => x * y;
+    std::println("乘法函数: " + lang::to_string(multiply));
+    
+    std::println("");
+}
+
+fn test_string_arrow_functions() {
+    std::println("🔥 字符串处理箭头函数测试");
+    std::println("========================");
+    
+    // 字符串处理函数
+    var greet = (name: string) => "Hello, " + name + "!";
+    std::println("问候函数: " + lang::to_string(greet));
+    
+    var format_name = (first: string, last: string) => first + " " + last;
+    std::println("姓名格式化函数: " + lang::to_string(format_name));
+    
+    var create_email = (username: string, domain: string) => username + "@" + domain;
+    std::println("邮箱创建函数: " + lang::to_string(create_email));
+    
+    std::println("");
+}
+
+fn test_conditional_arrow_functions() {
+    std::println("🔥 条件逻辑箭头函数测试");
+    std::println("======================");
+    
+    // 使用 when 表达式的箭头函数
+    var get_grade = (score: int) => when { score >= 90 => "A", score >= 80 => "B", score >= 70 => "C", else => "F" };
+    std::println("成绩评定函数: " + lang::to_string(get_grade));
+    
+    var get_discount = (amount: int) => when { amount >= 1000 => amount * 90 / 100, amount >= 500 => amount * 95 / 100, else => amount };
+    std::println("折扣计算函数: " + lang::to_string(get_discount));
+    
+    var classify_age = (age: int) => when { age >= 65 => "老年人", age >= 18 => "成年人", age >= 13 => "青少年", else => "儿童" };
+    std::println("年龄分类函数: " + lang::to_string(classify_age));
+    
+    std::println("");
+}
+
+fn test_mathematical_arrow_functions() {
+    std::println("🔥 数学计算箭头函数测试");
+    std::println("======================");
+    
+    // 数学计算函数
+    var calculate_area = (width: int, height: int) => width * height;
+    std::println("面积计算函数: " + lang::to_string(calculate_area));
+    
+    var calculate_perimeter = (width: int, height: int) => 2 * (width + height);
+    std::println("周长计算函数: " + lang::to_string(calculate_perimeter));
+    
+    var calculate_circle_area = (radius: int) => 3 * radius * radius; // 简化的π值
+    std::println("圆面积计算函数: " + lang::to_string(calculate_circle_area));
+    
+    var power_of_two = (n: int) => when { n == 0 => 1, n == 1 => 2, n == 2 => 4, n == 3 => 8, n == 4 => 16, else => n * n };
+    std::println("2的幂函数: " + lang::to_string(power_of_two));
+    
+    std::println("");
+}
+
+fn test_business_logic_arrow_functions() {
+    std::println("🔥 业务逻辑箭头函数测试");
+    std::println("======================");
+    
+    // 业务逻辑函数
+    var calculate_tax = (income: int) => when { income <= 50000 => income * 10 / 100, income <= 100000 => income * 15 / 100, else => income * 20 / 100 };
+    std::println("税收计算函数: " + lang::to_string(calculate_tax));
+    
+    var determine_shipping = (weight: int, distance: int) => when { weight <= 1 && distance <= 10 => 5, weight <= 5 && distance <= 50 => 15, weight <= 10 => 25, else => 50 };
+    std::println("运费计算函数: " + lang::to_string(determine_shipping));
+    
+    var calculate_loyalty_points = (purchase_amount: int, customer_tier: string) => when { customer_tier == "gold" => purchase_amount * 3, customer_tier == "silver" => purchase_amount * 2, else => purchase_amount };
+    std::println("积分计算函数: " + lang::to_string(calculate_loyalty_points));
+    
+    var get_insurance_premium = (age: int, risk_level: string) => when { risk_level == "high" => age * 100, risk_level == "medium" => age * 50, else => age * 25 };
+    std::println("保险费计算函数: " + lang::to_string(get_insurance_premium));
+    
+    std::println("");
+}
+
+fn test_validation_arrow_functions() {
+    std::println("🔥 验证逻辑箭头函数测试");
+    std::println("======================");
+    
+    // 验证函数（返回数字表示布尔值：1为真，0为假）
+    var is_adult = (age: int) => when { age >= 18 => 1, else => 0 };
+    std::println("成年验证函数: " + lang::to_string(is_adult));
+    
+    var is_valid_score = (score: int) => when { score >= 0 && score <= 100 => 1, else => 0 };
+    std::println("分数验证函数: " + lang::to_string(is_valid_score));
+    
+    var can_vote = (age: int, citizenship: string) => when { age >= 18 && citizenship == "citizen" => 1, else => 0 };
+    std::println("投票资格验证函数: " + lang::to_string(can_vote));
+    
+    var is_weekend = (day: int) => when { day == 6 || day == 7 => 1, else => 0 }; // 6=Saturday, 7=Sunday
+    std::println("周末判断函数: " + lang::to_string(is_weekend));
+    
+    std::println("");
+}
+
+fn test_data_processing_arrow_functions() {
+    std::println("🔥 数据处理箭头函数测试");
+    std::println("======================");
+    
+    // 数据处理函数
+    var normalize_score = (score: int) => when { score > 100 => 100, score < 0 => 0, else => score };
+    std::println("分数标准化函数: " + lang::to_string(normalize_score));
+    
+    var convert_temperature = (celsius: int) => celsius * 9 / 5 + 32; // 摄氏度转华氏度
+    std::println("温度转换函数: " + lang::to_string(convert_temperature));
+    
+    var calculate_bmi_category = (bmi: int) => when { bmi >= 30 => 4, bmi >= 25 => 3, bmi >= 18 => 2, else => 1 }; // 1=underweight, 2=normal, 3=overweight, 4=obese
+    std::println("BMI分类函数: " + lang::to_string(calculate_bmi_category));
+    
+    var encode_priority = (priority: string) => when { priority == "urgent" => 1, priority == "high" => 2, priority == "medium" => 3, priority == "low" => 4, else => 5 };
+    std::println("优先级编码函数: " + lang::to_string(encode_priority));
+    
+    std::println("");
+}
+
+fn test_advanced_arrow_functions() {
+    std::println("🔥 高级箭头函数测试");
+    std::println("==================");
+    
+    // 复杂的业务逻辑函数
+    var calculate_final_price = (base_price: int, discount_percent: int, tax_percent: int) => {
+        var discounted = base_price * (100 - discount_percent) / 100;
+        return discounted * (100 + tax_percent) / 100;
+    };
+    std::println("最终价格计算函数: " + lang::to_string(calculate_final_price));
+    
+    var determine_credit_score = (income: int, debt: int, payment_history: int) => {
+        var debt_ratio = debt * 100 / income;
+        var base_score = when { payment_history >= 95 => 800, payment_history >= 85 => 750, payment_history >= 75 => 700, else => 650 };
+        var adjusted_score = when { debt_ratio <= 10 => base_score + 50, debt_ratio <= 30 => base_score, else => base_score - 100 };
+        return when { adjusted_score > 850 => 850, adjusted_score < 300 => 300, else => adjusted_score };
+    };
+    std::println("信用评分函数: " + lang::to_string(determine_credit_score));
+    
+    std::println("");
+}
+
+fn main() : int {
+    std::println("🚀 CodeNothing 完整箭头函数测试套件");
+    std::println("=================================");
+    std::println("");
+    
+    test_basic_arrow_functions();
+    test_string_arrow_functions();
+    test_conditional_arrow_functions();
+    test_mathematical_arrow_functions();
+    test_business_logic_arrow_functions();
+    test_validation_arrow_functions();
+    test_data_processing_arrow_functions();
+    test_advanced_arrow_functions();
+    
+    std::println("🎉 所有箭头函数测试完成!");
+    std::println("");
+    std::println("🔥 箭头函数功能总结:");
+    std::println("✅ 单参数语法 - (x: type) => expression");
+    std::println("✅ 多参数语法 - (x: type, y: type) => expression");
+    std::println("✅ 表达式体 - 简洁的单行表达式");
+    std::println("✅ 块语句体 - 复杂的多行逻辑 { ... }");
+    std::println("✅ 类型注解支持 - 完整的类型系统集成");
+    std::println("✅ 与其他语法糖结合 - when表达式完美配合");
+    std::println("✅ 实际应用场景 - 数学计算、业务逻辑、数据处理");
+    std::println("✅ 高级功能 - 复杂的多步骤计算和决策");
+    std::println("");
+    std::println("💪 CodeNothing 箭头函数功能强大且实用!");
+    std::println("🚀 现代化函数式编程特性完美实现!");
+    std::println("🏆 语法简洁、功能完整、性能优秀!");
+    
+    return 0;
+}

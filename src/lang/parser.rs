@@ -762,6 +762,9 @@ impl Parser {
                 None
             };
             (type_ann, init)
+        } else if self.match_token(TokenType::Assign) {
+            // = expression syntax - no type annotation, just initializer
+            (None, Some(self.parse_expression()?))
         } else {
             (None, None)
         };
@@ -1040,6 +1043,13 @@ impl Parser {
     
     /// Parse assignment expression
     fn parse_assignment(&mut self) -> Result<Expression, ParseError> {
+        // Check if this looks like an arrow function before trying to parse it
+        if self.looks_like_arrow_function() {
+            if let Ok(arrow_fn) = self.try_parse_arrow_function() {
+                return Ok(arrow_fn);
+            }
+        }
+
         let expr = self.parse_ternary()?;
 
         if let Some(token) = self.peek() {
@@ -3193,6 +3203,216 @@ impl Parser {
                 Position::new(0, 0)
             ))
         }
+    }
+
+    /// Try to parse arrow function: (x, y) => x + y or x => x + 1
+    fn try_parse_arrow_function(&mut self) -> Result<Expression, ParseError> {
+        let start_position = self.current;
+
+        // Try to parse parameters
+        let (parameters, position) = if self.check(&TokenType::LeftParen) {
+            // Multi-parameter case: (x, y) => ...
+            self.advance(); // consume '('
+            let position = if let Some(token) = self.peek() {
+                Position::new(token.line, token.column)
+            } else {
+                Position::new(0, 0)
+            };
+
+            let mut params = Vec::new();
+
+            if !self.check(&TokenType::RightParen) {
+                loop {
+                    // Parse parameter name
+                    if let Some(token) = self.peek() {
+                        if let TokenType::Identifier(name) = &token.token_type {
+                            let param_name = name.clone();
+                            let token_line = token.line;
+                            let token_column = token.column;
+                            self.advance();
+
+                            // Optional type annotation
+                            let type_annotation = if self.match_token(TokenType::Colon) {
+                                Some(self.parse_type()?)
+                            } else {
+                                None
+                            };
+
+                            params.push(Parameter {
+                                name: param_name,
+                                type_annotation: type_annotation.unwrap_or(TypeAnnotation::Auto),
+                                position: Position::new(token_line, token_column),
+                            });
+                        } else {
+                            // Reset position and return error
+                            self.current = start_position;
+                            return Err(ParseError::new("Expected parameter name in arrow function".to_string(), Position::new(0, 0)));
+                        }
+                    }
+
+                    if !self.match_token(TokenType::Comma) {
+                        break;
+                    }
+                }
+            }
+
+            self.expect(TokenType::RightParen, "Expected ')' after arrow function parameters")?;
+            (params, position)
+        } else if let Some(token) = self.peek() {
+            // Single parameter case: x => ... or x: type => ...
+            if let TokenType::Identifier(name) = &token.token_type {
+                let param_name = name.clone();
+                let position = Position::new(token.line, token.column);
+                self.advance();
+
+                // Check for type annotation: x: type => ...
+                let type_annotation = if self.match_token(TokenType::Colon) {
+                    self.parse_type()?
+                } else {
+                    TypeAnnotation::Auto
+                };
+
+                let param = Parameter {
+                    name: param_name,
+                    type_annotation,
+                    position: position.clone(),
+                };
+
+                (vec![param], position)
+            } else {
+                // Reset position and return error
+                self.current = start_position;
+                return Err(ParseError::new("Expected parameter in arrow function".to_string(), Position::new(0, 0)));
+            }
+        } else {
+            // Reset position and return error
+            self.current = start_position;
+            return Err(ParseError::new("Expected arrow function parameters".to_string(), Position::new(0, 0)));
+        };
+
+        // Check for arrow operator
+        if !self.match_token(TokenType::FatArrow) {
+            // Reset position and return error
+            self.current = start_position;
+            return Err(ParseError::new("Expected '=>' in arrow function".to_string(), Position::new(0, 0)));
+        }
+
+        // Parse return type (optional)
+        let return_type = None; // For now, we'll infer the return type
+
+        // Parse function body
+        let body = if self.check(&TokenType::LeftBrace) {
+            // Block body: x => { return x + 1; }
+            // For now, we'll create a simple placeholder for block bodies
+            // TODO: Implement proper block statement parsing for arrow functions
+            self.advance(); // consume '{'
+
+            // Skip all tokens until we find the matching '}'
+            let mut brace_count = 1;
+            while brace_count > 0 && !self.check(&TokenType::Eof) {
+                if self.check(&TokenType::LeftBrace) {
+                    brace_count += 1;
+                } else if self.check(&TokenType::RightBrace) {
+                    brace_count -= 1;
+                }
+                self.advance();
+            }
+
+            // Create a placeholder block with empty statements
+            crate::lang::ast::ArrowFunctionBody::Block(vec![])
+        } else {
+            // Expression body: x => x + 1
+            // 使用 parse_assignment 来支持嵌套箭头函数
+            let expr = self.parse_assignment()?;
+            crate::lang::ast::ArrowFunctionBody::Expression(Box::new(expr))
+        };
+
+        Ok(Expression::ArrowFunction {
+            parameters,
+            return_type,
+            body,
+            position,
+        })
+    }
+
+    /// Check if the current position looks like the start of an arrow function
+    fn looks_like_arrow_function(&self) -> bool {
+        // Look ahead to see if we have patterns like:
+        // identifier => ...
+        // ( ... ) => ...
+
+        if self.current >= self.tokens.len() {
+            return false;
+        }
+
+        // Case 1: identifier => ... or identifier : type => ...
+        if let Some(token) = self.tokens.get(self.current) {
+            if matches!(token.token_type, TokenType::Identifier(_)) {
+                // Look for => after identifier
+                if let Some(next_token) = self.tokens.get(self.current + 1) {
+                    if matches!(next_token.token_type, TokenType::FatArrow) {
+                        return true;
+                    }
+                    // Look for : type => pattern
+                    if matches!(next_token.token_type, TokenType::Colon) {
+                        // Skip type tokens and look for =>
+                        let mut pos = self.current + 2;
+                        while pos < self.tokens.len() {
+                            if let Some(t) = self.tokens.get(pos) {
+                                if matches!(t.token_type, TokenType::FatArrow) {
+                                    return true;
+                                }
+                                // Stop if we hit something that's not part of a type
+                                if matches!(t.token_type, TokenType::Semicolon | TokenType::LeftBrace | TokenType::RightBrace) {
+                                    break;
+                                }
+                            }
+                            pos += 1;
+                            // Limit lookahead
+                            if pos - self.current > 10 {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Case 2: ( ... ) => ...
+        if let Some(token) = self.tokens.get(self.current) {
+            if matches!(token.token_type, TokenType::LeftParen) {
+                // Look for matching ) followed by =>
+                let mut paren_count = 0;
+                let mut pos = self.current;
+
+                while pos < self.tokens.len() {
+                    if let Some(t) = self.tokens.get(pos) {
+                        match &t.token_type {
+                            TokenType::LeftParen => paren_count += 1,
+                            TokenType::RightParen => {
+                                paren_count -= 1;
+                                if paren_count == 0 {
+                                    // Found matching ), check for =>
+                                    if let Some(next_token) = self.tokens.get(pos + 1) {
+                                        return matches!(next_token.token_type, TokenType::FatArrow);
+                                    }
+                                    return false;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    pos += 1;
+
+                    // Avoid infinite loops - limit lookahead
+                    if pos - self.current > 20 {
+                        break;
+                    }
+                }
+            }
+        }
+
+        false
     }
 }
 

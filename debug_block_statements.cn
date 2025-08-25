@@ -1,0 +1,17 @@
+// 测试块语句箭头函数
+lib <io>;
+
+fn main() : int {
+    std::println("测试块语句箭头函数");
+
+    // 先测试表达式箭头函数是否工作
+    var expr_arrow = (x: int) => x + 1;
+    std::println("表达式箭头函数: " + lang::to_string(expr_arrow));
+
+    // 然后测试空的块语句
+    var empty_block = (x: int) => {
+    };
+    std::println("块语句函数: " + lang::to_string(simple_block));
+
+    return 0;
+}

@@ -1,0 +1,12 @@
+// 测试空参数列表箭头函数
+lib <io>;
+
+fn main() : int {
+    std::println("测试空参数列表");
+    
+    // 测试空参数列表
+    var get_random = () => 42;
+    std::println("空参数函数: " + lang::to_string(get_random));
+    
+    return 0;
+}

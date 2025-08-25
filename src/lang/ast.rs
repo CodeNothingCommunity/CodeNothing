@@ -194,6 +194,14 @@ pub enum Expression {
         position: Position,
     },
 
+    // Arrow function expression (x, y) => x + y
+    ArrowFunction {
+        parameters: Vec<Parameter>,
+        return_type: Option<TypeAnnotation>,
+        body: ArrowFunctionBody,
+        position: Position,
+    },
+
     // Enum variant construction
     EnumVariant {
         enum_name: String,
@@ -277,6 +285,7 @@ impl Expression {
             Expression::InterpolatedString(_, position) => position,
             Expression::NullCoalescing { position, .. } => position,
             Expression::When { position, .. } => position,
+            Expression::ArrowFunction { position, .. } => position,
         }
     }
 }
@@ -652,6 +661,13 @@ pub struct WhenArm {
     pub condition: Expression,  // 条件表达式
     pub body: Expression,       // 结果表达式
     pub position: Position,
+}
+
+/// Arrow function body - either expression or block
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArrowFunctionBody {
+    Expression(Box<Expression>),  // x => x + 1
+    Block(Vec<Statement>),        // x => { return x + 1; }
 }
 
 /// Patterns for match expressions

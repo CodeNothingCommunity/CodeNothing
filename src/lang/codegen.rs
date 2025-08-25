@@ -1880,6 +1880,43 @@ impl CodeGenerator {
                 }
             }
 
+            Expression::ArrowFunction { parameters, return_type: _, body, position } => {
+                // For now, generate a simplified arrow function as a string representation
+                // This is a placeholder implementation until we have proper closure support
+
+                let mut arrow_fn_str = String::new();
+
+                // Build parameter list
+                if parameters.len() == 1 {
+                    arrow_fn_str.push_str(&parameters[0].name);
+                } else {
+                    arrow_fn_str.push('(');
+                    for (i, param) in parameters.iter().enumerate() {
+                        if i > 0 {
+                            arrow_fn_str.push_str(", ");
+                        }
+                        arrow_fn_str.push_str(&param.name);
+                    }
+                    arrow_fn_str.push(')');
+                }
+
+                arrow_fn_str.push_str(" => ");
+
+                // Add body representation
+                match body {
+                    crate::lang::ast::ArrowFunctionBody::Expression(_) => {
+                        arrow_fn_str.push_str("{ expression }");
+                    }
+                    crate::lang::ast::ArrowFunctionBody::Block(_) => {
+                        arrow_fn_str.push_str("{ block }");
+                    }
+                }
+
+                // For now, just generate a string constant representing the arrow function
+                let const_index = self.add_constant(Value::String(arrow_fn_str.into()));
+                self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+            }
+
             Expression::Match { expression, arms, position } => {
                 if let Err(e) = self.generate_match_expression(expression, arms, position) {
                     self.errors.push(e);

@@ -1,0 +1,17 @@
+// 测试单参数无括号语法
+lib <io>;
+
+fn main() : int {
+    std::println("测试开始");
+
+    // 先测试普通的带括号语法
+    var double1 = (x: int) => x * 2;
+    std::println("带括号: " + lang::to_string(double1));
+
+    // 然后测试无括号语法
+    var double2 = x: int => x * 2;
+    std::println("无括号: " + lang::to_string(double2));
+
+    std::println("测试完成");
+    return 0;
+}
