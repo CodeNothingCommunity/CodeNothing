@@ -113,6 +113,10 @@ pub struct VirtualMachine {
 
     /// Current execution context for access control
     pub(super) execution_context: ExecutionContext,
+
+    /// Function index mapping: original_index -> vm_index
+    /// Used to map compilation-time function indices to runtime VM indices
+    pub(super) function_index_mapping: HashMap<usize, usize>,
 }
 
 /// Execution result for instruction processing

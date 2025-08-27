@@ -23,12 +23,18 @@ pub enum Type {
         parameters: Vec<Type>,
         return_type: Box<Type>,
     },
+    /// Arrow function type (lambda functions)
+    ArrowFunction {
+        parameters: Vec<Type>,
+        return_type: Box<Type>,
+    },
     /// Library function type (accepts any parameters)
     LibraryFunction {
         return_type: Box<Type>,
     },
     Custom(String),
     Unknown,               // For type inference
+    Any,                   // Any type (for pipe operations)
     Void,                  // Void type for functions with no return value
     Enum(String),          // Enum type
     Struct {               // Struct type
@@ -299,6 +305,17 @@ impl fmt::Display for Type {
                 write!(f, "|{}| -> {}", params.join(", "), return_type)
             }
             Type::TypeParameter(name) => write!(f, "{}", name),
+            Type::ArrowFunction { parameters, return_type } => {
+                write!(f, "(")?;
+                for (i, param) in parameters.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", param)?;
+                }
+                write!(f, ") => {}", return_type)
+            }
+            Type::Any => write!(f, "any"),
         }
     }
 }

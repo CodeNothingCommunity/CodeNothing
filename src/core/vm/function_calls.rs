@@ -98,20 +98,28 @@ impl VirtualMachine {
 
     /// Execute function call
     fn execute_call(&mut self, instruction: &Instruction) -> VMResult<ExecutionResult> {
-        let function_index = instruction.get_u16(0)
+        let original_function_index = instruction.get_u16(0)
             .ok_or_else(|| VMError::InvalidOperand("Missing function index".to_string()))?;
+
+        // Map the original function index to the VM function index
+        let function_index = if let Some(&mapped_index) = self.function_index_mapping.get(&(original_function_index as usize)) {
+            mapped_index
+        } else {
+            // Fallback to original index if no mapping exists (for backward compatibility)
+            original_function_index as usize
+        };
 
         // Debug: Log function calls when debug mode is enabled
         if self.debug_mode {
-            println!("🔧 VM: OpCode::Call executed for function {}", function_index);
+            println!("🔧 VM: OpCode::Call executed for original function {} -> mapped function {}", original_function_index, function_index);
         }
 
-        if function_index as usize >= self.chunks.len() {
-            return Err(VMError::RuntimeError(format!("Invalid function index: {}", function_index)));
+        if function_index >= self.chunks.len() {
+            return Err(VMError::RuntimeError(format!("Invalid function index: {} (mapped from {})", function_index, original_function_index)));
         }
 
         // Check and potentially compile with JIT
-        self.check_jit_compilation(function_index as usize);
+        self.check_jit_compilation(function_index);
 
         // Get parameter count from the top of the stack
         let param_count_value = self.stack.pop()?;
@@ -122,7 +130,7 @@ impl VirtualMachine {
 
         // Handle memoization for memoized functions
         let mut memo_params = Vec::new();
-        let is_memoized = self.is_function_memoized(function_index as usize);
+        let is_memoized = self.is_function_memoized(function_index);
 
         if is_memoized {
             if self.debug_mode {
@@ -141,7 +149,7 @@ impl VirtualMachine {
             }
 
             // Check if we have a cached result
-            let cached_result = self.get_memo_result(function_index as usize, &memo_params).cloned();
+            let cached_result = self.get_memo_result(function_index, &memo_params).cloned();
             if let Some(cached_result) = cached_result {
                 if self.debug_mode {
                     println!("🔧 MEMO: Cache HIT for function {} with args {:?} -> {:?}", function_index, memo_params, cached_result);
@@ -164,7 +172,7 @@ impl VirtualMachine {
         }
 
         // Record execution for hot spot detection (only for actual function calls, not cache hits)
-        self.record_jit_execution(function_index as usize, 0);
+        self.record_jit_execution(function_index, 0);
 
         // Check call stack depth to prevent stack overflow
         if self.call_stack.depth() >= self.memory.config.max_call_depth {
@@ -211,7 +219,7 @@ impl VirtualMachine {
                 locals_count: 0,
                 saved_locals,
                 saved_chunk,
-                function_index: function_index as usize,
+                function_index: function_index,
                 function_args: memo_params,
             }
         } else {
@@ -242,7 +250,7 @@ impl VirtualMachine {
 
         // Save current state and set up new function context
         self.locals = Some(new_locals);
-        let function_chunk = &self.chunks[function_index as usize];
+        let function_chunk = &self.chunks[function_index];
         self.current_chunk = Some(function_chunk.clone());
         self.ip = 0;
 

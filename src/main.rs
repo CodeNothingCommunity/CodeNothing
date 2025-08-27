@@ -44,6 +44,7 @@ fn main() {
     let mut jit_debug = false;
     let mut debug = false;
     let mut show_stats = false;
+    let mut show_all_details = false;
 
     let mut i = 1;
     while i < args.len() {
@@ -148,6 +149,9 @@ fn main() {
             "--stats" => {
                 show_stats = true;
             }
+            "--all" => {
+                show_all_details = true;
+            }
             arg if arg.ends_with(".cn") => {
                 // CodeNothing source file
                 input_file = Some(arg.to_string());
@@ -193,7 +197,7 @@ fn main() {
             // Set library debug mode based on debug flag
             crate::library_loader::set_library_debug_mode(debug);
 
-            match compile_and_run_file(&file_path, memory_config, verbose, jit_enabled, jit_threshold, aggressive_jit, jit_debug, debug, show_stats) {
+            match compile_and_run_file(&file_path, memory_config, verbose, jit_enabled, jit_threshold, aggressive_jit, jit_debug, debug, show_stats, show_all_details) {
                 Ok(()) => {
                     if verbose {
                         println!("Program executed successfully.");
@@ -293,7 +297,7 @@ fn run_demo_program(memory_config: MemoryConfig, jit_enabled: bool, jit_threshol
 }
 
 /// Compile and run a CodeNothing source file
-fn compile_and_run_file(file_path: &str, memory_config: MemoryConfig, verbose: bool, jit_enabled: bool, jit_threshold: Option<u32>, aggressive_jit: bool, jit_debug: bool, debug: bool, show_stats: bool) -> Result<(), String> {
+fn compile_and_run_file(file_path: &str, memory_config: MemoryConfig, verbose: bool, jit_enabled: bool, jit_threshold: Option<u32>, aggressive_jit: bool, jit_debug: bool, debug: bool, show_stats: bool, show_all_details: bool) -> Result<(), String> {
     // Read source file
     if verbose {
         println!("Reading source file: {}", file_path);
@@ -347,6 +351,8 @@ fn compile_and_run_file(file_path: &str, memory_config: MemoryConfig, verbose: b
     let mut generator = CodeGenerator::new();
     // Set debug mode for code generation
     generator.set_debug_mode(debug);
+    // Set show all details mode for arrow function display
+    generator.set_show_all_details(show_all_details);
     // Pass the type environment from semantic analysis to code generation
     generator.set_type_environment(analyzer.get_type_environment().clone());
     let chunks = generator.generate_program(&program).map_err(|errors| {
@@ -490,6 +496,7 @@ fn print_help() {
     println!("  --jit-debug                 Show JIT compilation debug output");
     println!("  --debug                     Show VM execution debug output");
     println!("  --stats                     Show VM statistics after execution");
+    println!("  --all                       Show full details for arrow functions (not abbreviated)");
     println!("  --verbose, --log, -v        Show detailed compilation steps and stats");
     println!("  --help, -h                  Show this help message");
     println!();
@@ -515,6 +522,7 @@ fn print_help() {
     println!("  CodeNothing --aggressive-jit hello.cn   # Use aggressive JIT mode");
     println!("  CodeNothing --jit-debug hello.cn        # Show JIT debug output");
     println!("  CodeNothing --stats hello.cn            # Show VM statistics");
+    println!("  CodeNothing --all hello.cn              # Show full arrow function details");
     println!("  CodeNothing --unlimited fibonacci.cn    # Run with unlimited memory for deep recursion");
     println!("  CodeNothing --deep-recursion fib30.cn   # Run with deep recursion optimization");
     println!();

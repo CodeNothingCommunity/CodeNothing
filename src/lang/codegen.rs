@@ -75,6 +75,7 @@ pub struct CodeGenerator {
     memo_functions: HashSet<String>, // Names of memoized functions
     library_dependencies: HashSet<String>, // Library dependencies for bytecode
     debug_mode: bool,           // Debug mode flag
+    show_all_details: bool,     // Show full details for arrow functions
 }
 
 impl CodeGenerator {
@@ -98,6 +99,7 @@ impl CodeGenerator {
             memo_functions: HashSet::new(),
             library_dependencies: HashSet::new(),
             debug_mode: false,
+            show_all_details: false,
         };
         
         // Populate type environment with built-ins
@@ -109,6 +111,11 @@ impl CodeGenerator {
     /// Set debug mode
     pub fn set_debug_mode(&mut self, enabled: bool) {
         self.debug_mode = enabled;
+    }
+
+    /// Set show all details mode for arrow functions
+    pub fn set_show_all_details(&mut self, enabled: bool) {
+        self.show_all_details = enabled;
     }
 
     /// Set the type environment (usually from semantic analysis)
@@ -129,6 +136,13 @@ impl CodeGenerator {
             chunks_map.insert(chunk.name.clone(), chunk.clone());
         }
         chunks_map
+    }
+
+    /// Get chunks in their original compilation order
+    pub fn get_chunks_ordered(&self) -> Vec<(String, Chunk)> {
+        self.chunks.iter()
+            .map(|chunk| (chunk.name.clone(), chunk.clone()))
+            .collect()
     }
 
     /// Get class inheritance relationships
@@ -675,15 +689,26 @@ impl CodeGenerator {
     /// Generate code for function
     fn generate_function(&mut self, function: &FunctionDeclaration) {
         if let Some(func_info) = self.functions.get(&function.name).cloned() {
+            if self.debug_mode {
+                println!("🔧 CodeGen: Generating function '{}' in chunk {}", function.name, func_info.chunk_index);
+            }
+
+            // Save current state
             let old_chunk = self.current_chunk;
-            self.current_chunk = func_info.chunk_index;
-
-
-
-            // Reset local variable count
             let old_local_count = self.local_count;
+            let old_variables = self.variables.clone();
+
+            // Switch to function's chunk
+            self.current_chunk = func_info.chunk_index;
             self.local_count = 0;
-            
+
+            if self.debug_mode {
+                println!("🔧 CodeGen: Switched to chunk {} for function '{}'", self.current_chunk, function.name);
+            }
+
+            // Clear variables for this function scope
+            self.variables.clear();
+
             // Add parameters as local variables
             for (i, param) in function.parameters.iter().enumerate() {
                 let var_info = VariableInfo {
@@ -692,29 +717,51 @@ impl CodeGenerator {
                     var_type: Type::from(param.type_annotation.clone()),
                 };
                 self.variables.insert(param.name.clone(), var_info);
+                if self.debug_mode {
+                    println!("🔧 CodeGen: Added parameter '{}' at index {}", param.name, i);
+                }
             }
             self.local_count = function.parameters.len();
-            
+
+            if self.debug_mode {
+                println!("🔧 CodeGen: About to generate function body for '{}'", function.name);
+            }
+
             // Generate function body
             self.generate_statement(&function.body);
-            
+
             // Add implicit return if needed
             if !self.has_return_at_end() {
                 if func_info.return_type == Type::Null {
                     self.emit_instruction(Instruction::new(OpCode::Return, 0));
+                    if self.debug_mode {
+                        println!("🔧 CodeGen: Added implicit Return for function '{}'", function.name);
+                    }
                 } else {
                     self.emit_instruction(Instruction::new(OpCode::Null, 0));
                     self.emit_instruction(Instruction::new(OpCode::ReturnValue, 0));
+                    if self.debug_mode {
+                        println!("🔧 CodeGen: Added implicit ReturnValue for function '{}'", function.name);
+                    }
                 }
             }
-            
+
+            // Save local count to the chunk
+            if let Some(chunk) = self.chunks.get_mut(func_info.chunk_index) {
+                chunk.local_count = self.local_count;
+                if self.debug_mode {
+                    println!("🔧 CodeGen: Function '{}' needs {} local variables", function.name, self.local_count);
+                    println!("🔧 CodeGen: Function '{}' has {} instructions", function.name, chunk.instructions.len());
+                }
+            }
+
             // Restore state
             self.current_chunk = old_chunk;
             self.local_count = old_local_count;
-            
-            // Remove parameters from variable map
-            for param in &function.parameters {
-                self.variables.remove(&param.name);
+            self.variables = old_variables;
+
+            if self.debug_mode {
+                println!("🔧 CodeGen: Restored to chunk {} after generating function '{}'", self.current_chunk, function.name);
             }
         }
     }
@@ -1222,6 +1269,12 @@ impl CodeGenerator {
                 }
             }
             Expression::Binary { left, operator, right, .. } => {
+                // Special handling for pipe operations
+                if matches!(operator, BinaryOperator::PipeForward) {
+                    self.generate_pipe_operation(left, right);
+                    return;
+                }
+
                 // Special handling for assignment operations
                 if matches!(operator, BinaryOperator::Assign | BinaryOperator::AddAssign |
                            BinaryOperator::SubtractAssign | BinaryOperator::MultiplyAssign |
@@ -1410,6 +1463,11 @@ impl CodeGenerator {
                         // Stack: [current_value, new_value]
                         self.emit_instruction(Instruction::new(OpCode::Mod, 0));
                         self.handle_assignment_target(left);
+                    }
+
+                    BinaryOperator::PipeForward => {
+                        // This should not be reached as pipe operations are handled separately
+                        unreachable!("Pipe operations should be handled in generate_pipe_operation");
                     }
                 }
             }
@@ -1904,11 +1962,36 @@ impl CodeGenerator {
 
                 // Add body representation
                 match body {
-                    crate::lang::ast::ArrowFunctionBody::Expression(_) => {
-                        arrow_fn_str.push_str("{ expression }");
+                    crate::lang::ast::ArrowFunctionBody::Expression(expr) => {
+                        // Try to generate a simple representation of the expression
+                        let expr_str = self.expression_to_string(expr);
+                        if self.show_all_details || expr_str.len() <= 50 {
+                            arrow_fn_str.push_str(&expr_str);
+                        } else {
+                            arrow_fn_str.push_str("{ complex_expression }");
+                        }
                     }
-                    crate::lang::ast::ArrowFunctionBody::Block(_) => {
-                        arrow_fn_str.push_str("{ block }");
+                    crate::lang::ast::ArrowFunctionBody::Block(statements) => {
+                        if self.show_all_details {
+                            // Show full block content
+                            arrow_fn_str.push_str("{ ");
+                            for (i, stmt) in statements.iter().enumerate() {
+                                if i > 0 {
+                                    arrow_fn_str.push_str("; ");
+                                }
+                                arrow_fn_str.push_str(&self.statement_to_string(stmt));
+                            }
+                            arrow_fn_str.push_str(" }");
+                        } else {
+                            // Show abbreviated form
+                            if statements.is_empty() {
+                                arrow_fn_str.push_str("{ }");
+                            } else if statements.len() == 1 {
+                                arrow_fn_str.push_str("{ single_statement }");
+                            } else {
+                                arrow_fn_str.push_str(&format!("{{ {}_statements }}", statements.len()));
+                            }
+                        }
                     }
                 }
 
@@ -2218,6 +2301,12 @@ impl CodeGenerator {
 
     /// Emit instruction
     fn emit_instruction(&mut self, instruction: Instruction) {
+        if self.debug_mode {
+            let chunk_name = &self.chunks[self.current_chunk].name;
+            let instruction_count = self.chunks[self.current_chunk].instructions.len();
+            println!("🔧 CodeGen: Emitting {:?} to chunk '{}' (index {}) at position {}",
+                instruction.opcode, chunk_name, self.current_chunk, instruction_count);
+        }
         self.current_chunk().add_instruction(instruction);
     }
     
@@ -2744,6 +2833,154 @@ impl CodeGenerator {
                         UnaryOperator::PreDecrement | UnaryOperator::PostDecrement)
             }
             _ => false,
+        }
+    }
+
+    /// Generate pipe operation (left |> right)
+    /// This transforms `value |> func` into `func(value)`
+    fn generate_pipe_operation(&mut self, left: &Expression, right: &Expression) {
+        if self.debug_mode {
+            println!("🔧 CodeGen: Generating pipe operation");
+        }
+
+        // Generate the left side (the value to be piped)
+        self.generate_expression(left);
+
+        // The right side should be a function or arrow function
+        match right {
+            // Direct function call: func |> becomes func(left_value)
+            Expression::Identifier(func_name, _) => {
+                // Check if it's a function
+                if let Some(func_info) = self.functions.get(func_name).cloned() {
+                    // Call the function with the piped value as first argument
+                    // First push the parameter count to the stack
+                    let param_count_const = self.add_constant(Value::Int(1)); // 1 argument (the piped value)
+                    self.emit_instruction(Instruction::with_u16(OpCode::Const, param_count_const, 0));
+                    // Then call the function
+                    self.emit_instruction(Instruction::with_u16(OpCode::Call, func_info.chunk_index as u16, 0));
+                } else {
+                    // Try to call as a variable containing a function
+                    if let Some(var_info) = self.variables.get(func_name).cloned() {
+                        self.emit_instruction(Instruction::new(OpCode::LoadLocal, var_info.index as u32));
+                        // For function variables, we need to use a different approach
+                        // This is a placeholder - function variables need special handling
+                        eprintln!("Warning: Function variables in pipe operations not fully implemented");
+                    } else {
+                        eprintln!("Error: Undefined function or variable '{}' in pipe operation", func_name);
+                    }
+                }
+            }
+
+            // Arrow function: value |> (x => x * 2)
+            Expression::ArrowFunction { .. } => {
+                // Generate the arrow function
+                self.generate_expression(right);
+                // Call it with the piped value
+                // Call arrow function with 1 argument
+                // First push the parameter count to the stack
+                let param_count_const = self.add_constant(Value::Int(1)); // 1 argument (the piped value)
+                self.emit_instruction(Instruction::with_u16(OpCode::Const, param_count_const, 0));
+                // Arrow functions are handled differently - this needs more work
+                eprintln!("Warning: Arrow functions in pipe operations not fully implemented");
+            }
+
+            // Function call: value |> func(arg2, arg3) becomes func(value, arg2, arg3)
+            Expression::Call { function, arguments, .. } => {
+                // Generate additional arguments first (they'll be on stack after the piped value)
+                for arg in arguments {
+                    self.generate_expression(arg);
+                }
+
+                // Now call the function with piped value + additional arguments
+                match function.as_ref() {
+                    Expression::Identifier(func_name, _) => {
+                        if let Some(func_info) = self.functions.get(func_name).cloned() {
+                            // Push parameter count to stack
+                            let param_count_const = self.add_constant(Value::Int((arguments.len() + 1) as i64)); // +1 for piped value
+                            self.emit_instruction(Instruction::with_u16(OpCode::Const, param_count_const, 0));
+                            // Call the function
+                            self.emit_instruction(Instruction::with_u16(OpCode::Call, func_info.chunk_index as u16, 0));
+                        } else if let Some(var_info) = self.variables.get(func_name).cloned() {
+                            self.emit_instruction(Instruction::new(OpCode::LoadLocal, var_info.index as u32));
+                            // Function variables need special handling
+                            eprintln!("Warning: Function variables in pipe operations not fully implemented");
+                        } else {
+                            eprintln!("Error: Undefined function '{}' in pipe operation", func_name);
+                        }
+                    }
+                    _ => {
+                        // Generate the function expression
+                        self.generate_expression(function);
+                        // Function expressions need special handling
+                        eprintln!("Warning: Function expressions in pipe operations not fully implemented");
+                    }
+                }
+            }
+
+            _ => {
+                eprintln!("Error: Right side of pipe operator must be a function or function call");
+            }
+        }
+    }
+
+    /// Generate a simple string representation of an expression for arrow functions
+    fn expression_to_string(&self, expr: &Expression) -> String {
+        match expr {
+            Expression::Integer(i, _) => i.to_string(),
+            Expression::Float(f, _) => f.to_string(),
+            Expression::String(s, _) => format!("\"{}\"", s),
+            Expression::Boolean(b, _) => b.to_string(),
+            Expression::Null(_) => "null".to_string(),
+            Expression::Identifier(name, _) => name.clone(),
+            Expression::Binary { left, operator, right, .. } => {
+                let left_str = self.expression_to_string(left);
+                let right_str = self.expression_to_string(right);
+                format!("{} {:?} {}", left_str, operator, right_str)
+            }
+            Expression::Unary { operator, operand, .. } => {
+                let operand_str = self.expression_to_string(operand);
+                format!("{:?}{}", operator, operand_str)
+            }
+            Expression::Call { function, arguments, .. } => {
+                let function_str = self.expression_to_string(function);
+                if arguments.is_empty() {
+                    format!("{}()", function_str)
+                } else {
+                    format!("{}(...)", function_str)
+                }
+            }
+            Expression::ArrowFunction { .. } => "arrow_function".to_string(),
+            Expression::When { .. } => "when_expression".to_string(),
+            Expression::Ternary { .. } => "ternary_expression".to_string(),
+            _ => "expression".to_string(),
+        }
+    }
+
+    /// Generate a simple string representation of a statement for arrow functions
+    fn statement_to_string(&self, stmt: &Statement) -> String {
+        match stmt {
+            Statement::Expression(expression) => self.expression_to_string(expression),
+            Statement::Return { value: Some(expr), .. } => {
+                format!("return {}", self.expression_to_string(expr))
+            }
+            Statement::Return { value: None, .. } => "return".to_string(),
+            Statement::VarDeclaration { name, initializer: Some(expr), .. } => {
+                format!("var {} = {}", name, self.expression_to_string(expr))
+            }
+            Statement::VarDeclaration { name, initializer: None, .. } => {
+                format!("var {}", name)
+            }
+            Statement::If { .. } => "if_statement".to_string(),
+            Statement::While { .. } => "while_loop".to_string(),
+            Statement::For { .. } => "for_loop".to_string(),
+            Statement::Block { statements, .. } => {
+                if statements.is_empty() {
+                    "{}".to_string()
+                } else {
+                    format!("block({}_statements)", statements.len())
+                }
+            }
+            _ => "statement".to_string(),
         }
     }
 

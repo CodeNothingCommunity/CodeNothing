@@ -328,6 +328,9 @@ pub enum BinaryOperator {
     MultiplyAssign, // *=
     DivideAssign,   // /=
     ModuloAssign,   // %=
+
+    // Function composition
+    PipeForward,    // |> (pipe operator)
 }
 
 /// Unary operators

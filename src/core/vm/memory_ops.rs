@@ -26,61 +26,70 @@ impl VirtualMachine {
     pub(super) fn execute_memory_instruction(&mut self, instruction: &Instruction) -> VMResult<ExecutionResult> {
         match instruction.opcode {
             crate::core::bytecode::OpCode::LoadLocal => {
-                // Fast path for local variable access
-                let index = instruction.operands[0] as usize; // Direct access, assume valid
+                // Safe path for local variable access with proper bounds checking
+                let index = instruction.get_u8(0)
+                    .ok_or_else(|| VMError::InvalidOperand("Missing local index".to_string()))? as usize;
+
                 if self.debug_mode {
                     println!("🔧 VM: LoadLocal - index: {}, operands: {:?}", index, instruction.operands);
                 }
-                if let Some(locals) = &self.locals {
-                    if let Ok(value) = locals.get(index) {
-                        // Check if this is an object and if we have an updated version in the registry
-                        let final_value = if let Value::Object(obj_map) = &value {
-                            if let Some(Value::Int(object_id)) = obj_map.get("__object_id__") {
-                                let obj_id = *object_id as usize;
-                                if let Some(updated_object) = self.object_registry.get(&obj_id) {
-                                    if self.jit_engine.debug {
-                                        println!("🔧 VM: LoadLocal - using updated object from registry for ID {}", obj_id);
-                                    }
-                                    updated_object.clone()
-                                } else {
-                                    value.clone()
-                                }
-                            } else {
-                                value.clone()
-                            }
-                        } else {
-                            value.clone()
-                        };
 
-                        if self.jit_engine.debug {
-                            println!("🔧 VM: LoadLocal - loaded value: {:?}", final_value);
-                        }
-                        self.stack.push(final_value)?;
-                        self.ip += 1;
-                        return Ok(ExecutionResult::Continue);
-                    }
-                }
-                // Fallback to safe version
-                let index = instruction.get_u8(0)
-                    .ok_or_else(|| VMError::InvalidOperand("Missing local index".to_string()))?;
                 let locals = self.locals.as_ref()
                     .ok_or_else(|| VMError::RuntimeError("No local variables".to_string()))?;
-                let value = locals.get(index as usize)?.clone();
-                if self.debug_mode {
-                    println!("🔧 VM: LoadLocal (fallback) - index: {}, loaded value: {:?}", index, value);
+
+                // Check if the local variable exists
+                if index >= locals.count() {
+                    if self.debug_mode {
+                        println!("🔧 VM: LoadLocal - index {} out of bounds (count: {})", index, locals.count());
+                    }
+                    return Err(VMError::MemoryError(format!("Local variable index {} out of bounds", index)));
                 }
-                self.stack.push(value)?;
+
+                let value = locals.get(index)?.clone();
+
+                // Check if this is an object and if we have an updated version in the registry
+                let final_value = if let Value::Object(obj_map) = &value {
+                    if let Some(Value::Int(object_id)) = obj_map.get("__object_id__") {
+                        let obj_id = *object_id as usize;
+                        if let Some(updated_object) = self.object_registry.get(&obj_id) {
+                            if self.jit_engine.debug {
+                                println!("🔧 VM: LoadLocal - using updated object from registry for ID {}", obj_id);
+                            }
+                            updated_object.clone()
+                        } else {
+                            value.clone()
+                        }
+                    } else {
+                        value.clone()
+                    }
+                } else {
+                    value.clone()
+                };
+
+                if self.debug_mode {
+                    println!("🔧 VM: LoadLocal - loaded value: {:?}", final_value);
+                }
+                self.stack.push(final_value)?;
                 self.ip += 1;
                 Ok(ExecutionResult::Continue)
             }
 
             crate::core::bytecode::OpCode::StoreLocal => {
                 let index = instruction.get_u8(0)
-                    .ok_or_else(|| VMError::InvalidOperand("Missing local index".to_string()))?;
+                    .ok_or_else(|| VMError::InvalidOperand("Missing local index".to_string()))? as usize;
+
+                if self.debug_mode {
+                    println!("🔧 VM: StoreLocal - index: {}", index);
+                }
+
                 let value = self.stack.pop()?;
                 let locals = self.locals.as_mut()
                     .ok_or_else(|| VMError::RuntimeError("No local variables".to_string()))?;
-                locals.set(index as usize, value)?;
+
+                // StoreLocal will automatically grow the local memory if needed
+                // No bounds checking required as LocalMemory::set handles growth
+
+                locals.set(index, value)?;
                 self.ip += 1;
                 Ok(ExecutionResult::Continue)
             }

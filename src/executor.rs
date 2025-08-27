@@ -154,34 +154,36 @@ impl Executor {
             messages.push("Loading functions into VM...".to_string());
         }
         
-        // Load all chunks into the VM, ensuring main function is at index 0
+        // Load all chunks into the VM in the same order as they were compiled
+        // This preserves the chunk indices used in Call instructions
         let mut function_index_map = HashMap::new();
 
-        // First, load main function if it exists
-        if let Some(&main_index) = bytecode.function_map.get("main") {
-            if let Some(chunk) = bytecode.get_chunk_by_index(main_index) {
-                vm.add_chunk(chunk.clone());
-                function_index_map.insert("main".to_string(), 0);
-                if self.options.verbose {
-                    messages.push(format!("  Loaded function: main"));
-                }
+        // Get all chunks sorted by their original index
+        let mut chunks_with_indices: Vec<(usize, String, &crate::core::bytecode::Chunk)> = Vec::new();
+        for (name, &index) in &bytecode.function_map {
+            if let Some(chunk) = bytecode.get_chunk_by_index(index) {
+                chunks_with_indices.push((index, name.clone(), chunk));
             }
         }
 
-        // Then load all other functions
-        let mut vm_index = 1;
-        for (name, &index) in &bytecode.function_map {
-            if name != "main" {
-                if let Some(chunk) = bytecode.get_chunk_by_index(index) {
-                    vm.add_chunk(chunk.clone());
-                    function_index_map.insert(name.clone(), vm_index);
-                    vm_index += 1;
-                    if self.options.verbose {
-                        messages.push(format!("  Loaded function: {}", name));
-                    }
-                }
+        // Sort by original index to maintain compilation order
+        chunks_with_indices.sort_by_key(|(index, _, _)| *index);
+
+        // Create index mapping: original_index -> vm_index
+        let mut index_mapping = HashMap::new();
+
+        // Load chunks in their original order and create mapping
+        for (vm_index, (original_index, name, chunk)) in chunks_with_indices.iter().enumerate() {
+            vm.add_chunk((*chunk).clone());
+            function_index_map.insert(name.clone(), *original_index);
+            index_mapping.insert(*original_index, vm_index);
+            if self.options.verbose {
+                messages.push(format!("  Loaded function: {} (original index {}, VM index {})", name, original_index, vm_index));
             }
         }
+
+        // Set the index mapping in the VM
+        vm.set_function_index_mapping(index_mapping.clone());
 
         // Set up memoization for memoized functions
         let memo_functions = bytecode.get_memo_functions();
@@ -249,8 +251,38 @@ impl Executor {
             vm.set_debug_mode(true);
         }
 
-        // Execute the entry point function (main function is usually at index 0)
-        let exit_code = match vm.execute(0) {
+        // Find and execute the main function
+        let main_original_index = if let Some(&main_index) = bytecode.function_map.get("main") {
+            main_index
+        } else {
+            messages.push("No main function found in bytecode".to_string());
+            return ExecuteResult {
+                success: false,
+                exit_code: -1,
+                messages,
+                execution_time_ms: start_time.elapsed().as_millis(),
+            };
+        };
+
+        // Convert original index to VM index
+        let main_vm_index = if let Some(&vm_index) = index_mapping.get(&main_original_index) {
+            vm_index
+        } else {
+            messages.push(format!("Main function index {} not found in VM mapping", main_original_index));
+            return ExecuteResult {
+                success: false,
+                exit_code: -1,
+                messages,
+                execution_time_ms: start_time.elapsed().as_millis(),
+            };
+        };
+
+        if self.options.verbose {
+            messages.push(format!("Executing main function at original index {} (VM index {})...", main_original_index, main_vm_index));
+        }
+
+        // Execute the main function
+        let exit_code = match vm.execute(main_vm_index) {
             Ok(result) => {
                 if self.options.verbose {
                     messages.push("Execution completed successfully".to_string());

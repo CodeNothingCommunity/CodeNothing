@@ -48,6 +48,11 @@ impl SemanticAnalyzer {
                 right_type.clone()
             }
 
+            // Pipe operation (function composition)
+            BinaryOperator::PipeForward => {
+                self.analyze_pipe_operation(left_type, right_type, position)
+            }
+
             // Compound assignment operations
             BinaryOperator::AddAssign | BinaryOperator::SubtractAssign |
             BinaryOperator::MultiplyAssign | BinaryOperator::DivideAssign |
@@ -195,6 +200,102 @@ impl SemanticAnalyzer {
                 ));
                 Type::Unknown
             }
+        }
+    }
+
+    /// Analyze pipe operation (left |> right)
+    /// The pipe operator passes the left value as the first argument to the right function
+    fn analyze_pipe_operation(
+        &mut self,
+        left_type: &Type,
+        right_type: &Type,
+        position: &Position,
+    ) -> Type {
+        match right_type {
+            // Right side should be a function
+            Type::Function { parameters, return_type, .. } => {
+                // Check if the function can accept the left value as its first parameter
+                if parameters.is_empty() {
+                    self.add_error(TypeError::new(
+                        "Cannot pipe value to function with no parameters".to_string(),
+                        position.clone(),
+                    ));
+                    return Type::Unknown;
+                }
+
+                // Check if the left type matches the first parameter type
+                let first_param_type = &parameters[0];
+                if !self.types_compatible(left_type, first_param_type) {
+                    self.add_error(TypeError::new(
+                        format!(
+                            "Cannot pipe '{}' to function expecting '{}' as first parameter",
+                            left_type, first_param_type
+                        ),
+                        position.clone(),
+                    ));
+                    return Type::Unknown;
+                }
+
+                // Return the function's return type
+                *return_type.clone()
+            }
+
+            // Right side could also be an arrow function
+            Type::ArrowFunction { parameters, return_type, .. } => {
+                // Check if the arrow function can accept the left value as its first parameter
+                if parameters.is_empty() {
+                    self.add_error(TypeError::new(
+                        "Cannot pipe value to arrow function with no parameters".to_string(),
+                        position.clone(),
+                    ));
+                    return Type::Unknown;
+                }
+
+                // Check if the left type matches the first parameter type
+                let first_param_type = &parameters[0];
+                if !self.types_compatible(left_type, first_param_type) {
+                    self.add_error(TypeError::new(
+                        format!(
+                            "Cannot pipe '{}' to arrow function expecting '{}' as first parameter",
+                            left_type, first_param_type
+                        ),
+                        position.clone(),
+                    ));
+                    return Type::Unknown;
+                }
+
+                // Return the arrow function's return type
+                *return_type.clone()
+            }
+
+            _ => {
+                self.add_error(TypeError::new(
+                    format!("Right side of pipe operator must be a function, found '{}'", right_type),
+                    position.clone(),
+                ));
+                Type::Unknown
+            }
+        }
+    }
+
+    /// Check if two types are compatible for pipe operation
+    fn types_compatible(&self, left: &Type, right: &Type) -> bool {
+        match (left, right) {
+            // Exact match
+            (a, b) if a == b => true,
+
+            // Numeric compatibility
+            (Type::Int, Type::Float(_)) | (Type::Float(_), Type::Int) => true,
+            (Type::Int, Type::Num(_)) | (Type::Num(_), Type::Int) => true,
+            (Type::Float(_), Type::Num(_)) | (Type::Num(_), Type::Float(_)) => true,
+
+            // Any type can be passed to Any
+            (_, Type::Any) => true,
+
+            // Unknown types are compatible (error already reported elsewhere)
+            (Type::Unknown, _) | (_, Type::Unknown) => true,
+
+            _ => false,
         }
     }
 }

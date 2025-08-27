@@ -137,6 +137,7 @@ pub enum TokenType {
     Question,   // ?
     DoubleQuestion, // ?? (null coalescing operator)
     Pipe,       // | (for lambda parameters)
+    PipeForward, // |> (pipe operator)
     Arrow,      // -> (for lambda return type)
     FatArrow,   // => (for match expressions)
 
@@ -215,10 +216,10 @@ impl Lexer {
         }
     }
     
-    /// Skip whitespace (except newlines)
+    /// Skip all whitespace including newlines (C-style)
     fn skip_whitespace(&mut self) {
         while let Some(ch) = self.peek() {
-            if ch.is_whitespace() && ch != '\n' {
+            if ch.is_whitespace() {
                 self.advance();
             } else {
                 break;
@@ -498,10 +499,6 @@ impl Lexer {
             let lexeme_start = self.position;
             
             let token_type = match ch {
-                '\n' => {
-                    self.advance();
-                    TokenType::Newline
-                }
                 '/' => {
                     if self.peek_ahead(1) == Some('/') {
                         self.skip_line_comment();
@@ -620,8 +617,11 @@ impl Lexer {
                     if self.peek() == Some('|') {
                         self.advance();
                         TokenType::Or
+                    } else if self.peek() == Some('>') {
+                        self.advance();
+                        TokenType::PipeForward
                     } else {
-                        TokenType::BitOr
+                        TokenType::Pipe
                     }
                 }
                 '^' => {

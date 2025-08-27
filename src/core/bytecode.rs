@@ -425,6 +425,7 @@ pub struct Chunk {
     pub constants: Vec<crate::core::value::Value>,
     pub name: String,
     pub global_count: usize,  // Number of global variables needed
+    pub local_count: usize,   // Number of local variables needed
 }
 
 impl Chunk {
@@ -435,6 +436,7 @@ impl Chunk {
             constants: Vec::new(),
             name,
             global_count: 0,
+            local_count: 0,
         }
     }
 

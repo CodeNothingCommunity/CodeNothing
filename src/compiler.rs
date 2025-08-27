@@ -195,6 +195,7 @@ impl Compiler {
         
         // Code generation
         let mut generator = CodeGenerator::new();
+        generator.set_debug_mode(self.options.verbose);
         generator.generate_program(&ast);
 
         if !generator.get_errors().is_empty() {
@@ -232,8 +233,10 @@ impl Compiler {
         bytecode_file.metadata.debug_info = self.options.debug_info;
         bytecode_file.metadata.flags = self.options.flags.clone();
 
-        // Add all chunks to bytecode file
-        for (name, chunk) in generator.get_chunks() {
+        // Add all chunks to bytecode file in the correct order
+        // Get chunks as a vector to preserve the original compilation order
+        let chunks_vec = generator.get_chunks_ordered();
+        for (name, chunk) in chunks_vec {
             bytecode_file.add_chunk(name, chunk);
         }
 

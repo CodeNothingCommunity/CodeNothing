@@ -52,6 +52,7 @@ impl VirtualMachine {
             class_definitions: HashMap::new(),
             vtables: HashMap::new(),
             execution_context: super::types::ExecutionContext::new(),
+            function_index_mapping: HashMap::new(),
         }
     }
 
@@ -100,6 +101,11 @@ impl VirtualMachine {
 
         self.chunks.push(chunk);
         index
+    }
+
+    /// Set the function index mapping for Call instruction translation
+    pub fn set_function_index_mapping(&mut self, mapping: HashMap<usize, usize>) {
+        self.function_index_mapping = mapping;
     }
 
     /// Execute a chunk
@@ -156,7 +162,21 @@ impl VirtualMachine {
         let chunk = &self.chunks[chunk_index];
         self.current_chunk = Some(chunk.clone());
         self.ip = 0;
-        self.locals = Some(LocalMemory::new(self.memory.config.locals_per_function));
+
+        // Create local memory with the exact capacity needed by the function
+        let local_capacity = if chunk.local_count > 0 {
+            // Use the local count from the chunk (set by compiler)
+            chunk.local_count
+        } else {
+            // Fallback to default capacity for functions without locals
+            self.memory.config.locals_per_function.max(8)
+        };
+
+        if self.debug_mode {
+            println!("🔧 VM: Creating local memory with capacity {} for chunk '{}'", local_capacity, chunk.name);
+        }
+
+        self.locals = Some(LocalMemory::new(local_capacity));
 
         if self.debug_mode {
             println!("🔧 VM: About to call run() method");

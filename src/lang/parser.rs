@@ -137,11 +137,9 @@ impl Parser {
         }
     }
 
-    /// Skip newlines
+    /// Skip newlines (now handled by lexer, this is a no-op)
     fn skip_newlines(&mut self) {
-        while self.match_token(TokenType::Newline) {
-            // Skip
-        }
+        // No-op: newlines are now skipped by the lexer like other whitespace
     }
     
     /// Parse complete program
@@ -785,16 +783,16 @@ impl Parser {
         let return_token = self.expect(TokenType::Return, "Expected 'return'")?;
         let position = Position::new(return_token.line, return_token.column);
 
-        let value = if self.check(&TokenType::Semicolon) || self.check(&TokenType::Newline) || self.check(&TokenType::RightBrace) {
+        let value = if self.check(&TokenType::Semicolon) || self.check(&TokenType::RightBrace) {
             None
         } else {
             Some(self.parse_expression()?)
         };
 
-        // Semicolon is optional if we're at the end of a block or line
+        // Semicolon is optional if we're at the end of a block
         if self.check(&TokenType::Semicolon) {
             self.advance();
-        } else if !self.check(&TokenType::Newline) && !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
+        } else if !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
             return Err(ParseError::new("Expected ';' after return statement".to_string(), position));
         }
 
@@ -1050,7 +1048,7 @@ impl Parser {
             }
         }
 
-        let expr = self.parse_ternary()?;
+        let expr = self.parse_pipe()?;
 
         if let Some(token) = self.peek() {
             let operator = match &token.token_type {
@@ -1089,6 +1087,24 @@ impl Parser {
                 right: Box::new(right),
                 position,
             });
+        }
+
+        Ok(expr)
+    }
+
+    /// Parse pipe expression (left |> right)
+    fn parse_pipe(&mut self) -> Result<Expression, ParseError> {
+        let mut expr = self.parse_ternary()?;
+
+        while self.match_token(TokenType::PipeForward) {
+            let position = expr.position().clone();
+            let right = self.parse_ternary()?;
+            expr = Expression::Binary {
+                left: Box::new(expr),
+                operator: BinaryOperator::PipeForward,
+                right: Box::new(right),
+                position,
+            };
         }
 
         Ok(expr)
@@ -2034,11 +2050,6 @@ impl Parser {
         let mut variants = Vec::new();
 
         while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
-            // Skip newlines
-            while self.check(&TokenType::Newline) {
-                self.advance();
-            }
-
             // Check if we've reached the end
             if self.check(&TokenType::RightBrace) || self.check(&TokenType::Eof) {
                 break;
@@ -2092,13 +2103,8 @@ impl Parser {
                 position: variant_position,
             });
 
-            // Skip optional comma and newlines
+            // Skip optional comma
             if self.check(&TokenType::Comma) {
-                self.advance();
-            }
-
-            // Skip trailing newlines
-            while self.check(&TokenType::Newline) {
                 self.advance();
             }
         }
@@ -2129,11 +2135,6 @@ impl Parser {
         let mut fields = Vec::new();
 
         while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
-            // Skip newlines
-            while self.check(&TokenType::Newline) {
-                self.advance();
-            }
-
             // Check if we've reached the end
             if self.check(&TokenType::RightBrace) || self.check(&TokenType::Eof) {
                 break;
@@ -2157,13 +2158,8 @@ impl Parser {
                 position: field_position,
             });
 
-            // Skip optional comma and newlines
+            // Skip optional comma
             if self.check(&TokenType::Comma) {
-                self.advance();
-            }
-
-            // Skip trailing newlines
-            while self.check(&TokenType::Newline) {
                 self.advance();
             }
         }
@@ -2194,11 +2190,6 @@ impl Parser {
         let mut methods = Vec::new();
 
         while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
-            // Skip newlines
-            while self.check(&TokenType::Newline) {
-                self.advance();
-            }
-
             // Check if we've reached the end
             if self.check(&TokenType::RightBrace) || self.check(&TokenType::Eof) {
                 break;
@@ -2318,11 +2309,6 @@ impl Parser {
         let mut methods = Vec::new();
 
         while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
-            // Skip newlines
-            while self.check(&TokenType::Newline) {
-                self.advance();
-            }
-
             // Check if we've reached the end
             if self.check(&TokenType::RightBrace) || self.check(&TokenType::Eof) {
                 break;
@@ -2432,11 +2418,6 @@ impl Parser {
         let mut friend_classes = Vec::new();
 
         while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
-            // Skip newlines
-            while self.check(&TokenType::Newline) {
-                self.advance();
-            }
-
             // Check if we've reached the end
             if self.check(&TokenType::RightBrace) || self.check(&TokenType::Eof) {
                 break;
@@ -3303,23 +3284,17 @@ impl Parser {
         // Parse function body
         let body = if self.check(&TokenType::LeftBrace) {
             // Block body: x => { return x + 1; }
-            // For now, we'll create a simple placeholder for block bodies
-            // TODO: Implement proper block statement parsing for arrow functions
             self.advance(); // consume '{'
+            let mut statements = Vec::new();
 
-            // Skip all tokens until we find the matching '}'
-            let mut brace_count = 1;
-            while brace_count > 0 && !self.check(&TokenType::Eof) {
-                if self.check(&TokenType::LeftBrace) {
-                    brace_count += 1;
-                } else if self.check(&TokenType::RightBrace) {
-                    brace_count -= 1;
-                }
-                self.advance();
+            while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
+                // Parse statements within the arrow function block
+                // We need to be careful to avoid infinite recursion
+                statements.push(self.parse_arrow_function_statement()?);
             }
 
-            // Create a placeholder block with empty statements
-            crate::lang::ast::ArrowFunctionBody::Block(vec![])
+            self.expect(TokenType::RightBrace, "Expected '}' after arrow function block")?;
+            crate::lang::ast::ArrowFunctionBody::Block(statements)
         } else {
             // Expression body: x => x + 1
             // 使用 parse_assignment 来支持嵌套箭头函数
@@ -3333,6 +3308,52 @@ impl Parser {
             body,
             position,
         })
+    }
+
+    /// Parse a statement within an arrow function block
+    /// This is similar to parse_statement but avoids infinite recursion with arrow functions
+    fn parse_arrow_function_statement(&mut self) -> Result<Statement, ParseError> {
+        match self.peek() {
+            Some(token) => match &token.token_type {
+                TokenType::Var => self.parse_variable_declaration(),
+                TokenType::If => self.parse_if_statement(),
+                TokenType::While => self.parse_while_statement(),
+                TokenType::For => self.parse_for_statement(),
+                TokenType::Return => self.parse_return_statement(),
+                TokenType::Break => {
+                    // Simple break statement
+                    let position = Position::new(self.peek().unwrap().line, self.peek().unwrap().column);
+                    self.advance(); // consume 'break'
+                    self.expect(TokenType::Semicolon, "Expected ';' after break")?;
+                    Ok(Statement::Break(position))
+                }
+                TokenType::Continue => {
+                    // Simple continue statement
+                    let position = Position::new(self.peek().unwrap().line, self.peek().unwrap().column);
+                    self.advance(); // consume 'continue'
+                    self.expect(TokenType::Semicolon, "Expected ';' after continue")?;
+                    Ok(Statement::Continue(position))
+                }
+                TokenType::LeftBrace => {
+                    // Block statement
+                    self.parse_block_statement()
+                }
+                _ => {
+                    // Expression statement
+                    let expr = self.parse_arrow_function_expression()?;
+                    self.expect(TokenType::Semicolon, "Expected ';' after expression")?;
+                    Ok(Statement::Expression(expr))
+                }
+            }
+            None => Err(ParseError::new("Unexpected end of input".to_string(), Position::new(0, 0)))
+        }
+    }
+
+    /// Parse an expression within an arrow function, avoiding arrow function recursion
+    fn parse_arrow_function_expression(&mut self) -> Result<Expression, ParseError> {
+        // Parse expressions but avoid arrow function recursion by starting from assignment level
+        // This skips the arrow function parsing in parse_expression
+        self.parse_assignment()
     }
 
     /// Check if the current position looks like the start of an arrow function

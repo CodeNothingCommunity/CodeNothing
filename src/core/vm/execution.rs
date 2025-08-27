@@ -97,15 +97,20 @@ impl VirtualMachine {
         match instruction.opcode {
             // Most frequent operations first for better branch prediction
             OpCode::LoadLocal => {
-                // Inline local variable loading
-                let index = instruction.operands[0] as usize;
-                if let Some(locals) = &self.locals {
-                    if let Ok(value) = locals.get(index) {
-                        self.stack.push(value.clone())?;
-                        self.ip += 1;
-                        return Ok(ExecutionResult::Continue);
+                // Inline local variable loading with bounds checking
+                if let Some(index_byte) = instruction.operands.get(0) {
+                    let index = *index_byte as usize;
+                    if let Some(locals) = &self.locals {
+                        if index < locals.count() {
+                            if let Ok(value) = locals.get(index) {
+                                self.stack.push(value.clone())?;
+                                self.ip += 1;
+                                return Ok(ExecutionResult::Continue);
+                            }
+                        }
                     }
                 }
+                // Fallback to safe memory instruction handler
                 self.execute_memory_instruction(instruction)
             },
             OpCode::Call => return self.execute_function_instruction(instruction),
