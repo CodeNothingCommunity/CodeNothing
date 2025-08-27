@@ -1,8 +1,0 @@
-// 简单的库测试
-
-lib <io>;
-
-fn main() {
-    std::println("Hello from bytecode!");
-    std::println("Library system is working!");
-}

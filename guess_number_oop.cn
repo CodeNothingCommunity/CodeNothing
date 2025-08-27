@@ -1,8 +1,25 @@
-// CodeNothing 猜数字小游戏 - 面向对象版本
+// CodeNothing 猜数字小游戏 - 面向对象 - CODENOTHING 官方示例程序。
 // 展示 CodeNothing 语言的 OOP 特性：类、封装、方法
 
 lib <math>;
 lib <io>;
+
+// ========================================
+// 🔧 辅助函数
+// ========================================
+
+// 安全的字符串转整数函数
+fn to_int_safe(input: string): int {
+    try {
+        return lang::to_int(input);
+    } catch {
+        return -999;  // 返回特殊值表示转换失败
+    }
+}
+
+// ========================================
+// 🎮 游戏类定义
+// ========================================
 
 // 玩家类 - 封装玩家信息和统计数据
 class Player {
@@ -70,13 +87,15 @@ class GuessNumberGame {
 
     GuessNumberGame(player: Player) {
         self.player = player;
-        self.target_number = 0;
         self.attempts = 0;
         self.max_attempts = 10;
         self.min_range = 1;
         self.max_range = 100;
         self.is_won = false;
         self.current_score = 0;
+
+        // 初始化 target_number 为 0，将在 start_new_round 中设置
+        self.target_number = 0;
     }
 
     public fn show_welcome(self: GuessNumberGame): void {
@@ -98,8 +117,9 @@ class GuessNumberGame {
         self.current_score = 0;
 
         // 生成随机数
-        var random_str := random::randint(lang::to_string(self.min_range), lang::to_string(self.max_range));
-        self.target_number = lang::to_int(random_str);
+        random::seed();
+        var random_str := random::randint("1", "100");
+        self.target_number = to_int_safe(random_str);
 
         // 通知玩家开始新游戏
         self.player.start_new_game();
@@ -281,6 +301,13 @@ class GameManager {
             std::print(prompt);
 
             var input := std::input();
+
+            // 检查 debug 命令
+            if (input == "debug") {
+                std::println("DEBUG : NUMBER IS " + lang::to_string(self.game.target_number));
+                continue;  // 继续循环，不计入猜测次数
+            }
+
             var guess := self.validator.validate_number_input(input, self.game.min_range, self.game.max_range);
 
             if (guess != -1) {

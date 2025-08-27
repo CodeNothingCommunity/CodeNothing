@@ -45,12 +45,8 @@ impl SemanticAnalyzer {
                         .map(|t| Type::from(t.clone()))
                         .unwrap_or(Type::Unknown);
 
-                    if let Err(e) = self.type_env.define_variable(name.clone(), var_type) {
-                        self.add_error(TypeError::new(
-                            format!("Global variable '{}' already defined: {}", name, e),
-                            stmt.position().clone(),
-                        ));
-                    }
+                    // Use define_global_variable for global variables to ensure they're in global scope
+                    self.type_env.define_global_variable(name.clone(), var_type);
                 }
             }
             Declaration::Enum(enum_decl) => {

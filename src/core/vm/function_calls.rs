@@ -261,6 +261,9 @@ impl VirtualMachine {
     fn execute_return(&mut self) -> VMResult<ExecutionResult> {
         // Check if we're in a function call
         if self.call_stack.depth() > 0 {
+            // Before restoring caller's context, propagate object state changes
+            self.propagate_object_state_changes()?;
+
             // Pop the call frame
             let call_frame = self.call_stack.pop().map_err(|_| {
                 VMError::RuntimeError("Call stack underflow".to_string())
@@ -307,6 +310,9 @@ impl VirtualMachine {
 
         // Check if we're in a function call
         if self.call_stack.depth() > 0 {
+            // Before restoring caller's context, propagate object state changes
+            self.propagate_object_state_changes()?;
+
             // Pop the call frame
             let call_frame = self.call_stack.pop().map_err(|_| {
                 VMError::RuntimeError("Call stack underflow".to_string())
@@ -1519,5 +1525,29 @@ impl VirtualMachine {
         // Build inheritance chain and check if parent_class is in it
         let inheritance_chain = self.build_inheritance_chain(child_class);
         inheritance_chain.contains(&parent_class.to_string())
+    }
+
+    /// Propagate object state changes from method calls back to caller's context
+    fn propagate_object_state_changes(&mut self) -> VMResult<()> {
+        // Get the current local variables (method's locals)
+        if let Some(ref locals) = self.locals {
+            // Check if local variable 0 (self) is an object
+            if let Ok(self_value) = locals.get(0) {
+                if let Value::Object(obj_map) = self_value {
+                    // Get the object ID for tracking
+                    if let Some(Value::Int(object_id)) = obj_map.get("__object_id__") {
+                        let obj_id = *object_id as usize;
+
+                        // Update the object registry with the current state
+                        self.object_registry.insert(obj_id, self_value.clone());
+
+                        if self.debug_mode {
+                            println!("🔧 VM: Propagated object state changes for object ID {}", obj_id);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }

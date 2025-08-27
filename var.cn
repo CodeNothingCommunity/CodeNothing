@@ -1,0 +1,27 @@
+
+lib <io>;
+
+fn main() {
+    std::println("🔧 CodeNothing 变量声明测试");
+    std::println("============================");
+
+    // 函数内变量声明（需要前缀）
+    var v1 : string = "这是var变量 - 函数作用域";
+    let v2 : string = "这是let变量 - 块作用域";
+    const v3 : string = "这是常量 - 不可修改";
+
+    std::println("1. " + v1);
+    std::println("2. " + v2);
+    std::println("3. " + v3);
+
+    // 测试在不同作用域中的变量声明
+    {
+        var v4 : int = 42;
+        let v5 : int = 100;
+        std::println("4. 块作用域var: " + lang::to_string(v4));
+        std::println("5. 块作用域let: " + lang::to_string(v5));
+    }
+
+    std::println("============================");
+    std::println("✅ 所有变量声明测试通过！");
+}

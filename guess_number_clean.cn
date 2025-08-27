@@ -83,6 +83,19 @@ fn to_int_safe(input: string): int {
     }
 }
 
+// 调试辅助函数 - 带目标数字参数
+fn to_int_safe_with_debug(input: string, target: int): int {
+    try {
+        if (input == "debug") {
+            lang::println("[DEBUG] 答案：" + lang::to_string(target));
+            return -999;  // 返回特殊值，不作为有效猜测
+        }
+        return lang::to_int(input);
+    } catch {
+        return -999;  // 返回特殊值表示转换失败
+    }
+}
+
 fn validate_range(value: int): int {
     if (value == -999) {
         return -1;  // 转换失败
@@ -185,8 +198,9 @@ fn play_modern_game() {
 
         var input := std::input();
 
-        // 🔍 输入验证和处理 - 使用管道操作符链
-        var guess := input |> to_int_safe |> validate_range;
+        // 🔍 输入验证和处理 - 使用管道操作符链（带调试支持）
+        var parsed_input := to_int_safe_with_debug(input, target_number);
+        var guess := parsed_input |> validate_range;
 
         if (guess == -1) {
             std::println("[!] 请输入 1-100 之间的有效数字！");

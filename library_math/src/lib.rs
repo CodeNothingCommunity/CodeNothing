@@ -628,7 +628,8 @@ mod random {
 
         unsafe {
             RNG_STATE = RNG_STATE.wrapping_mul(1103515245).wrapping_add(12345);
-            let range = (max - min) as u64;
+            // 修复：range应该是(max - min + 1)以包含max值
+            let range = (max - min + 1) as u64;
             let result = min + ((RNG_STATE % range) as i32);
             result.to_string()
         }

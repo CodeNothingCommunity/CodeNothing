@@ -240,7 +240,25 @@ impl VirtualMachine {
                     }
 
                     if let Some(value) = obj_map.get(field_name_str.as_ref()) {
-                        self.stack.push(value.clone())?;
+                        // Check if the field value is an object and get the latest version from registry
+                        let final_value = if let Value::Object(field_obj_map) = value {
+                            if let Some(Value::Int(object_id)) = field_obj_map.get("__object_id__") {
+                                let obj_id = *object_id as usize;
+                                if let Some(updated_object) = self.object_registry.get(&obj_id) {
+                                    if self.debug_mode {
+                                        println!("🔧 VM: LoadField - using updated object from registry for field '{}', ID {}", field_name_str.as_ref(), obj_id);
+                                    }
+                                    updated_object.clone()
+                                } else {
+                                    value.clone()
+                                }
+                            } else {
+                                value.clone()
+                            }
+                        } else {
+                            value.clone()
+                        };
+                        self.stack.push(final_value)?;
                     } else {
                         self.stack.push(Value::Null)?; // Field doesn't exist
                     }

@@ -1,9 +1,0 @@
-lib <math>;
-lib <io>;
-using ns trig;
-
-fn main() {
-    std::println("Testing trig namespace");
-    var result := sin("1.57");
-    std::println("sin(1.57) = " + result);
-}

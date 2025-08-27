@@ -241,14 +241,22 @@ impl CodeGenerator {
                 }
                 Declaration::Variable(stmt) => {
                     // Process global variable declaration
-                    if let Statement::VarDeclaration { name, .. } = stmt {
-                        let var_info = VariableInfo {
-                            index: self.global_count,
-                            is_global: true,
-                            var_type: Type::Unknown, // Will be determined later
-                        };
-                        self.variables.insert(name.clone(), var_info);
-                        self.global_count += 1;
+                    if let Statement::VarDeclaration { scope, name, .. } = stmt {
+                        // Only collect variables with Global scope
+                        if matches!(scope, VarScope::Global) {
+                            let var_info = VariableInfo {
+                                index: self.global_count,
+                                is_global: true,
+                                var_type: Type::Unknown, // Will be determined later
+                            };
+                            if self.debug_mode {
+                                println!("🔧 CodeGen: Collecting global variable '{}' at index {}", name, self.global_count);
+                            }
+                            self.variables.insert(name.clone(), var_info);
+                            self.global_count += 1;
+                        } else if self.debug_mode {
+                            println!("🔧 CodeGen: Skipping non-global variable '{}' with scope {:?}", name, scope);
+                        }
                     }
                 }
                 Declaration::Memo(memo) => {
@@ -302,8 +310,12 @@ impl CodeGenerator {
     fn generate_global_initializers(&mut self, declaration: &Declaration) {
         match declaration {
             Declaration::Variable(stmt) => {
-                // Generate global variable initialization
-                self.generate_statement(stmt);
+                // Generate global variable initialization only for global scope variables
+                if let Statement::VarDeclaration { scope, .. } = stmt {
+                    if matches!(scope, VarScope::Global) {
+                        self.generate_statement(stmt);
+                    }
+                }
             }
             Declaration::Namespace(ns) => {
                 // Generate namespace variable initializers
@@ -706,8 +718,8 @@ impl CodeGenerator {
                 println!("🔧 CodeGen: Switched to chunk {} for function '{}'", self.current_chunk, function.name);
             }
 
-            // Clear variables for this function scope
-            self.variables.clear();
+            // Clear only local variables, keep global variables
+            self.variables.retain(|_, var_info| var_info.is_global);
 
             // Add parameters as local variables
             for (i, param) in function.parameters.iter().enumerate() {
