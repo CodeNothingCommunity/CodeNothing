@@ -67,6 +67,26 @@ pub enum Type {
         parameters: Vec<Type>,
         return_type: Box<Type>,
     },
+
+    /// Function pointer type (fn(T1, T2) -> T3)
+    FunctionPointer {
+        parameters: Vec<Type>,
+        return_type: Box<Type>,
+    },
+
+    // Pointer and reference types
+    Reference {            // Immutable reference (&T)
+        target_type: Box<Type>,
+        lifetime: Option<String>, // Optional lifetime annotation
+    },
+    MutableReference {     // Mutable reference (&mut T)
+        target_type: Box<Type>,
+        lifetime: Option<String>, // Optional lifetime annotation
+    },
+    RawPointer {           // Raw pointer (*T)
+        target_type: Box<Type>,
+        is_mutable: bool,  // *mut T vs *const T
+    },
 }
 
 impl Type {
@@ -191,6 +211,57 @@ impl Type {
                 r1.is_compatible_with_env(r2, type_env)
             }
 
+            // FunctionPointer types match by signature compatibility
+            (Type::FunctionPointer { parameters: p1, return_type: r1 },
+             Type::FunctionPointer { parameters: p2, return_type: r2 }) => {
+                p1.len() == p2.len() &&
+                p1.iter().zip(p2.iter()).all(|(a, b)| a.is_compatible_with_env(b, type_env)) &&
+                r1.is_compatible_with_env(r2, type_env)
+            }
+
+            // FunctionPointer is compatible with Function and Lambda types
+            (Type::FunctionPointer { parameters: p1, return_type: r1 },
+             Type::Function { parameters: p2, return_type: r2 }) => {
+                p1.len() == p2.len() &&
+                p1.iter().zip(p2.iter()).all(|(a, b)| a.is_compatible_with_env(b, type_env)) &&
+                r1.is_compatible_with_env(r2, type_env)
+            }
+            (Type::Function { parameters: p1, return_type: r1 },
+             Type::FunctionPointer { parameters: p2, return_type: r2 }) => {
+                p1.len() == p2.len() &&
+                p1.iter().zip(p2.iter()).all(|(a, b)| a.is_compatible_with_env(b, type_env)) &&
+                r1.is_compatible_with_env(r2, type_env)
+            }
+            (Type::FunctionPointer { parameters: p1, return_type: r1 },
+             Type::Lambda { parameters: p2, return_type: r2 }) => {
+                p1.len() == p2.len() &&
+                p1.iter().zip(p2.iter()).all(|(a, b)| a.is_compatible_with_env(b, type_env)) &&
+                r1.is_compatible_with_env(r2, type_env)
+            }
+            (Type::Lambda { parameters: p1, return_type: r1 },
+             Type::FunctionPointer { parameters: p2, return_type: r2 }) => {
+                p1.len() == p2.len() &&
+                p1.iter().zip(p2.iter()).all(|(a, b)| a.is_compatible_with_env(b, type_env)) &&
+                r1.is_compatible_with_env(r2, type_env)
+            }
+
+            // Reference type compatibility
+            (Type::Reference { target_type: t1, .. }, Type::Reference { target_type: t2, .. }) => {
+                t1.is_compatible_with_env(t2, type_env)
+            }
+            (Type::MutableReference { target_type: t1, .. }, Type::MutableReference { target_type: t2, .. }) => {
+                t1.is_compatible_with_env(t2, type_env)
+            }
+            // Mutable reference can be used as immutable reference (coercion)
+            (Type::Reference { target_type: t1, .. }, Type::MutableReference { target_type: t2, .. }) => {
+                t1.is_compatible_with_env(t2, type_env)
+            }
+
+            // Raw pointer compatibility
+            (Type::RawPointer { target_type: t1, is_mutable: m1 }, Type::RawPointer { target_type: t2, is_mutable: m2 }) => {
+                t1.is_compatible_with_env(t2, type_env) && m1 == m2
+            }
+
             // Null is compatible with any nullable type
             (Type::Null, _) => true,
             (_, Type::Null) => true,
@@ -198,11 +269,11 @@ impl Type {
             // Unknown is compatible with anything (for inference)
             (Type::Unknown, _) => true,
             (_, Type::Unknown) => true,
-            
+
             // Numeric promotions
             (Type::Int, Type::Float(_)) => true,
             (Type::Float(_), Type::Num(_)) => true,
-            
+
             _ => false,
         }
     }
@@ -304,6 +375,10 @@ impl fmt::Display for Type {
                 let params: Vec<String> = parameters.iter().map(|p| p.to_string()).collect();
                 write!(f, "|{}| -> {}", params.join(", "), return_type)
             }
+            Type::FunctionPointer { parameters, return_type } => {
+                let params: Vec<String> = parameters.iter().map(|p| p.to_string()).collect();
+                write!(f, "fn({}) -> {}", params.join(", "), return_type)
+            }
             Type::TypeParameter(name) => write!(f, "{}", name),
             Type::ArrowFunction { parameters, return_type } => {
                 write!(f, "(")?;
@@ -316,6 +391,27 @@ impl fmt::Display for Type {
                 write!(f, ") => {}", return_type)
             }
             Type::Any => write!(f, "any"),
+            Type::Reference { target_type, lifetime } => {
+                if let Some(lifetime) = lifetime {
+                    write!(f, "&'{} {}", lifetime, target_type)
+                } else {
+                    write!(f, "&{}", target_type)
+                }
+            }
+            Type::MutableReference { target_type, lifetime } => {
+                if let Some(lifetime) = lifetime {
+                    write!(f, "&'{}mut {}", lifetime, target_type)
+                } else {
+                    write!(f, "&mut {}", target_type)
+                }
+            }
+            Type::RawPointer { target_type, is_mutable } => {
+                if *is_mutable {
+                    write!(f, "*mut {}", target_type)
+                } else {
+                    write!(f, "*const {}", target_type)
+                }
+            }
         }
     }
 }
@@ -352,7 +448,23 @@ impl From<TypeAnnotation> for Type {
                 parameters: parameters.into_iter().map(Type::from).collect(),
                 return_type: Box::new(Type::from(*return_type)),
             },
+            TypeAnnotation::FunctionPointer { parameters, return_type } => Type::FunctionPointer {
+                parameters: parameters.into_iter().map(Type::from).collect(),
+                return_type: Box::new(Type::from(*return_type)),
+            },
             TypeAnnotation::TypeParameter(name) => Type::TypeParameter(name),
+            TypeAnnotation::Reference { target_type, lifetime } => Type::Reference {
+                target_type: Box::new(Type::from(*target_type)),
+                lifetime,
+            },
+            TypeAnnotation::MutableReference { target_type, lifetime } => Type::MutableReference {
+                target_type: Box::new(Type::from(*target_type)),
+                lifetime,
+            },
+            TypeAnnotation::RawPointer { target_type, is_mutable } => Type::RawPointer {
+                target_type: Box::new(Type::from(*target_type)),
+                is_mutable,
+            },
         }
     }
 }
@@ -437,6 +549,11 @@ impl TypeEnvironment {
             }
         }
         None
+    }
+
+    /// Get variable type (alias for lookup_variable)
+    pub fn get_variable(&self, name: &str) -> Option<&Type> {
+        self.lookup_variable(name)
     }
     
     /// Define a function
@@ -727,6 +844,28 @@ impl TypeEnvironment {
                     return_type: Box::new(ret_type),
                 }
             }
+            TypeAnnotation::FunctionPointer { parameters, return_type } => {
+                let param_types: Vec<Type> = parameters.iter()
+                    .map(|p| self.resolve_type_annotation(p))
+                    .collect();
+                let ret_type = self.resolve_type_annotation(return_type);
+                Type::FunctionPointer {
+                    parameters: param_types,
+                    return_type: Box::new(ret_type),
+                }
+            }
+            TypeAnnotation::Reference { target_type, lifetime } => Type::Reference {
+                target_type: Box::new(self.resolve_type_annotation(target_type)),
+                lifetime: lifetime.clone(),
+            },
+            TypeAnnotation::MutableReference { target_type, lifetime } => Type::MutableReference {
+                target_type: Box::new(self.resolve_type_annotation(target_type)),
+                lifetime: lifetime.clone(),
+            },
+            TypeAnnotation::RawPointer { target_type, is_mutable } => Type::RawPointer {
+                target_type: Box::new(self.resolve_type_annotation(target_type)),
+                is_mutable: *is_mutable,
+            },
         }
     }
 

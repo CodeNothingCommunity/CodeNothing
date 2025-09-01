@@ -1,3 +1,5 @@
+// CodeNothing Virtual Machine ONE.
+
 //! Virtual Machine implementation for CodeNothing
 //!
 //! This module contains the core virtual machine that executes bytecode instructions

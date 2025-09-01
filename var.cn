@@ -1,7 +1,10 @@
 
 lib <io>;
 
+v6 : string = "这是全局变量 - 程序作用域";
+
 fn main() {
+
     std::println("🔧 CodeNothing 变量声明测试");
     std::println("============================");
 
@@ -21,6 +24,7 @@ fn main() {
         std::println("4. 块作用域var: " + lang::to_string(v4));
         std::println("5. 块作用域let: " + lang::to_string(v5));
     }
+    std::println("6. " + v6);
 
     std::println("============================");
     std::println("✅ 所有变量声明测试通过！");

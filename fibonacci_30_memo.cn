@@ -1,13 +1,13 @@
 using ns lang;
 
 fn main() : int {
-    // 计算斐波那契第30项
-    println("斐波那契第30项");
+    // 计算斐波那契第35项
+    println("斐波那契第35项");
     println("================================");
-    let memo_result : int = fibonacci(30);
-    println("F(30) = " + to_string(memo_result));
+    let memo_result : int = fibonacci(35);
+    println("F(35) = " + to_string(memo_result));
 
-    return memo_result; // F(30) = 832040
+    return memo_result; // F(35) = 832040
 }
 
 memo{

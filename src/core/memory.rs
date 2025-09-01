@@ -505,6 +505,19 @@ pub struct MemoryManager {
     pub globals: GlobalMemory,
     pub heap: HeapMemory,
     pub config: MemoryConfig,
+    /// Pointer tracking: address -> (value_location, reference_count)
+    pub pointer_registry: std::collections::HashMap<usize, (PointerTarget, usize)>,
+    /// Next available address for pointer allocation
+    pub next_address: usize,
+}
+
+/// Represents where a pointer points to
+#[derive(Debug, Clone)]
+pub enum PointerTarget {
+    Global(usize),    // Points to global variable at index
+    Local(usize),     // Points to local variable at index
+    Heap(usize),      // Points to heap object at index
+    Stack(usize),     // Points to stack position
 }
 
 impl MemoryManager {
@@ -519,6 +532,8 @@ impl MemoryManager {
             globals: GlobalMemory::with_config(&config),
             heap: HeapMemory::with_config(&config),
             config,
+            pointer_registry: std::collections::HashMap::new(),
+            next_address: 0x1000, // Start addresses at a reasonable offset
         }
     }
 
@@ -534,6 +549,75 @@ impl MemoryManager {
     pub fn clear(&mut self) {
         self.globals.clear();
         self.heap.clear();
+        self.pointer_registry.clear();
+        self.next_address = 0x1000;
+    }
+
+    /// Create a pointer to a global variable
+    pub fn create_global_pointer(&mut self, global_index: usize) -> Result<usize, MemoryError> {
+        let address = self.next_address;
+        self.next_address += 8; // Assume 8-byte pointers
+
+        self.pointer_registry.insert(address, (PointerTarget::Global(global_index), 1));
+        Ok(address)
+    }
+
+    /// Create a pointer to a local variable
+    pub fn create_local_pointer(&mut self, local_index: usize) -> Result<usize, MemoryError> {
+        let address = self.next_address;
+        self.next_address += 8; // Assume 8-byte pointers
+
+        self.pointer_registry.insert(address, (PointerTarget::Local(local_index), 1));
+        Ok(address)
+    }
+
+    /// Create a pointer to a heap object
+    pub fn create_heap_pointer(&mut self, heap_index: usize) -> Result<usize, MemoryError> {
+        let address = self.next_address;
+        self.next_address += 8; // Assume 8-byte pointers
+
+        self.pointer_registry.insert(address, (PointerTarget::Heap(heap_index), 1));
+        Ok(address)
+    }
+
+    /// Increment reference count for a pointer
+    pub fn increment_ref_count(&mut self, address: usize) -> Result<(), MemoryError> {
+        if let Some((target, ref_count)) = self.pointer_registry.get_mut(&address) {
+            *ref_count += 1;
+            Ok(())
+        } else {
+            Err(MemoryError::new(format!("Invalid pointer address: 0x{:x}", address)))
+        }
+    }
+
+    /// Decrement reference count for a pointer
+    pub fn decrement_ref_count(&mut self, address: usize) -> Result<(), MemoryError> {
+        if let Some((target, ref_count)) = self.pointer_registry.get_mut(&address) {
+            if *ref_count > 0 {
+                *ref_count -= 1;
+                if *ref_count == 0 {
+                    // Pointer is no longer referenced, can be cleaned up
+                    self.pointer_registry.remove(&address);
+                }
+            }
+            Ok(())
+        } else {
+            Err(MemoryError::new(format!("Invalid pointer address: 0x{:x}", address)))
+        }
+    }
+
+    /// Get the target of a pointer
+    pub fn get_pointer_target(&self, address: usize) -> Result<&PointerTarget, MemoryError> {
+        if let Some((target, _)) = self.pointer_registry.get(&address) {
+            Ok(target)
+        } else {
+            Err(MemoryError::new(format!("Invalid pointer address: 0x{:x}", address)))
+        }
+    }
+
+    /// Check if a pointer address is valid
+    pub fn is_valid_pointer(&self, address: usize) -> bool {
+        self.pointer_registry.contains_key(&address)
     }
 }
 

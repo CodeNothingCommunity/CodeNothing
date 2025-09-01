@@ -41,6 +41,24 @@ pub enum TypeAnnotation {
         parameters: Vec<TypeAnnotation>,
         return_type: Box<TypeAnnotation>,
     },
+    FunctionPointer {      // Function pointer type (fn(T1, T2) -> T3)
+        parameters: Vec<TypeAnnotation>,
+        return_type: Box<TypeAnnotation>,
+    },
+
+    // Pointer and reference types
+    Reference {            // Immutable reference (&T)
+        target_type: Box<TypeAnnotation>,
+        lifetime: Option<String>, // Optional lifetime annotation
+    },
+    MutableReference {     // Mutable reference (&mut T)
+        target_type: Box<TypeAnnotation>,
+        lifetime: Option<String>, // Optional lifetime annotation
+    },
+    RawPointer {           // Raw pointer (*T or *mut T)
+        target_type: Box<TypeAnnotation>,
+        is_mutable: bool,  // *mut T vs *const T
+    },
 }
 
 impl fmt::Display for TypeAnnotation {
@@ -78,7 +96,36 @@ impl fmt::Display for TypeAnnotation {
                 }
                 write!(f, "| -> {}", return_type)
             },
+            TypeAnnotation::FunctionPointer { parameters, return_type } => {
+                write!(f, "fn(")?;
+                for (i, param) in parameters.iter().enumerate() {
+                    if i > 0 { write!(f, ", ")?; }
+                    write!(f, "{}", param)?;
+                }
+                write!(f, ") -> {}", return_type)
+            },
             TypeAnnotation::TypeParameter(name) => write!(f, "{}", name),
+            TypeAnnotation::Reference { target_type, lifetime } => {
+                if let Some(lifetime) = lifetime {
+                    write!(f, "&'{} {}", lifetime, target_type)
+                } else {
+                    write!(f, "&{}", target_type)
+                }
+            }
+            TypeAnnotation::MutableReference { target_type, lifetime } => {
+                if let Some(lifetime) = lifetime {
+                    write!(f, "&'{}mut {}", lifetime, target_type)
+                } else {
+                    write!(f, "&mut {}", target_type)
+                }
+            }
+            TypeAnnotation::RawPointer { target_type, is_mutable } => {
+                if *is_mutable {
+                    write!(f, "*mut {}", target_type)
+                } else {
+                    write!(f, "*const {}", target_type)
+                }
+            }
         }
     }
 }
@@ -119,6 +166,17 @@ pub enum Expression {
     // Unary operations
     Unary {
         operator: UnaryOperator,
+        operand: Box<Expression>,
+        position: Position,
+    },
+
+    // Pointer operations
+    AddressOf {            // Take address (&expr)
+        operand: Box<Expression>,
+        is_mutable: bool,  // &mut expr vs &expr
+        position: Position,
+    },
+    Dereference {          // Dereference (*expr)
         operand: Box<Expression>,
         position: Position,
     },
@@ -286,6 +344,8 @@ impl Expression {
             Expression::NullCoalescing { position, .. } => position,
             Expression::When { position, .. } => position,
             Expression::ArrowFunction { position, .. } => position,
+            Expression::AddressOf { position, .. } => position,
+            Expression::Dereference { position, .. } => position,
         }
     }
 }

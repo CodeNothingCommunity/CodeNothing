@@ -194,6 +194,14 @@ impl VirtualMachine {
                 self.execute_array_length()
             }
 
+            crate::core::bytecode::OpCode::StoreThrough => {
+                self.execute_store_through()
+            }
+
+            crate::core::bytecode::OpCode::Dereference => {
+                self.execute_dereference()
+            }
+
             _ => Err(VMError::InvalidInstruction(format!("Not a memory instruction: {:?}", instruction.opcode)))
         }
     }
@@ -858,6 +866,134 @@ impl VirtualMachine {
             _ => {
                 return Err(VMError::TypeMismatch(format!("Cannot set super field of {}", object.type_name())));
             }
+        }
+
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    /// Execute store through pointer operation
+    /// Stack: [pointer, value] -> []
+    fn execute_store_through(&mut self) -> VMResult<ExecutionResult> {
+        // Pop value and pointer from stack
+        let value = self.stack.pop()?;
+        let pointer = self.stack.pop()?;
+
+        if self.debug_mode {
+            println!("🔧 VM: StoreThrough - pointer: {:?}, value: {:?}", pointer, value);
+        }
+
+        match pointer {
+            Value::Reference { address, target_type, .. } => {
+                // For now, we'll use a simple approach where the address represents
+                // the local variable index for references created by AddressOf
+                let index = address;
+
+                if target_type == "local" {
+                    // Store to local variable
+                    let locals = self.locals.as_mut()
+                        .ok_or_else(|| VMError::RuntimeError("No local variables".to_string()))?;
+                    locals.set(index, value)?;
+                } else if target_type == "global" {
+                    // Store to global variable
+                    self.memory.globals.set(index, value)
+                        .map_err(|e| VMError::RuntimeError(format!("Failed to store global variable: {}", e)))?;
+                } else {
+                    return Err(VMError::RuntimeError(format!("Unsupported reference target type: {}", target_type)));
+                }
+            }
+            Value::MutableReference { address, target_type, .. } => {
+                // Handle mutable references similarly
+                let index = address;
+
+                if target_type == "local" || target_type == "mutable_local" {
+                    // Store to local variable
+                    let locals = self.locals.as_mut()
+                        .ok_or_else(|| VMError::RuntimeError("No local variables".to_string()))?;
+                    locals.set(index, value)?;
+                } else if target_type == "global" || target_type == "mutable_global" {
+                    // Store to global variable
+                    self.memory.globals.set(index, value)
+                        .map_err(|e| VMError::RuntimeError(format!("Failed to store global variable: {}", e)))?;
+                } else {
+                    return Err(VMError::RuntimeError(format!("Unsupported mutable reference target type: {}", target_type)));
+                }
+            }
+            _ => {
+                return Err(VMError::RuntimeError(format!("Cannot store through non-reference value: {:?}", pointer)));
+            }
+        }
+
+        if self.debug_mode {
+            println!("🔧 VM: StoreThrough completed successfully");
+        }
+
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    /// Execute dereference operation
+    /// Stack: [reference] -> [value]
+    fn execute_dereference(&mut self) -> VMResult<ExecutionResult> {
+        // Pop reference from stack
+        let reference = self.stack.pop()?;
+
+        if self.debug_mode {
+            println!("🔧 VM: Dereference - reference: {:?}", reference);
+        }
+
+        match reference {
+            Value::Reference { address, target_type, .. } => {
+                // Dereference a reference to get the actual value
+                let index = address;
+
+                let value = if target_type == "local" {
+                    // Load from local variable
+                    let locals = self.locals.as_ref()
+                        .ok_or_else(|| VMError::RuntimeError("No local variables".to_string()))?;
+                    locals.get(index)
+                        .map_err(|e| VMError::RuntimeError(format!("Failed to get local variable: {}", e)))?
+                        .clone()
+                } else if target_type == "global" {
+                    // Load from global variable
+                    self.memory.globals.get(index)
+                        .map_err(|e| VMError::RuntimeError(format!("Failed to get global variable: {}", e)))?
+                        .clone()
+                } else {
+                    return Err(VMError::RuntimeError(format!("Unsupported reference target type: {}", target_type)));
+                };
+
+                self.stack.push(value)?;
+            }
+            Value::MutableReference { address, target_type, .. } => {
+                // Dereference a mutable reference to get the actual value
+                let index = address;
+
+                let value = if target_type == "local" || target_type == "mutable_local" {
+                    // Load from local variable
+                    let locals = self.locals.as_ref()
+                        .ok_or_else(|| VMError::RuntimeError("No local variables".to_string()))?;
+                    locals.get(index)
+                        .map_err(|e| VMError::RuntimeError(format!("Failed to get local variable: {}", e)))?
+                        .clone()
+                } else if target_type == "global" || target_type == "mutable_global" {
+                    // Load from global variable
+                    self.memory.globals.get(index)
+                        .map_err(|e| VMError::RuntimeError(format!("Failed to get global variable: {}", e)))?
+                        .clone()
+                } else {
+                    return Err(VMError::RuntimeError(format!("Unsupported mutable reference target type: {}", target_type)));
+                };
+
+                self.stack.push(value)?;
+            }
+            _ => {
+                return Err(VMError::RuntimeError(format!("Cannot dereference non-reference value: {:?}", reference)));
+            }
+        }
+
+        if self.debug_mode {
+            println!("🔧 VM: Dereference completed successfully");
         }
 
         self.ip += 1;

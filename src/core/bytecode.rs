@@ -134,6 +134,31 @@ pub enum OpCode {
     /// Store value to array element: array[index] = value
     StoreIndex = 0x57,
 
+    // === Pointer Operations ===
+    /// Take address of a variable (create reference)
+    /// Operand: variable_index (u16), is_mutable (u8)
+    /// Stack: [] -> [reference]
+    AddressOf = 0x58,
+
+    /// Dereference a pointer/reference
+    /// Operand: none
+    /// Stack: [pointer/reference] -> [value]
+    Dereference = 0x59,
+
+    /// Store value through pointer/reference
+    /// Operand: none
+    /// Stack: [pointer/reference, value] -> []
+    StoreThrough = 0x5A,
+
+    /// Create raw pointer from address
+    /// Operand: is_mutable (u8)
+    /// Stack: [address] -> [raw_pointer]
+    CreateRawPointer = 0x5B,
+
+    /// Get address from pointer/reference
+    /// Operand: none
+    /// Stack: [pointer/reference] -> [address]
+    GetAddress = 0x5C,
 
     // === Control Flow Operations ===
     /// Unconditional jump
@@ -176,6 +201,10 @@ pub enum OpCode {
     /// Call static method
     /// Operand: method_index (u16), arg_count (u8)
     CallStatic = 0x76,
+
+    /// Call function through function pointer
+    /// Stack: [function_pointer, arg1, arg2, ..., argN, param_count]
+    CallIndirect = 0x77,
 
     /// Return from function
     Return = 0x72,
@@ -277,6 +306,16 @@ impl OpCode {
 
             // 3 byte operands (function_index + arg_count)
             OpCode::Call | OpCode::CallMethod | OpCode::CallSuper | OpCode::CallVirtual | OpCode::CallStatic => 3,
+
+            // CallIndirect has no operands (uses stack)
+            OpCode::CallIndirect => 0,
+
+            // Pointer operations
+            OpCode::AddressOf => 3,        // variable_index (u16) + is_mutable (u8)
+            OpCode::Dereference => 1,      // no operands
+            OpCode::StoreThrough => 1,     // no operands
+            OpCode::CreateRawPointer => 2, // is_mutable (u8)
+            OpCode::GetAddress => 1,       // no operands
         }
     }
 

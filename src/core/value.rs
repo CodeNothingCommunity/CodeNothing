@@ -40,6 +40,28 @@ pub enum Value {
 
     /// Exception value
     Exception(ExceptionRef),
+
+    /// Pointer and reference types
+    /// Immutable reference (&T)
+    Reference {
+        address: usize,        // Memory address
+        target_type: String,   // Type name for type checking
+        lifetime: Option<String>, // Optional lifetime annotation
+    },
+
+    /// Mutable reference (&mut T)
+    MutableReference {
+        address: usize,        // Memory address
+        target_type: String,   // Type name for type checking
+        lifetime: Option<String>, // Optional lifetime annotation
+    },
+
+    /// Raw pointer (*T or *mut T)
+    RawPointer {
+        address: usize,        // Memory address (can be null/invalid)
+        target_type: String,   // Type name for type checking
+        is_mutable: bool,      // *mut T vs *const T
+    },
 }
 
 /// Function reference containing bytecode
@@ -111,6 +133,9 @@ impl Value {
             Value::Function(_) => true,
             Value::NativeFunction(_) => true,
             Value::Exception(_) => true, // Exceptions are always truthy
+            Value::Reference { address, .. } => *address != 0, // Non-null references are truthy
+            Value::MutableReference { address, .. } => *address != 0, // Non-null references are truthy
+            Value::RawPointer { address, .. } => *address != 0, // Non-null pointers are truthy
         }
     }
 
@@ -132,6 +157,9 @@ impl Value {
             Value::Function(_) => "function",
             Value::NativeFunction(_) => "native_function",
             Value::Exception(_) => "exception",
+            Value::Reference { .. } => "reference",
+            Value::MutableReference { .. } => "mutable_reference",
+            Value::RawPointer { .. } => "raw_pointer",
         }
     }
 
@@ -156,6 +184,19 @@ impl Value {
             Value::Function(f) => format!("function {}", f.name),
             Value::NativeFunction(f) => format!("native function {}", f.name),
             Value::Exception(e) => format!("{}: {}", e.exception_type, e.message),
+            Value::Reference { address, target_type, .. } => {
+                format!("&{} @ 0x{:x}", target_type, address)
+            }
+            Value::MutableReference { address, target_type, .. } => {
+                format!("&mut {} @ 0x{:x}", target_type, address)
+            }
+            Value::RawPointer { address, target_type, is_mutable } => {
+                if *is_mutable {
+                    format!("*mut {} @ 0x{:x}", target_type, address)
+                } else {
+                    format!("*const {} @ 0x{:x}", target_type, address)
+                }
+            }
         }
     }
 

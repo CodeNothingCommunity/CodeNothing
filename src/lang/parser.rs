@@ -428,10 +428,83 @@ impl Parser {
                     self.advance();
                     Ok(TypeAnnotation::Null)
                 }
+                TokenType::Fn => {
+                    // Function pointer type: fn(T1, T2) -> T3
+                    self.advance(); // consume 'fn'
+
+                    self.expect(TokenType::LeftParen, "Expected '(' after 'fn'")?;
+
+                    let mut parameters = Vec::new();
+
+                    if !self.check(&TokenType::RightParen) {
+                        loop {
+                            let param_type = self.parse_type_annotation()?;
+                            parameters.push(param_type);
+
+                            if !self.match_token(TokenType::Comma) {
+                                break;
+                            }
+                        }
+                    }
+
+                    self.expect(TokenType::RightParen, "Expected ')' after function parameters")?;
+                    self.expect(TokenType::Arrow, "Expected '->' after function parameters")?;
+
+                    let return_type = Box::new(self.parse_type_annotation()?);
+
+                    Ok(TypeAnnotation::FunctionPointer {
+                        parameters,
+                        return_type,
+                    })
+                }
                 TokenType::Identifier(name) => {
                     let name = name.clone();
                     self.advance();
                     Ok(TypeAnnotation::Custom(name))
+                }
+                TokenType::BitAnd => {
+                    // Reference type: &T or &mut T
+                    self.advance(); // consume &
+
+                    let is_mutable = if self.match_token(TokenType::Mut) {
+                        true
+                    } else {
+                        false
+                    };
+
+                    let target_type = Box::new(self.parse_type_annotation()?);
+
+                    if is_mutable {
+                        Ok(TypeAnnotation::MutableReference {
+                            target_type,
+                            lifetime: None, // TODO: Add lifetime parsing
+                        })
+                    } else {
+                        Ok(TypeAnnotation::Reference {
+                            target_type,
+                            lifetime: None, // TODO: Add lifetime parsing
+                        })
+                    }
+                }
+                TokenType::Multiply => {
+                    // Raw pointer type: *T or *mut T or *const T
+                    self.advance(); // consume *
+
+                    let is_mutable = if self.match_token(TokenType::Mut) {
+                        true
+                    } else if self.match_token(TokenType::ConstPtr) {
+                        false
+                    } else {
+                        // Default to const pointer
+                        false
+                    };
+
+                    let target_type = Box::new(self.parse_type_annotation()?);
+
+                    Ok(TypeAnnotation::RawPointer {
+                        target_type,
+                        is_mutable,
+                    })
                 }
                 _ => {
                     Err(ParseError::new(
@@ -737,7 +810,14 @@ impl Parser {
             TokenType::Const => VarScope::Const,
             _ => unreachable!(),
         };
-        
+
+        // Check for optional 'mut' keyword after 'let'
+        let _is_mutable = if matches!(scope, VarScope::Let) && self.match_token(TokenType::Mut) {
+            true
+        } else {
+            false
+        };
+
         let name_token = self.expect(TokenType::Identifier(String::new()), "Expected variable name")?;
         let name = if let TokenType::Identifier(n) = name_token.token_type {
             n
@@ -1468,6 +1548,32 @@ impl Parser {
                     let operand = self.parse_unary()?;
                     Ok(Expression::Unary {
                         operator: UnaryOperator::PreDecrement,
+                        operand: Box::new(operand),
+                        position,
+                    })
+                }
+                TokenType::BitAnd => {
+                    // Address-of operator: &expr or &mut expr
+                    self.advance(); // consume &
+
+                    let is_mutable = if self.match_token(TokenType::Mut) {
+                        true
+                    } else {
+                        false
+                    };
+
+                    let operand = self.parse_unary()?;
+                    Ok(Expression::AddressOf {
+                        operand: Box::new(operand),
+                        is_mutable,
+                        position,
+                    })
+                }
+                TokenType::Multiply => {
+                    // Dereference operator: *expr
+                    self.advance(); // consume *
+                    let operand = self.parse_unary()?;
+                    Ok(Expression::Dereference {
                         operand: Box::new(operand),
                         position,
                     })

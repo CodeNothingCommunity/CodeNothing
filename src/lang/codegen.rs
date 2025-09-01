@@ -399,6 +399,9 @@ impl CodeGenerator {
                             var_type,
                         };
 
+                        if self.debug_mode {
+                            println!("🔧 CodeGen: Storing namespace variable '{}' as '{}'", name, full_name);
+                        }
                         self.variables.insert(full_name, var_info);
                         self.global_count += 1;
                     }
@@ -658,9 +661,13 @@ impl CodeGenerator {
             self.current_chunk = func_info.chunk_index;
             self.current_namespace = Some(namespace.to_string());
 
-            // Reset local variable count
+            // Save current variables and reset local variable count
+            let old_variables = self.variables.clone();
             let old_local_count = self.local_count;
             self.local_count = 0;
+
+            // Clear only local variables, keep global variables
+            self.variables.retain(|_, var_info| var_info.is_global);
 
             // Add parameters as local variables
             for (i, param) in function.parameters.iter().enumerate() {
@@ -690,11 +697,7 @@ impl CodeGenerator {
             self.current_chunk = old_chunk;
             self.current_namespace = old_namespace;
             self.local_count = old_local_count;
-
-            // Remove parameters from variable map
-            for param in &function.parameters {
-                self.variables.remove(&param.name);
-            }
+            self.variables = old_variables;
         }
     }
 
@@ -786,8 +789,10 @@ impl CodeGenerator {
                     .map(|t| Type::from(t.clone()))
                     .unwrap_or(Type::Unknown);
                 
-                // Variables are global only if they have Global scope
-                let is_global = matches!(scope, VarScope::Global);
+                // Variables are global if they have Global scope OR if they are namespace-level variables
+                // (but not function-local variables inside namespace functions)
+                let is_global = matches!(scope, VarScope::Global) ||
+                    (self.current_namespace.is_some() && self.current_chunk == 0);
 
                 // Get variable info (should already exist for globals)
                 let var_info = if is_global {
@@ -1261,9 +1266,26 @@ impl CodeGenerator {
                 if self.debug_mode {
                     println!("🔧 CodeGen: Generating identifier '{}'", name);
                 }
-                if let Some(var_info) = self.variables.get(name) {
+                // Try to find variable by simple name first
+                let var_info = if let Some(var_info) = self.variables.get(name) {
                     if self.debug_mode {
-                        println!("🔧 CodeGen: Found variable '{}' at index {}", name, var_info.index);
+                        println!("🔧 CodeGen: Found variable '{}' by simple name", name);
+                    }
+                    Some(var_info)
+                } else if let Some(current_ns) = &self.current_namespace {
+                    // Try to find variable with namespace prefix
+                    let full_name = format!("{}::{}", current_ns, name);
+                    if self.debug_mode {
+                        println!("🔧 CodeGen: Trying to find variable with full name '{}'", full_name);
+                    }
+                    self.variables.get(&full_name)
+                } else {
+                    None
+                };
+
+                if let Some(var_info) = var_info {
+                    if self.debug_mode {
+                        println!("🔧 CodeGen: Found variable '{}' at index {} (is_global: {})", name, var_info.index, var_info.is_global);
                     }
                     if var_info.is_global {
                         self.emit_instruction(Instruction::with_u16(OpCode::LoadGlobal, var_info.index as u16, 0));
@@ -1271,13 +1293,42 @@ impl CodeGenerator {
                         self.emit_instruction(Instruction::with_u8(OpCode::LoadLocal, var_info.index as u8, 0));
                     }
                 } else {
-                    if self.debug_mode {
-                        println!("🔧 CodeGen: Variable '{}' not found", name);
+                    // If not found as variable, try to find as function
+                    if let Some(func_info) = self.functions.get(name).cloned() {
+                        if self.debug_mode {
+                            println!("🔧 CodeGen: Found function '{}' for function pointer", name);
+                        }
+                        // Generate function reference for function pointer assignment
+                        let const_index = self.add_constant(Value::String(name.clone().into()));
+                        self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+                    } else if let Some(current_ns) = &self.current_namespace {
+                        // Try to find function with namespace prefix
+                        let full_name = format!("{}::{}", current_ns, name);
+                        if let Some(func_info) = self.functions.get(&full_name).cloned() {
+                            if self.debug_mode {
+                                println!("🔧 CodeGen: Found namespaced function '{}' for function pointer", full_name);
+                            }
+                            // Generate function reference for function pointer assignment
+                            let const_index = self.add_constant(Value::String(full_name.into()));
+                            self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+                        } else {
+                            if self.debug_mode {
+                                println!("🔧 CodeGen: Neither variable nor function '{}' found", name);
+                            }
+                            self.errors.push(CodeGenError::new(
+                                format!("Undefined variable '{}'", name),
+                                position.clone()
+                            ));
+                        }
+                    } else {
+                        if self.debug_mode {
+                            println!("🔧 CodeGen: Neither variable nor function '{}' found", name);
+                        }
+                        self.errors.push(CodeGenError::new(
+                            format!("Undefined variable '{}'", name),
+                            position.clone()
+                        ));
                     }
-                    self.errors.push(CodeGenError::new(
-                        format!("Undefined variable '{}'", name),
-                        position.clone()
-                    ));
                 }
             }
             Expression::Binary { left, operator, right, .. } => {
@@ -1378,6 +1429,23 @@ impl CodeGenerator {
                                         }
                                     }
                                 }
+                                // Now the assigned value is still on the stack as the result of the assignment expression
+                            }
+                            Expression::Dereference { operand, .. } => {
+                                // Pointer dereference assignment: *ptr = value
+                                // Stack: [value] (right side already generated)
+                                // We need: [pointer, value] for StoreThrough
+                                // Duplicate the value first so we can return it as the assignment result
+                                self.emit_instruction(Instruction::new(OpCode::Dup, 0));
+                                // Stack: [value, value]
+
+                                self.generate_expression(operand);
+                                // Now stack is: [value, value, pointer] but we need [value, pointer, value]
+                                // Use Swap instruction to exchange the top two stack values
+                                self.emit_instruction(Instruction::new(OpCode::Swap, 0));
+                                // Now stack is: [value, pointer, value] - correct for StoreThrough
+
+                                self.emit_instruction(Instruction::new(OpCode::StoreThrough, 0));
                                 // Now the assigned value is still on the stack as the result of the assignment expression
                             }
 
@@ -1547,8 +1615,36 @@ impl CodeGenerator {
                 // Handle function call
                 match function.as_ref() {
                     Expression::Identifier(name, _) => {
-                        // First, try to find a regular function with this name
-                        if let Some(func_info) = self.functions.get(name).cloned() {
+                        // First, check if this is a function pointer variable
+                        if let Some(var_info) = self.variables.get(name) {
+                            if self.debug_mode {
+                                println!("🔧 CodeGen: Found variable '{}' for function call", name);
+                            }
+                            // This is a function pointer call
+                            // 栈布局：[arg1, arg2, ..., argN, function_pointer, param_count]
+                            // 参数已经在栈上了，现在加载函数指针
+
+                            // 加载函数指针变量
+                            if var_info.is_global {
+                                self.emit_instruction(Instruction::with_u16(OpCode::LoadGlobal, var_info.index as u16, 0));
+                            } else {
+                                self.emit_instruction(Instruction::with_u8(OpCode::LoadLocal, var_info.index as u8, 0));
+                            }
+
+                            // 推送参数计数
+                            let param_count_const = self.add_constant(Value::Int(arguments.len() as i64));
+                            self.emit_instruction(Instruction::with_u16(OpCode::Const, param_count_const, 0));
+
+                            // 调用函数指针
+                            self.emit_instruction(Instruction::new(OpCode::CallIndirect, 0));
+
+                            if self.debug_mode {
+                                println!("🔧 CodeGen: Generated CallIndirect for function pointer '{}'", name);
+                            }
+                            return; // 重要：找到函数指针变量后直接返回，不继续查找普通函数
+                        }
+                        // Then, try to find a regular function with this name
+                        else if let Some(func_info) = self.functions.get(name).cloned() {
                             if func_info.parameter_count != arguments.len() {
                                 self.errors.push(CodeGenError::new(
                                     format!("Function '{}' expects {} arguments, got {}",
@@ -2194,6 +2290,55 @@ impl CodeGenerator {
                         position.clone(),
                     ));
                 }
+            }
+            Expression::AddressOf { operand, is_mutable, position } => {
+                // Generate code for taking address of expression
+                match operand.as_ref() {
+                    Expression::Identifier(name, _) => {
+                        // Taking address of a variable
+                        if let Some(var_info) = self.variables.get(name) {
+                            // Create a reference to the variable
+                            let ref_type = if var_info.is_global {
+                                if *is_mutable { "mutable_global" } else { "global" }
+                            } else {
+                                if *is_mutable { "mutable_local" } else { "local" }
+                            };
+
+                            let reference = if *is_mutable {
+                                Value::MutableReference {
+                                    address: var_info.index,
+                                    target_type: ref_type.to_string(),
+                                    lifetime: None,
+                                }
+                            } else {
+                                Value::Reference {
+                                    address: var_info.index,
+                                    target_type: ref_type.to_string(),
+                                    lifetime: None,
+                                }
+                            };
+                            let const_index = self.add_constant(reference);
+                            self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+                        } else {
+                            self.errors.push(CodeGenError::new(
+                                format!("Variable '{}' not found for address-of operation", name),
+                                position.clone(),
+                            ));
+                        }
+                    }
+                    _ => {
+                        self.errors.push(CodeGenError::new(
+                            "Address-of operation only supported for variables".to_string(),
+                            position.clone(),
+                        ));
+                    }
+                }
+            }
+            Expression::Dereference { operand, position } => {
+                // Generate code for dereferencing expression
+                self.generate_expression(operand);
+                // Emit the dereference instruction to convert reference to value
+                self.emit_instruction(Instruction::new(OpCode::Dereference, 0));
             }
         }
     }
@@ -3045,6 +3190,23 @@ impl CodeGenerator {
                 }
                 // Now the assigned value is still on the stack as the result of the assignment expression
             }
+            Expression::Dereference { operand, .. } => {
+                // Pointer dereference assignment: *ptr = value
+                // Stack: [value] (computed value already on stack)
+                // We need: [pointer, value] for StoreThrough
+                // Duplicate the value first so we can return it as the assignment result
+                self.emit_instruction(Instruction::new(OpCode::Dup, 0));
+                // Stack: [value, value]
+
+                self.generate_expression(operand);
+                // Now stack is: [value, value, pointer] but we need [value, pointer, value]
+                // Use Swap instruction to exchange the top two stack values
+                self.emit_instruction(Instruction::new(OpCode::Swap, 0));
+                // Now stack is: [value, pointer, value] - correct for StoreThrough
+
+                self.emit_instruction(Instruction::new(OpCode::StoreThrough, 0));
+                // Now the assigned value is still on the stack as the result of the assignment expression
+            }
             _ => {
                 // Other assignment types not yet supported
                 self.errors.push(CodeGenError::new(
@@ -3097,6 +3259,18 @@ impl CodeGenerator {
                         }
                     }
                 }
+            }
+            Expression::Dereference { operand, .. } => {
+                // Pointer dereference assignment: *ptr = value
+                // Stack: [value] (computed value already on stack)
+                // We need: [pointer, value] for StoreThrough
+                self.generate_expression(operand);
+                // Now stack is: [value, pointer] but we need [pointer, value]
+                // Use Swap instruction to exchange the top two stack values
+                self.emit_instruction(Instruction::new(OpCode::Swap, 0));
+                // Now stack is: [pointer, value] - correct for StoreThrough
+
+                self.emit_instruction(Instruction::new(OpCode::StoreThrough, 0));
             }
             _ => {
                 // Other assignment types not yet supported

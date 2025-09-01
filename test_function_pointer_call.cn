@@ -1,0 +1,37 @@
+// 测试函数指针调用功能
+// Test Function Pointer Call
+
+fn add(a: int, b: int) : int {
+    return a + b;
+}
+
+fn multiply(x: int, y: int) : int {
+    return x * y;
+}
+
+fn get_constant() : int {
+    return 42;
+}
+
+fn main() : int {
+    // 测试函数指针变量声明和赋值
+    let func_ptr: fn(int, int) -> int = add;
+
+    // 测试函数指针调用
+    let result1 = func_ptr(5, 3);
+
+    // 测试函数指针重新分配和调用
+    func_ptr = multiply;
+    let result2 = func_ptr(4, 6);
+
+    // 测试无参数函数指针调用
+    let no_param_func: fn() -> int = get_constant;
+    let result3 = no_param_func();
+
+    // 验证结果（通过返回值验证）
+    // result1 应该是 8 (5 + 3)
+    // result2 应该是 24 (4 * 6)
+    // result3 应该是 42
+    lang::println(result1 + result2 + result3);
+    return result1 + result2 + result3; // 应该返回 74
+}

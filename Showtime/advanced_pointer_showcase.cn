@@ -1,0 +1,353 @@
+// Advanced Pointer Operations Showcase
+// Demonstrates sophisticated pointer usage patterns in CodeNothing
+
+// Linked list implementation using pointers
+struct Node {
+    data: int,
+    next: *mut Node,
+}
+
+struct LinkedList {
+    head: *mut Node,
+    size: int,
+}
+
+impl LinkedList {
+    fn new() -> LinkedList {
+        return LinkedList {
+            head: null as *mut Node,
+            size: 0,
+        };
+    }
+    
+    fn push(&mut self, value: int) {
+        var new_node : *mut Node = allocate_node(value);
+        (*new_node).next = self.head;
+        self.head = new_node;
+        self.size += 1;
+    }
+    
+    fn pop(&mut self) -> int {
+        if (self.head == null) {
+            throw "Cannot pop from empty list";
+        }
+        
+        var old_head : *mut Node = self.head;
+        var value : int = (*old_head).data;
+        self.head = (*old_head).next;
+        deallocate_node(old_head);
+        self.size -= 1;
+        return value;
+    }
+    
+    fn get(&self, index: int) -> &int {
+        if (index < 0 || index >= self.size) {
+            throw "Index out of bounds";
+        }
+        
+        var current : *const Node = self.head as *const Node;
+        var i : int = 0;
+        
+        while (i < index) {
+            current = (*current).next as *const Node;
+            i += 1;
+        }
+        
+        return &(*current).data;
+    }
+    
+    fn set(&mut self, index: int, value: int) {
+        if (index < 0 || index >= self.size) {
+            throw "Index out of bounds";
+        }
+        
+        var current : *mut Node = self.head;
+        var i : int = 0;
+        
+        while (i < index) {
+            current = (*current).next;
+            i += 1;
+        }
+        
+        (*current).data = value;
+    }
+    
+    fn print(&self) {
+        print("LinkedList [");
+        var current : *const Node = self.head as *const Node;
+        var first : bool = true;
+        
+        while (current != null) {
+            if (!first) {
+                print(", ");
+            }
+            print((*current).data);
+            current = (*current).next as *const Node;
+            first = false;
+        }
+        println("]");
+    }
+}
+
+// Memory management functions (simplified)
+fn allocate_node(data: int) -> *mut Node {
+    // In a real implementation, this would allocate memory
+    // For now, we'll simulate it
+    var node : Node = Node {
+        data: data,
+        next: null as *mut Node,
+    };
+    return &mut node as *mut Node;
+}
+
+fn deallocate_node(node: *mut Node) {
+    // In a real implementation, this would free memory
+    // For now, we'll just mark it as null
+    node = null as *mut Node;
+}
+
+// Smart pointer implementation
+struct SmartPtr<T> {
+    ptr: *mut T,
+    ref_count: *mut int,
+}
+
+impl<T> SmartPtr<T> {
+    fn new(value: T) -> SmartPtr<T> {
+        var ptr : *mut T = allocate<T>(value);
+        var ref_count : *mut int = allocate<int>(1);
+        
+        return SmartPtr<T> {
+            ptr: ptr,
+            ref_count: ref_count,
+        };
+    }
+    
+    fn clone(&self) -> SmartPtr<T> {
+        *self.ref_count += 1;
+        return SmartPtr<T> {
+            ptr: self.ptr,
+            ref_count: self.ref_count,
+        };
+    }
+    
+    fn get(&self) -> &T {
+        return &(*self.ptr);
+    }
+    
+    fn get_mut(&mut self) -> &mut T {
+        if (*self.ref_count > 1) {
+            throw "Cannot get mutable reference when multiple references exist";
+        }
+        return &mut (*self.ptr);
+    }
+    
+    fn drop(&mut self) {
+        *self.ref_count -= 1;
+        if (*self.ref_count == 0) {
+            deallocate<T>(self.ptr);
+            deallocate<int>(self.ref_count);
+        }
+    }
+}
+
+// Generic allocation functions
+fn allocate<T>(value: T) -> *mut T {
+    // Simplified allocation
+    return &mut value as *mut T;
+}
+
+fn deallocate<T>(ptr: *mut T) {
+    // Simplified deallocation
+    ptr = null as *mut T;
+}
+
+// Binary tree implementation with pointers
+struct TreeNode {
+    value: int,
+    left: *mut TreeNode,
+    right: *mut TreeNode,
+}
+
+struct BinaryTree {
+    root: *mut TreeNode,
+}
+
+impl BinaryTree {
+    fn new() -> BinaryTree {
+        return BinaryTree {
+            root: null as *mut TreeNode,
+        };
+    }
+    
+    fn insert(&mut self, value: int) {
+        self.root = self.insert_recursive(self.root, value);
+    }
+    
+    fn insert_recursive(&self, node: *mut TreeNode, value: int) -> *mut TreeNode {
+        if (node == null) {
+            var new_node : TreeNode = TreeNode {
+                value: value,
+                left: null as *mut TreeNode,
+                right: null as *mut TreeNode,
+            };
+            return &mut new_node as *mut TreeNode;
+        }
+        
+        if (value < (*node).value) {
+            (*node).left = self.insert_recursive((*node).left, value);
+        } else if (value > (*node).value) {
+            (*node).right = self.insert_recursive((*node).right, value);
+        }
+        
+        return node;
+    }
+    
+    fn search(&self, value: int) -> bool {
+        return self.search_recursive(self.root, value);
+    }
+    
+    fn search_recursive(&self, node: *const TreeNode, value: int) -> bool {
+        if (node == null) {
+            return false;
+        }
+        
+        if ((*node).value == value) {
+            return true;
+        } else if (value < (*node).value) {
+            return self.search_recursive((*node).left as *const TreeNode, value);
+        } else {
+            return self.search_recursive((*node).right as *const TreeNode, value);
+        }
+    }
+    
+    fn inorder_print(&self) {
+        print("Tree (inorder): ");
+        self.inorder_recursive(self.root as *const TreeNode);
+        println("");
+    }
+    
+    fn inorder_recursive(&self, node: *const TreeNode) {
+        if (node != null) {
+            self.inorder_recursive((*node).left as *const TreeNode);
+            print((*node).value);
+            print(" ");
+            self.inorder_recursive((*node).right as *const TreeNode);
+        }
+    }
+}
+
+// Pointer-based string manipulation
+fn reverse_string_in_place(str_ptr: &mut string) {
+    var len : int = str_ptr.length();
+    var chars : *mut char = str_ptr.as_mut_ptr();
+    
+    var i : int = 0;
+    var j : int = len - 1;
+    
+    while (i < j) {
+        var temp : char = *(chars + i);
+        *(chars + i) = *(chars + j);
+        *(chars + j) = temp;
+        i += 1;
+        j -= 1;
+    }
+}
+
+// Memory pool implementation
+struct MemoryPool {
+    pool: *mut char,
+    size: int,
+    used: int,
+}
+
+impl MemoryPool {
+    fn new(size: int) -> MemoryPool {
+        var pool : *mut char = allocate_bytes(size);
+        return MemoryPool {
+            pool: pool,
+            size: size,
+            used: 0,
+        };
+    }
+    
+    fn allocate(&mut self, bytes: int) -> *mut char {
+        if (self.used + bytes > self.size) {
+            throw "Memory pool exhausted";
+        }
+        
+        var ptr : *mut char = self.pool + self.used;
+        self.used += bytes;
+        return ptr;
+    }
+    
+    fn reset(&mut self) {
+        self.used = 0;
+    }
+    
+    fn usage(&self) -> float {
+        return (self.used as float) / (self.size as float) * 100.0;
+    }
+}
+
+fn allocate_bytes(size: int) -> *mut char {
+    // Simplified byte allocation
+    var dummy : char = 0 as char;
+    return &mut dummy as *mut char;
+}
+
+fn main() {
+    println("=== Advanced Pointer Operations Showcase ===");
+    
+    // Test linked list
+    println("\n1. Linked List with Pointers:");
+    var list : LinkedList = LinkedList::new();
+    list.push(10);
+    list.push(20);
+    list.push(30);
+    list.print();
+    
+    var value : int = list.pop();
+    println("Popped: " + value);
+    list.print();
+    
+    // Test smart pointers
+    println("\n2. Smart Pointer Reference Counting:");
+    var smart1 : SmartPtr<int> = SmartPtr::new(42);
+    var smart2 : SmartPtr<int> = smart1.clone();
+    println("Smart pointer value: " + *smart1.get());
+    
+    // Test binary tree
+    println("\n3. Binary Tree with Pointers:");
+    var tree : BinaryTree = BinaryTree::new();
+    tree.insert(50);
+    tree.insert(30);
+    tree.insert(70);
+    tree.insert(20);
+    tree.insert(40);
+    tree.insert(60);
+    tree.insert(80);
+    tree.inorder_print();
+    
+    println("Search 40: " + tree.search(40));
+    println("Search 90: " + tree.search(90));
+    
+    // Test string manipulation
+    println("\n4. Pointer-based String Manipulation:");
+    var text : string = "Hello World";
+    println("Original: " + text);
+    reverse_string_in_place(&mut text);
+    println("Reversed: " + text);
+    
+    // Test memory pool
+    println("\n5. Memory Pool Management:");
+    var pool : MemoryPool = MemoryPool::new(1024);
+    var ptr1 : *mut char = pool.allocate(100);
+    var ptr2 : *mut char = pool.allocate(200);
+    println("Memory usage: " + pool.usage() + "%");
+    
+    pool.reset();
+    println("After reset: " + pool.usage() + "%");
+    
+    println("\n=== Showcase Complete ===");
+}

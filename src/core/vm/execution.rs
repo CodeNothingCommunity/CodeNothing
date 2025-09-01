@@ -232,7 +232,8 @@ impl VirtualMachine {
             OpCode::LoadLocal | OpCode::StoreLocal | OpCode::LoadGlobal | OpCode::StoreGlobal |
             OpCode::CreateArray | OpCode::CreateObject | OpCode::LoadField | OpCode::StoreField |
             OpCode::LoadIndex | OpCode::StoreIndex | OpCode::NewObject | OpCode::NewArray |
-            OpCode::ArrayLength | OpCode::SuperFieldLoad | OpCode::SuperFieldStore => {
+            OpCode::ArrayLength | OpCode::SuperFieldLoad | OpCode::SuperFieldStore | OpCode::StoreThrough |
+            OpCode::Dereference => {
                 self.execute_memory_instruction(instruction)
             }
 
@@ -245,7 +246,7 @@ impl VirtualMachine {
 
             // Function operations
             OpCode::Call | OpCode::Return | OpCode::ReturnValue | OpCode::CallMethod
-            | OpCode::CallSuper | OpCode::CallVirtual | OpCode::CallStatic => {
+            | OpCode::CallSuper | OpCode::CallVirtual | OpCode::CallStatic | OpCode::CallIndirect => {
                 self.execute_function_instruction(instruction)
             }
 

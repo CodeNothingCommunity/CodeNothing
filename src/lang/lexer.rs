@@ -83,6 +83,10 @@ pub enum TokenType {
     Array,      // array
     Obj,        // obj
     Auto,       // auto
+
+    // Pointer keywords
+    Mut,        // mut (for &mut references)
+    ConstPtr,   // const (for *const pointers)
     
     // Operators
     Plus,       // +
@@ -484,6 +488,8 @@ impl Lexer {
             "obj" => TokenType::Obj,
             "auto" => TokenType::Auto,
             "null" => TokenType::Null,
+            "mut" => TokenType::Mut,
+            "const" => TokenType::ConstPtr,
             _ => TokenType::Identifier(identifier.to_string()),
         }
     }

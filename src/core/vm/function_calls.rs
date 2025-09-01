@@ -92,6 +92,10 @@ impl VirtualMachine {
                 self.execute_call_static(instruction)
             }
 
+            OpCode::CallIndirect => {
+                self.execute_call_indirect()
+            }
+
             _ => Err(VMError::InvalidInstruction(format!("Not a function instruction: {:?}", instruction.opcode)))
         }
     }
@@ -897,16 +901,18 @@ impl VirtualMachine {
             // Parameters are popped in reverse order: [self, param_n-1, ..., param_1, param_0]
             // We need to map them to local variables: [self, param_0, param_1, ..., param_n-1]
 
+            // Handle parameter setting based on whether we have parameters
+            if param_count > 0 {
+                // Set self (always at local index 0) - object is the last item popped
+                local_memory.set(0, params[param_count - 1].clone()).map_err(|e| VMError::RuntimeError(e.to_string()))?;
 
-
-            // Set self (always at local index 0) - object is the last item popped
-            local_memory.set(0, params[param_count - 1].clone()).map_err(|e| VMError::RuntimeError(e.to_string()))?;
-
-            // Set other parameters in correct order
-            for i in 1..param_count {
-                let param_index = param_count - 1 - i; // Reverse the order to get correct parameter mapping
-                local_memory.set(i, params[param_index].clone()).map_err(|e| VMError::RuntimeError(e.to_string()))?;
+                // Set other parameters in correct order
+                for i in 1..param_count {
+                    let param_index = param_count - 1 - i; // Reverse the order to get correct parameter mapping
+                    local_memory.set(i, params[param_index].clone()).map_err(|e| VMError::RuntimeError(e.to_string()))?;
+                }
             }
+            // For functions with no parameters, we don't need to set any local variables from parameters
 
             if self.debug_mode {
                 println!("🔧 VM: Parameters set successfully");
@@ -969,6 +975,89 @@ impl VirtualMachine {
         } else {
             return Err(VMError::TypeMismatch("Method name must be a string".to_string()));
         }
+    }
+
+    /// Execute function pointer call (CallIndirect)
+    fn execute_call_indirect(&mut self) -> VMResult<ExecutionResult> {
+        // 实际的栈布局：[arg1, arg2, ..., argN, function_pointer, param_count]
+
+        // Get parameter count from the top of the stack
+        let param_count_value = self.stack.pop()?;
+        let param_count = match param_count_value {
+            Value::Int(n) => n as usize,
+            _ => return Err(VMError::TypeMismatch("Parameter count must be an integer".to_string())),
+        };
+
+        if self.debug_mode {
+            println!("🔧 VM: CallIndirect with {} parameters", param_count);
+        }
+
+        // Get function pointer from the top of the stack (it's now at the top after popping param_count)
+        if self.stack.len() < param_count + 1 {
+            return Err(VMError::StackUnderflow);
+        }
+
+        // Pop the function pointer from the top of the stack
+        let function_pointer = self.stack.pop()?;
+
+        if self.debug_mode {
+            println!("🔧 VM: Function pointer value: {:?}", function_pointer);
+            println!("🔧 VM: Stack size: {}, param_count: {}", self.stack.len(), param_count);
+            println!("🔧 VM: Stack contents after popping function pointer:");
+            for (i, val) in self.stack.values().iter().enumerate() {
+                println!("  [{}]: {:?}", i, val);
+            }
+        }
+
+        // Extract function name from the function pointer
+        let function_name = match function_pointer {
+            Value::String(name) => name.to_string(),
+            _ => {
+                println!("❌ VM: Expected String, got {:?}", function_pointer);
+                return Err(VMError::TypeMismatch("Function pointer must be a string".to_string()));
+            }
+        };
+
+        // Look up the function by name in chunks
+        let mut function_index = None;
+        for (i, chunk) in self.chunks.iter().enumerate() {
+            if chunk.name == function_name {
+                function_index = Some(i);
+                break;
+            }
+        }
+
+        let function_index = match function_index {
+            Some(index) => index,
+            None => return Err(VMError::RuntimeError(format!("Function '{}' not found", function_name))),
+        };
+
+        if self.debug_mode {
+            println!("🔧 VM: CallIndirect resolved '{}' to function index {}", function_name, function_index);
+        }
+
+        // 现在栈上只有参数：[arg1, arg2, ..., argN]
+        // 这正是我们调用函数所需要的布局
+
+        // Check and potentially compile with JIT
+        self.check_jit_compilation(function_index);
+
+        // Create an instruction with the correct parameter count for the function call
+        // Call instruction format: function_index (u16), arg_count (u8)
+        let function_index_bytes = (function_index as u16).to_le_bytes();
+        let mut operands = Vec::new();
+        operands.extend_from_slice(&function_index_bytes);  // function_index (u16)
+        operands.push(param_count as u8);                   // arg_count (u8)
+
+        let call_instruction = crate::core::bytecode::Instruction {
+            opcode: crate::core::bytecode::OpCode::Call,
+            operands,
+            line: 0,
+        };
+
+        // Call the function with the correct parameter count
+        self.call_function_by_index_with_method_name(function_index, "", &call_instruction)?;
+        Ok(ExecutionResult::Continue)
     }
 
     /// Execute static method call instruction

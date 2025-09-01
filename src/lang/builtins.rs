@@ -304,6 +304,19 @@ fn value_to_string(value: &Value) -> String {
         Value::Function(_) => "<function>".to_string(),
         Value::NativeFunction(_) => "<native function>".to_string(),
         Value::Exception(e) => format!("{}: {}", e.exception_type, e.message),
+        Value::Reference { address, target_type, .. } => {
+            format!("&{} @ 0x{:x}", target_type, address)
+        }
+        Value::MutableReference { address, target_type, .. } => {
+            format!("&mut {} @ 0x{:x}", target_type, address)
+        }
+        Value::RawPointer { address, target_type, is_mutable } => {
+            if *is_mutable {
+                format!("*mut {} @ 0x{:x}", target_type, address)
+            } else {
+                format!("*const {} @ 0x{:x}", target_type, address)
+            }
+        }
     }
 }
 
@@ -320,6 +333,9 @@ fn value_type_name(value: &Value) -> &'static str {
         Value::Function(_) => "function",
         Value::NativeFunction(_) => "native_function",
         Value::Exception(_) => "exception",
+        Value::Reference { .. } => "reference",
+        Value::MutableReference { .. } => "mutable_reference",
+        Value::RawPointer { .. } => "raw_pointer",
     }
 }
 

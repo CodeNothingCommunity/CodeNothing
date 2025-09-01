@@ -927,6 +927,60 @@ impl SemanticAnalyzer {
                     return Type::Unknown;
                 }
             }
+            Expression::AddressOf { operand, is_mutable, position } => {
+                // Analyze address-of expression (&expr or &mut expr)
+                let operand_type = self.analyze_expression(operand);
+
+                // Check if operand is addressable (lvalue)
+                if !self.is_lvalue(operand) {
+                    self.add_error(TypeError::new(
+                        "Cannot take address of non-lvalue expression".to_string(),
+                        position.clone()
+                    ));
+                    return Type::Unknown;
+                }
+
+                // Check mutability constraints
+                if *is_mutable && !self.is_mutable_lvalue(operand) {
+                    self.add_error(TypeError::new(
+                        "Cannot create mutable reference to immutable value".to_string(),
+                        position.clone()
+                    ));
+                    return Type::Unknown;
+                }
+
+                if *is_mutable {
+                    Type::MutableReference {
+                        target_type: Box::new(operand_type),
+                        lifetime: None, // TODO: Implement lifetime analysis
+                    }
+                } else {
+                    Type::Reference {
+                        target_type: Box::new(operand_type),
+                        lifetime: None, // TODO: Implement lifetime analysis
+                    }
+                }
+            }
+            Expression::Dereference { operand, position } => {
+                // Analyze dereference expression (*expr)
+                let operand_type = self.analyze_expression(operand);
+
+                match operand_type {
+                    Type::Reference { target_type, .. } => *target_type,
+                    Type::MutableReference { target_type, .. } => *target_type,
+                    Type::RawPointer { target_type, .. } => {
+                        // Raw pointer dereference is unsafe but allowed
+                        *target_type
+                    }
+                    _ => {
+                        self.add_error(TypeError::new(
+                            format!("Cannot dereference non-pointer type: {}", operand_type),
+                            position.clone()
+                        ));
+                        Type::Unknown
+                    }
+                }
+            }
         }
     }
 
@@ -983,6 +1037,68 @@ impl SemanticAnalyzer {
                         }
                     }
                 } else {
+                    // Check if this is a function pointer variable
+                    if let Some(var_type) = self.type_env.lookup_variable(name).cloned() {
+                        match var_type {
+                            Type::FunctionPointer { parameters, return_type } => {
+                                // This is a function pointer call
+                                if arguments.len() != parameters.len() {
+                                    self.add_error(TypeError::new(
+                                        format!("Function pointer '{}' expects {} arguments, got {}",
+                                               name, parameters.len(), arguments.len()),
+                                        position.clone(),
+                                    ));
+                                    return Type::Unknown;
+                                }
+
+                                for (i, (arg, expected_type)) in arguments.iter().zip(parameters.iter()).enumerate() {
+                                    let arg_type = self.analyze_expression(arg);
+                                    if !self.inference.can_unify_with_env(&arg_type, expected_type, Some(&self.type_env)) {
+                                        self.add_error(TypeError::new(
+                                            format!("Argument {} to function pointer '{}': expected '{}', got '{}'",
+                                                   i + 1, name, expected_type, arg_type),
+                                            arg.position().clone(),
+                                        ));
+                                    }
+                                }
+
+                                return *return_type;
+                            }
+                            Type::Function { parameters, return_type } => {
+                                // This is a function variable (lambda/closure)
+                                if arguments.len() != parameters.len() {
+                                    self.add_error(TypeError::new(
+                                        format!("Function variable '{}' expects {} arguments, got {}",
+                                               name, parameters.len(), arguments.len()),
+                                        position.clone(),
+                                    ));
+                                    return Type::Unknown;
+                                }
+
+                                for (i, (arg, expected_type)) in arguments.iter().zip(parameters.iter()).enumerate() {
+                                    let arg_type = self.analyze_expression(arg);
+                                    if !self.inference.can_unify_with_env(&arg_type, expected_type, Some(&self.type_env)) {
+                                        self.add_error(TypeError::new(
+                                            format!("Argument {} to function variable '{}': expected '{}', got '{}'",
+                                                   i + 1, name, expected_type, arg_type),
+                                            arg.position().clone(),
+                                        ));
+                                    }
+                                }
+
+                                return *return_type;
+                            }
+                            _ => {
+                                // Variable exists but is not callable
+                                self.add_error(TypeError::new(
+                                    format!("'{}' is not a function or function pointer", name),
+                                    position.clone(),
+                                ));
+                                return Type::Unknown;
+                            }
+                        }
+                    }
+
                     // Check if this is a class constructor call
                     if let Some(class_type) = self.type_env.get_type(name).cloned() {
                         if let Type::Class { .. } = &class_type {
@@ -1257,5 +1373,45 @@ impl SemanticAnalyzer {
             }
         }
         None
+    }
+
+    /// Check if an expression is an lvalue (can be assigned to)
+    fn is_lvalue(&self, expr: &Expression) -> bool {
+        match expr {
+            Expression::Identifier(_, _) => true,
+            Expression::FieldAccess { .. } => true,
+            Expression::ArrayAccess { .. } => true,
+            Expression::Dereference { .. } => true,
+            _ => false,
+        }
+    }
+
+    /// Check if an expression is a mutable lvalue
+    fn is_mutable_lvalue(&mut self, expr: &Expression) -> bool {
+        match expr {
+            Expression::Identifier(name, _) => {
+                // Check if variable is mutable
+                if let Some(_var_type) = self.type_env.get_variable(name) {
+                    // TODO: Track mutability in variable declarations
+                    true // For now, assume all variables are mutable
+                } else {
+                    false
+                }
+            }
+            Expression::FieldAccess { object, .. } => {
+                // Field is mutable if object is mutable
+                self.is_mutable_lvalue(object)
+            }
+            Expression::ArrayAccess { array, .. } => {
+                // Array element is mutable if array is mutable
+                self.is_mutable_lvalue(array)
+            }
+            Expression::Dereference { operand, .. } => {
+                // Dereferenced value is mutable if pointer is mutable reference
+                let operand_type = self.analyze_expression(operand);
+                matches!(operand_type, Type::MutableReference { .. } | Type::RawPointer { is_mutable: true, .. })
+            }
+            _ => false,
+        }
     }
 }

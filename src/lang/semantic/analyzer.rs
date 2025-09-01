@@ -190,7 +190,29 @@ impl SemanticAnalyzer {
                     return_type: resolved_return,
                 }
             }
+            TypeAnnotation::FunctionPointer { parameters, return_type } => {
+                let resolved_params: Vec<Type> = parameters.iter()
+                    .map(|p| self.resolve_type_annotation(p))
+                    .collect();
+                let resolved_return = Box::new(self.resolve_type_annotation(return_type));
+                Type::FunctionPointer {
+                    parameters: resolved_params,
+                    return_type: resolved_return,
+                }
+            }
             TypeAnnotation::TypeParameter(name) => Type::TypeParameter(name.clone()),
+            TypeAnnotation::Reference { target_type, lifetime } => Type::Reference {
+                target_type: Box::new(self.resolve_type_annotation(target_type)),
+                lifetime: lifetime.clone(),
+            },
+            TypeAnnotation::MutableReference { target_type, lifetime } => Type::MutableReference {
+                target_type: Box::new(self.resolve_type_annotation(target_type)),
+                lifetime: lifetime.clone(),
+            },
+            TypeAnnotation::RawPointer { target_type, is_mutable } => Type::RawPointer {
+                target_type: Box::new(self.resolve_type_annotation(target_type)),
+                is_mutable: *is_mutable,
+            },
         }
     }
 }
