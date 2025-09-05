@@ -192,13 +192,96 @@ impl Compiler {
         if self.options.verbose {
             messages.push("4. Code generation...".to_string());
         }
-        
-        // Code generation
-        let mut generator = CodeGenerator::new();
-        generator.set_debug_mode(self.options.verbose);
-        generator.generate_program(&ast);
 
+        println!("🔧 Compiler: Entering code generation phase");
+
+        // Use catch_unwind to capture any panics during code generation
+        let code_gen_result = std::panic::catch_unwind(|| {
+            println!("🔧 Compiler: About to create code generator");
+
+            // Code generation
+            let mut generator = CodeGenerator::new();
+            println!("🔧 Compiler: Code generator created successfully");
+
+            generator.set_debug_mode(self.options.verbose);
+            println!("🔧 Compiler: Debug mode set");
+
+            generator.set_type_environment(analyzer.get_type_environment().clone());
+            println!("🔧 Compiler: Type environment set");
+
+            // Debug: Check external modules (always show for debugging)
+            let external_modules = analyzer.get_external_modules();
+            println!("🔧 Compiler: Found {} external modules (verbose={})", external_modules.len(), self.options.verbose);
+            for (module_path, external_program) in external_modules {
+                println!("🔧 Compiler: External module '{}' has {} declarations", module_path, external_program.declarations.len());
+            }
+
+            generator
+        });
+
+        let mut generator = match code_gen_result {
+            Ok(gen) => {
+                println!("🔧 Compiler: Code generation setup completed successfully");
+                gen
+            },
+            Err(e) => {
+                println!("🔧 Compiler: PANIC during code generation setup: {:?}", e);
+                messages.push("Error: Code generation setup failed due to panic".to_string());
+                return CompileResult {
+                    output_file: output_path,
+                    success: false,
+                    messages,
+                    bytecode: None,
+                };
+            }
+        };
+        println!("🔧 Compiler: Code generator created successfully");
+
+        generator.set_debug_mode(self.options.verbose);
+        println!("🔧 Compiler: Debug mode set");
+
+        generator.set_type_environment(analyzer.get_type_environment().clone());
+        println!("🔧 Compiler: Type environment set");
+
+        // Debug: Check external modules (always show for debugging)
+        let external_modules = analyzer.get_external_modules();
+        println!("🔧 Compiler: Found {} external modules (verbose={})", external_modules.len(), self.options.verbose);
+        for (module_path, external_program) in external_modules {
+            println!("🔧 Compiler: External module '{}' has {} declarations", module_path, external_program.declarations.len());
+        }
+
+        // First, collect and compile all external module functions
+        for (module_path, external_program) in analyzer.get_external_modules() {
+            if self.options.verbose {
+                println!("🔧 Compiler: Collecting functions from external module: {}", module_path);
+            }
+            // First pass: collect all functions from external module
+            generator.collect_functions(external_program);
+        }
+
+        // Collect functions from main program
+        if self.options.verbose {
+            println!("🔧 Compiler: Collecting functions from main program");
+        }
+        generator.collect_functions(&ast);
+
+        // Second pass: generate code for all external modules
+        for (module_path, external_program) in analyzer.get_external_modules() {
+            if self.options.verbose {
+                println!("🔧 Compiler: Generating code for external module: {}", module_path);
+            }
+            let _ = generator.generate_program(external_program);
+        }
+
+        // Generate code for main program
+        if self.options.verbose {
+            println!("🔧 Compiler: Generating code for main program");
+        }
+        let _ = generator.generate_program(&ast);
+
+        println!("🔧 Compiler: Checking for code generation errors...");
         if !generator.get_errors().is_empty() {
+            println!("🔧 Compiler: Found {} code generation errors", generator.get_errors().len());
             messages.push("Code generation errors:".to_string());
             for error in generator.get_errors() {
                 messages.push(format!("  {}", error));
@@ -210,6 +293,7 @@ impl Compiler {
                 bytecode: None,
             };
         }
+        println!("🔧 Compiler: No code generation errors found");
         
         if self.options.verbose {
             messages.push(format!("   Generated {} chunks", generator.get_chunks().len()));

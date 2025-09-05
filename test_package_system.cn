@@ -1,0 +1,162 @@
+// 测试 Package 系统功能
+// Test Package System Implementation
+
+// 定义一个包含多种元素的包
+package banking {
+    // 包级变量 (package-level variables)
+    var package_secret_key: int = 12345;
+    var public_bank_name: string = "CodeNothing Bank";
+    
+    // 包级函数 (package-level functions)
+    fn encrypt_data(data: int): int {
+        return data + package_secret_key;
+    }
+    
+    public fn get_bank_name(): string {
+        return public_bank_name;
+    }
+    
+    private fn internal_audit(): int {
+        return encrypt_data(100);
+    }
+    
+    // 包内命名空间 (namespace within package)
+    ns security {
+        var security_level: int = 5;
+        
+        public fn check_security(): int {
+            return security_level;
+        }
+        
+        fn validate_transaction(amount: int): bool {
+            return amount > 0 && amount < 10000;
+        }
+    }
+    
+    // 包内类 (class within package)
+    class Account {
+        public balance: int;
+        private account_id: int;
+        
+        Account(initial_balance: int) {
+            self.balance = initial_balance;
+            self.account_id = 1001;
+        }
+        
+        public fn deposit(amount: int): int {
+            if (security::validate_transaction(amount)) {
+                self.balance = self.balance + amount;
+            }
+            return self.balance;
+        }
+        
+        public fn get_balance(): int {
+            return self.balance;
+        }
+        
+        fn get_account_id(): int {
+            return self.account_id;
+        }
+    }
+    
+    // 包内枚举 (enum within package)
+    enum TransactionType {
+        Deposit,
+        Withdrawal,
+        Transfer
+    }
+    
+    // 包内结构体 (struct within package)
+    struct Transaction {
+        amount: int,
+        transaction_type: TransactionType,
+        timestamp: int
+    }
+}
+
+// 定义另一个包用于测试包间访问
+package utilities {
+    var package_version: int = 1;
+    var public_utils_name: string = "CodeNothing Utils";
+    
+    public fn get_version(): int {
+        return package_version;
+    }
+    
+    fn format_currency(amount: int): string {
+        return "¥" + lang::to_string(amount);
+    }
+    
+    // 测试跨包访问
+    public fn test_banking_access(): string {
+        // 公开访问 - 应该工作
+        var bank_name: string = banking::get_bank_name();
+        
+        // 包级访问 - 应该被限制 (但当前实现可能允许)
+        // var encrypted: int = banking::encrypt_data(50);
+        
+        return bank_name;
+    }
+    
+    // 嵌套包 (nested package)
+    package logging {
+        var log_level: int = 2;
+        
+        public fn log_info(message: string): int {
+            return log_level;
+        }
+        
+        fn log_debug(message: string): int {
+            return log_level + 1;
+        }
+    }
+}
+
+// 全局函数测试包访问
+fn test_package_access(): int {
+    // 测试公开访问
+    var bank_name: string = banking::get_bank_name();
+    var utils_version: int = utilities::get_version();
+    
+    // 测试包内命名空间访问
+    var security_level: int = banking::security::check_security();
+    
+    // 测试包内类的使用
+    var account: banking::Account = banking::Account(1000);
+    var balance: int = account.deposit(500);
+    
+    // 测试嵌套包访问
+    var log_result: int = utilities::logging::log_info("Test message");
+    
+    return balance + security_level + utils_version + log_result;
+}
+
+// 测试包级访问控制
+fn test_package_level_access(): int {
+    // 这些调用应该被包级访问控制限制
+    // var encrypted: int = banking::encrypt_data(100);  // 应该失败
+    // var formatted: string = utilities::format_currency(100);  // 应该失败
+    
+    // 但公开访问应该工作
+    var bank_name: string = banking::get_bank_name();
+    var utils_version: int = utilities::get_version();
+    
+    return utils_version;
+}
+
+// 主函数
+fn main(): int {
+    var access_result: int = test_package_access();
+    var package_access_result: int = test_package_level_access();
+    
+    // 预期结果计算:
+    // balance = 1000 + 500 = 1500
+    // security_level = 5
+    // utils_version = 1
+    // log_result = 2
+    // Total: 1500 + 5 + 1 + 2 = 1508
+    // package_access_result = 1
+    // Final: 1508 + 1 = 1509
+    
+    return access_result + package_access_result;
+}

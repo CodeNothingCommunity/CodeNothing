@@ -33,6 +33,7 @@ pub enum TokenType {
     Ns,         // ns
     Using,      // using
     Lib,        // lib
+    Import,     // import
     Return,     // return
     If,         // if
     Else,       // else
@@ -442,6 +443,7 @@ impl Lexer {
             "ns" => TokenType::Ns,
             "using" => TokenType::Using,
             "lib" => TokenType::Lib,
+            "import" => TokenType::Import,
             "return" => TokenType::Return,
             "if" => TokenType::If,
             "else" => TokenType::Else,

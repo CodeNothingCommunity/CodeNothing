@@ -1,0 +1,41 @@
+// 外部数学工具包模块
+// External Math Utils Module
+
+package math {
+    // 基础数学运算
+    public fn add(a: int, b: int): int {
+        return a + b;
+    }
+    
+    public fn multiply(x: int, y: int): int {
+        return x * y;
+    }
+    
+    public fn power(base: int, exp: int): int {
+        if (exp == 0) {
+            return 1;
+        }
+        var result: int = 1;
+        var i: int = 0;
+        while (i < exp) {
+            result = result * base;
+            i = i + 1;
+        }
+        return result;
+    }
+}
+
+package geometry {
+    // 几何计算
+    public fn area_rectangle(width: int, height: int): int {
+        return width * height;
+    }
+    
+    public fn area_triangle(base: int, height: int): int {
+        return (base * height) / 2;
+    }
+    
+    public fn perimeter_rectangle(width: int, height: int): int {
+        return 2 * (width + height);
+    }
+}

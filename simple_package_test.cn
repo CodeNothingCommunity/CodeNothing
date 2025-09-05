@@ -1,0 +1,130 @@
+// 简单的 Package 系统测试
+// Simple Package System Test
+
+// 定义一个简单的包
+package math {
+    // 包级变量
+    var pi: int = 3;
+    var e: int = 2;
+    
+    // 包级函数
+    public fn add(a: int, b: int): int {
+        return a + b;
+    }
+    
+    public fn multiply(a: int, b: int): int {
+        return a * b;
+    }
+    
+    private fn internal_calc(): int {
+        return pi + e;
+    }
+    
+    // 包内命名空间
+    ns advanced {
+        var precision: int = 10;
+        
+        public fn power(base: int, exp: int): int {
+            if (exp == 0) {
+                return 1;
+            } else {
+                return base * power(base, exp - 1);
+            }
+        }
+        
+        public fn factorial(n: int): int {
+            if (n <= 1) {
+                return 1;
+            } else {
+                return n * factorial(n - 1);
+            }
+        }
+    }
+}
+
+// 定义另一个包
+package utils {
+    var version: int = 1;
+    
+    public fn get_version(): int {
+        return version;
+    }
+    
+    public fn format_number(num: int): int {
+        return num * 100;
+    }
+    
+    // 嵌套包
+    package logging {
+        var log_level: int = 2;
+        
+        public fn log(message: int): int {
+            return log_level + message;
+        }
+        
+        public fn debug(value: int): int {
+            return value + 1;
+        }
+    }
+}
+
+// 全局函数测试包访问
+fn test_basic_package_access(): int {
+    // 测试基本包函数调用
+    var sum: int = math::add(5, 3);
+    var product: int = math::multiply(4, 6);
+    
+    // 测试包内命名空间访问
+    var power_result: int = math::advanced::power(2, 3);
+    var factorial_result: int = math::advanced::factorial(5);
+    
+    // 测试另一个包的访问
+    var version: int = utils::get_version();
+    var formatted: int = utils::format_number(42);
+    
+    // 测试嵌套包访问
+    var log_result: int = utils::logging::log(100);
+    var debug_result: int = utils::logging::debug(200);
+    
+    // 计算总和
+    var total: int = sum + product + power_result + factorial_result + version + formatted + log_result + debug_result;
+    
+    return total;
+}
+
+// 测试包级访问控制
+fn test_package_access_control(): int {
+    // 公开函数应该可以访问
+    var public_result: int = math::add(10, 20);
+    var utils_result: int = utils::get_version();
+    
+    // 私有函数应该被限制（但当前实现可能允许）
+    // var private_result: int = math::internal_calc();  // 这应该失败
+    
+    return public_result + utils_result;
+}
+
+// 主函数
+fn main(): int {
+    var basic_test: int = test_basic_package_access();
+    var access_test: int = test_package_access_control();
+    
+    // 预期结果计算:
+    // sum = 5 + 3 = 8
+    // product = 4 * 6 = 24
+    // power_result = 2^3 = 8
+    // factorial_result = 5! = 120
+    // version = 1
+    // formatted = 42 * 100 = 4200
+    // log_result = 2 + 100 = 102
+    // debug_result = 200 + 1 = 201
+    // basic_test = 8 + 24 + 8 + 120 + 1 + 4200 + 102 + 201 = 4664
+    
+    // public_result = 10 + 20 = 30
+    // utils_result = 1
+    // access_test = 30 + 1 = 31
+    
+    // total = 4664 + 31 = 4695
+    
+    return basic_test + access_test;
+}
