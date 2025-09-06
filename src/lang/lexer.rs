@@ -348,26 +348,55 @@ impl Lexer {
                 self.advance(); // Skip $
                 self.advance(); // Skip {
 
-                // 读取表达式直到 }
+                // 读取表达式直到 }，正确处理字符串字面量
                 let mut expression = String::new();
                 let mut brace_count = 1;
+                let mut in_string = false;
+                let mut escape_next = false;
 
                 while let Some(expr_ch) = self.peek() {
-                    if expr_ch == '{' {
-                        brace_count += 1;
-                    } else if expr_ch == '}' {
+                    if escape_next {
+                        // 转义字符，直接添加
+                        expression.push(expr_ch);
+                        self.advance();
+                        escape_next = false;
+                    } else if expr_ch == '\\' && in_string {
+                        // 在字符串中遇到转义字符
+                        expression.push(expr_ch);
+                        self.advance();
+                        escape_next = true;
+                    } else if expr_ch == '"' {
+                        // 字符串开始或结束
+                        in_string = !in_string;
+                        expression.push(expr_ch);
+                        self.advance();
+                    } else if !in_string && expr_ch == '}' {
+                        // 不在字符串中遇到 }，检查是否是结束大括号
                         brace_count -= 1;
                         if brace_count == 0 {
                             self.advance(); // Skip closing }
                             break;
                         }
+                        expression.push(expr_ch);
+                        self.advance();
+                    } else if !in_string && expr_ch == '{' {
+                        // 不在字符串中遇到 {，增加嵌套计数
+                        brace_count += 1;
+                        expression.push(expr_ch);
+                        self.advance();
+                    } else {
+                        // 其他字符，直接添加
+                        expression.push(expr_ch);
+                        self.advance();
                     }
-                    expression.push(expr_ch);
-                    self.advance();
                 }
 
                 if brace_count > 0 {
                     return Err("Unterminated interpolation expression".to_string());
+                }
+
+                if in_string {
+                    return Err("Unterminated string literal in interpolation expression".to_string());
                 }
 
                 parts.push(InterpolationPart::Expression(expression));

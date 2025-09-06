@@ -1115,7 +1115,7 @@ impl Parser {
     }
     
     /// Parse expression (placeholder - will be expanded)
-    fn parse_expression(&mut self) -> Result<Expression, ParseError> {
+    pub fn parse_expression(&mut self) -> Result<Expression, ParseError> {
         self.parse_assignment()
     }
     

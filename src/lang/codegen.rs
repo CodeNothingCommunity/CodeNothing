@@ -1207,12 +1207,22 @@ impl CodeGenerator {
                         }
                         crate::lang::lexer::InterpolationPart::Expression(expr_str) => {
                             // 表达式部分需要解析并生成代码
-                            // 这里简化处理，生成一个占位符字符串
-                            // TODO: 实现完整的表达式解析和代码生成
+                            match self.parse_and_generate_interpolation_expression(expr_str) {
+                                Ok(()) => {
+                                    // 表达式已经生成到栈上，现在需要转换为字符串
+                                    self.emit_instruction(Instruction::new(OpCode::ToString, 0));
+                                }
+                                Err(e) => {
+                                    // 提供更详细的错误处理
+                                    let detailed_error = self.format_interpolation_error(expr_str, &e);
+                                    eprintln!("⚠️ INTERPOLATION ERROR: {}", detailed_error);
 
-                            let placeholder = format!("${{{}}}", expr_str);
-                            let const_index = self.add_constant(Value::String(placeholder.into()));
-                            self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+                                    // 生成更友好的错误占位符
+                                    let error_msg = format!("${{PARSE_ERROR}}", );
+                                    let const_index = self.add_constant(Value::String(error_msg.into()));
+                                    self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+                                }
+                            }
                         }
                     }
 
@@ -3078,6 +3088,65 @@ impl CodeGenerator {
                 eprintln!("Error: Right side of pipe operator must be a function or function call");
             }
         }
+    }
+
+    /// Parse and generate code for an interpolation expression
+    fn parse_and_generate_interpolation_expression(&mut self, expr_str: &str) -> Result<(), String> {
+        // 处理空表达式或只包含空格的表达式
+        let trimmed_expr = expr_str.trim();
+        if trimmed_expr.is_empty() {
+            // 空表达式，生成空字符串常量
+            let const_index = self.add_constant(Value::String("".to_string().into()));
+            self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+            return Ok(());
+        }
+
+        // 创建一个临时的词法分析器来解析表达式
+        use crate::lang::lexer::Lexer;
+        use crate::lang::parser::Parser;
+
+        let mut lexer = Lexer::new(trimmed_expr);
+        let tokens = lexer.tokenize().map_err(|e| format!("Lexer error in interpolation '{}': {}", trimmed_expr, e))?;
+
+        if tokens.is_empty() {
+            // 如果词法分析后没有令牌，生成空字符串
+            let const_index = self.add_constant(Value::String("".to_string().into()));
+            self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+            return Ok(());
+        }
+
+        let mut parser = Parser::new(tokens);
+        let expression = parser.parse_expression().map_err(|e| format!("Parser error in interpolation '{}': {}", trimmed_expr, e))?;
+
+        // 生成表达式的字节码
+        self.generate_expression(&expression);
+
+        Ok(())
+    }
+
+    /// Format a detailed error message for interpolation expression parsing
+    fn format_interpolation_error(&self, expr_str: &str, error: &str) -> String {
+        let mut detailed_msg = format!("Failed to parse interpolation expression: '${{{}}}'", expr_str);
+        detailed_msg.push_str(&format!("\n  Error: {}", error));
+
+        // 提供一些常见错误的建议
+        if error.contains("Unterminated string") {
+            detailed_msg.push_str("\n  Suggestion: Check for unmatched quotes in string literals");
+        } else if error.contains("Unexpected character '\\'") {
+            detailed_msg.push_str("\n  Suggestion: String literals in interpolation expressions are not yet fully supported");
+            detailed_msg.push_str("\n  Try using variables instead: var msg = \"text\"; \"${msg}\"");
+        } else if error.contains("Empty") {
+            detailed_msg.push_str("\n  Suggestion: Empty interpolation expressions ${} are now supported and will render as empty strings");
+        } else if error.contains("Unexpected token") {
+            detailed_msg.push_str("\n  Suggestion: Check expression syntax - ensure all operators and parentheses are correct");
+        }
+
+        detailed_msg.push_str(&format!("\n  Expression length: {} characters", expr_str.len()));
+        if expr_str.len() > 100 {
+            detailed_msg.push_str("\n  Note: Very long expressions may be harder to debug - consider breaking into smaller parts");
+        }
+
+        detailed_msg
     }
 
     /// Generate a simple string representation of an expression for arrow functions

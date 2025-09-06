@@ -278,6 +278,9 @@ pub enum OpCode {
 
     /// Print top stack value (debug)
     Print = 0xF3,
+
+    /// Convert top stack value to string
+    ToString = 0xF4,
 }
 
 impl OpCode {
@@ -293,7 +296,7 @@ impl OpCode {
             | OpCode::LoadIndex | OpCode::StoreIndex | OpCode::Return | OpCode::ReturnValue
             | OpCode::ArrayLength | OpCode::IsInstance | OpCode::Cast
             | OpCode::Throw | OpCode::TryEnd | OpCode::Finally
-            | OpCode::Nop | OpCode::Halt | OpCode::Debug | OpCode::Print => 0,
+            | OpCode::Nop | OpCode::Halt | OpCode::Debug | OpCode::Print | OpCode::ToString => 0,
 
             // 1 byte operand
             OpCode::LoadLocal | OpCode::StoreLocal => 1,

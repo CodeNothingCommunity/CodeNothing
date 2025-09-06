@@ -15,9 +15,24 @@ impl SemanticAnalyzer {
                 // 分析插值字符串中的表达式
                 for part in parts {
                     if let crate::lang::lexer::InterpolationPart::Expression(expr_str) = part {
-                        // 这里需要解析表达式字符串并分析类型
-                        // 暂时简化处理，假设所有插值表达式都是有效的
-                        // TODO: 实现完整的表达式解析和类型检查
+                        // 解析表达式字符串并分析类型
+                        match self.parse_and_analyze_interpolation_expression(expr_str, position) {
+                            Ok(expr_type) => {
+                                // 检查表达式类型是否可以转换为字符串
+                                if !self.can_convert_to_string(&expr_type) {
+                                    self.errors.push(TypeError::new(
+                                        format!("Expression in string interpolation cannot be converted to string: {}", expr_type),
+                                        position.clone()
+                                    ));
+                                }
+                            }
+                            Err(e) => {
+                                self.errors.push(TypeError::new(
+                                    format!("Invalid expression in string interpolation '{}': {}", expr_str, e),
+                                    position.clone()
+                                ));
+                            }
+                        }
                     }
                 }
                 Type::String // 插值字符串的结果总是字符串类型
@@ -1412,6 +1427,51 @@ impl SemanticAnalyzer {
                 matches!(operand_type, Type::MutableReference { .. } | Type::RawPointer { is_mutable: true, .. })
             }
             _ => false,
+        }
+    }
+
+    /// Parse and analyze an interpolation expression
+    fn parse_and_analyze_interpolation_expression(&mut self, expr_str: &str, position: &Position) -> Result<Type, String> {
+        use crate::lang::lexer::Lexer;
+        use crate::lang::parser::Parser;
+
+        // 处理空表达式或只包含空格的表达式
+        let trimmed_expr = expr_str.trim();
+        if trimmed_expr.is_empty() {
+            // 空表达式返回字符串类型
+            return Ok(Type::String);
+        }
+
+        // Create a temporary lexer and parser for the expression
+        let mut lexer = Lexer::new(trimmed_expr);
+        let tokens = lexer.tokenize().map_err(|e| format!("Lexer error: {}", e))?;
+
+        if tokens.is_empty() {
+            // 如果词法分析后没有令牌，返回字符串类型
+            return Ok(Type::String);
+        }
+
+        let mut parser = Parser::new(tokens);
+        let expression = parser.parse_expression().map_err(|e| format!("Parser error: {}", e))?;
+
+        // Analyze the expression type
+        Ok(self.analyze_expression(&expression))
+    }
+
+    /// Check if a type can be converted to string
+    fn can_convert_to_string(&self, type_: &Type) -> bool {
+        match type_ {
+            Type::String => true,
+            Type::Int | Type::Long | Type::Float(_) | Type::Num(_) => true,
+            Type::Bool => true,
+            Type::Null => true,
+            Type::Array(_) => true, // Arrays can be converted to string representation
+            Type::Obj => true, // Objects can be converted to string representation
+            Type::Custom(_) => true, // Custom types might have toString methods
+            Type::Class { .. } => true, // Classes might have toString methods
+            Type::Unknown => true, // Unknown types are assumed convertible
+            Type::Any => true, // Any type is convertible
+            _ => false, // Other types like functions, pointers, etc. cannot be easily converted
         }
     }
 }
