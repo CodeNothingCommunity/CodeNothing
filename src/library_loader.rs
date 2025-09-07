@@ -468,6 +468,9 @@ pub fn convert_value_to_string_arg(value: &Value) -> String {
         Value::NativeFunction(native_func) => {
             format!("native_function({:p})", native_func)
         },
+        Value::Closure { parameter_count, .. } => {
+            format!("closure/{}", parameter_count)
+        },
         Value::Exception(exc) => {
             format!("exception({})", exc.message)
         },

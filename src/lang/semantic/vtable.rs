@@ -201,7 +201,7 @@ impl VTableManager {
         // Add methods to VTable
         for method in &class_decl.methods {
             let param_types: Vec<Type> = method.function.parameters.iter()
-                .map(|p| type_env.resolve_type_annotation(&p.type_annotation))
+                .map(|p| type_env.resolve_optional_type_annotation(&p.type_annotation))
                 .collect();
 
             let return_type = method.function.return_type.as_ref()

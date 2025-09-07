@@ -10,7 +10,13 @@ impl SemanticAnalyzer {
         match declaration {
             Declaration::Function(func) => {
                 let param_types: Vec<Type> = func.parameters.iter()
-                    .map(|p| self.resolve_type_annotation(&p.type_annotation))
+                    .map(|p| {
+                        if let Some(type_annotation) = &p.type_annotation {
+                            self.resolve_type_annotation(type_annotation)
+                        } else {
+                            Type::Unknown
+                        }
+                    })
                     .collect();
 
                 let return_type = func.return_type.as_ref()
@@ -86,7 +92,13 @@ impl SemanticAnalyzer {
 
                 for trait_method in &trait_decl.methods {
                     let param_types: Vec<Type> = trait_method.parameters.iter()
-                        .map(|p| self.resolve_type_annotation(&p.type_annotation))
+                        .map(|p| {
+                            if let Some(type_annotation) = &p.type_annotation {
+                                self.resolve_type_annotation(type_annotation)
+                            } else {
+                                Type::Unknown
+                            }
+                        })
                         .collect();
 
                     let return_type = trait_method.return_type.as_ref()
@@ -145,7 +157,13 @@ impl SemanticAnalyzer {
             match item {
                 NamespaceItem::Function(func) => {
                     let param_types: Vec<Type> = func.parameters.iter()
-                        .map(|p| Type::from(p.type_annotation.clone()))
+                        .map(|p| {
+                            if let Some(type_annotation) = &p.type_annotation {
+                                Type::from(type_annotation.clone())
+                            } else {
+                                Type::Unknown
+                            }
+                        })
                         .collect();
                     
                     let return_type = func.return_type.as_ref()
@@ -244,7 +262,13 @@ impl SemanticAnalyzer {
             MemoContent::Function(func) => {
                 // Collect function signature like in collect_declaration
                 let param_types: Vec<Type> = func.parameters.iter()
-                    .map(|p| Type::from(p.type_annotation.clone()))
+                    .map(|p| {
+                        if let Some(type_annotation) = &p.type_annotation {
+                            Type::from(type_annotation.clone())
+                        } else {
+                            Type::Unknown
+                        }
+                    })
                     .collect();
 
                 let return_type = func.return_type.as_ref()
@@ -288,7 +312,13 @@ impl SemanticAnalyzer {
         // Collect each method signature
         for method in &impl_decl.methods {
             let param_types: Vec<Type> = method.parameters.iter()
-                .map(|p| Type::from(p.type_annotation.clone()))
+                .map(|p| {
+                    if let Some(type_annotation) = &p.type_annotation {
+                        Type::from(type_annotation.clone())
+                    } else {
+                        Type::Unknown
+                    }
+                })
                 .collect();
 
             let return_type = method.return_type.as_ref()
@@ -334,7 +364,13 @@ impl SemanticAnalyzer {
         // Collect methods
         for method in &class_decl.methods {
             let param_types: Vec<Type> = method.function.parameters.iter()
-                .map(|p| self.type_env.resolve_type_annotation(&p.type_annotation))
+                .map(|p| {
+                    if let Some(type_annotation) = &p.type_annotation {
+                        self.type_env.resolve_type_annotation(type_annotation)
+                    } else {
+                        Type::Unknown
+                    }
+                })
                 .collect();
 
             let return_type = method.function.return_type.as_ref()

@@ -229,24 +229,29 @@ pub enum OpCode {
     /// Operand: field_count (u16)
     CreateObject = 0x83,
 
+    /// Create closure with captured variables from stack
+    /// Operand: capture_count (u8)
+    /// Stack: [closure_template, captured_var1, captured_var2, ...] -> [closure]
+    CreateClosureWithCaptures = 0x84,
+
     /// Get array length
-    ArrayLength = 0x84,
+    ArrayLength = 0x85,
 
     /// Type check
     /// Operand: type_index (u16)
-    IsInstance = 0x85,
+    IsInstance = 0x86,
 
     /// Cast to type
     /// Operand: type_index (u16)
-    Cast = 0x86,
+    Cast = 0x87,
 
     /// Load field from super class
     /// Operand: field_index (u16)
-    SuperFieldLoad = 0x87,
+    SuperFieldLoad = 0x88,
 
     /// Store value to super class field
     /// Operand: field_index (u16)
-    SuperFieldStore = 0x88,
+    SuperFieldStore = 0x89,
 
     // === Exception Handling ===
     /// Throw exception
@@ -299,7 +304,7 @@ impl OpCode {
             | OpCode::Nop | OpCode::Halt | OpCode::Debug | OpCode::Print | OpCode::ToString => 0,
 
             // 1 byte operand
-            OpCode::LoadLocal | OpCode::StoreLocal => 1,
+            OpCode::LoadLocal | OpCode::StoreLocal | OpCode::CreateClosureWithCaptures => 1,
 
             // 2 byte operands
             OpCode::Const | OpCode::LoadGlobal | OpCode::StoreGlobal | OpCode::LoadField | OpCode::StoreField

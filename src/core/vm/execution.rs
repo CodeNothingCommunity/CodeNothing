@@ -233,7 +233,7 @@ impl VirtualMachine {
             OpCode::CreateArray | OpCode::CreateObject | OpCode::LoadField | OpCode::StoreField |
             OpCode::LoadIndex | OpCode::StoreIndex | OpCode::NewObject | OpCode::NewArray |
             OpCode::ArrayLength | OpCode::SuperFieldLoad | OpCode::SuperFieldStore | OpCode::StoreThrough |
-            OpCode::Dereference => {
+            OpCode::Dereference | OpCode::CreateClosureWithCaptures => {
                 self.execute_memory_instruction(instruction)
             }
 

@@ -362,7 +362,13 @@ impl SemanticAnalyzer {
                 // Define parameters in scope
                 let mut param_types = Vec::new();
                 for param in parameters {
-                    let param_type = Type::from(param.type_annotation.clone());
+                    let param_type = if let Some(type_annotation) = &param.type_annotation {
+                        Type::from(type_annotation.clone())
+                    } else {
+                        // For lambda parameters without type annotation, use Unknown for now
+                        // Type inference will be handled later
+                        Type::Unknown
+                    };
                     param_types.push(param_type.clone());
 
                     if let Err(e) = self.type_env.define_variable(param.name.clone(), param_type) {
@@ -531,7 +537,7 @@ impl SemanticAnalyzer {
                 // Add parameters to the scope
                 let mut param_types = Vec::new();
                 for param in parameters {
-                    let param_type = self.resolve_type_annotation(&param.type_annotation);
+                    let param_type = self.resolve_optional_type_annotation(&param.type_annotation);
                     param_types.push(param_type.clone());
                     self.type_env.define_variable(param.name.clone(), param_type);
                 }
@@ -1103,6 +1109,30 @@ impl SemanticAnalyzer {
 
                                 return *return_type;
                             }
+                            Type::Lambda { parameters, return_type } => {
+                                // This is a lambda/closure variable
+                                if arguments.len() != parameters.len() {
+                                    self.add_error(TypeError::new(
+                                        format!("Lambda '{}' expects {} arguments, got {}",
+                                               name, parameters.len(), arguments.len()),
+                                        position.clone(),
+                                    ));
+                                    return Type::Unknown;
+                                }
+
+                                for (i, (arg, expected_type)) in arguments.iter().zip(parameters.iter()).enumerate() {
+                                    let arg_type = self.analyze_expression(arg);
+                                    if !self.inference.can_unify_with_env(&arg_type, expected_type, Some(&self.type_env)) {
+                                        self.add_error(TypeError::new(
+                                            format!("Argument {} to lambda '{}': expected '{}', got '{}'",
+                                                   i + 1, name, expected_type, arg_type),
+                                            arg.position().clone(),
+                                        ));
+                                    }
+                                }
+
+                                return *return_type;
+                            }
                             _ => {
                                 // Variable exists but is not callable
                                 self.add_error(TypeError::new(
@@ -1442,6 +1472,13 @@ impl SemanticAnalyzer {
             return Ok(Type::String);
         }
 
+        // 检查是否是闭包插值表达式
+        if self.is_closure_interpolation(trimmed_expr) {
+            // 对于闭包插值，我们假设它们可以转换为字符串
+            // 这是一个简化的处理，在完整实现中需要更复杂的类型推断
+            return Ok(Type::String);
+        }
+
         // Create a temporary lexer and parser for the expression
         let mut lexer = Lexer::new(trimmed_expr);
         let tokens = lexer.tokenize().map_err(|e| format!("Lexer error: {}", e))?;
@@ -1456,6 +1493,13 @@ impl SemanticAnalyzer {
 
         // Analyze the expression type
         Ok(self.analyze_expression(&expression))
+    }
+
+    /// Check if an expression is a closure interpolation
+    fn is_closure_interpolation(&self, expr_str: &str) -> bool {
+        // 检查是否包含闭包语法：|...|
+        let pipe_count = expr_str.chars().filter(|&c| c == '|').count();
+        pipe_count >= 2 && expr_str.contains('|')
     }
 
     /// Check if a type can be converted to string

@@ -138,7 +138,7 @@ impl SemanticAnalyzer {
 
         // Define parameters
         for param in &function.parameters {
-            let param_type = self.resolve_type_annotation(&param.type_annotation);
+            let param_type = self.resolve_optional_type_annotation(&param.type_annotation);
             if let Err(e) = self.type_env.define_variable(param.name.clone(), param_type) {
                 self.add_error(TypeError::new(
                     format!("Parameter '{}' already defined: {}", param.name, e),
@@ -212,7 +212,7 @@ impl SemanticAnalyzer {
 
         // Define parameters
         for param in &function.parameters {
-            let param_type = self.resolve_type_annotation(&param.type_annotation);
+            let param_type = self.resolve_optional_type_annotation(&param.type_annotation);
             if let Err(e) = self.type_env.define_variable(param.name.clone(), param_type) {
                 self.add_error(TypeError::new(
                     format!("Parameter '{}' already defined: {}", param.name, e),
@@ -239,7 +239,7 @@ impl SemanticAnalyzer {
         
         // Define parameters
         for param in &function.parameters {
-            let param_type = self.resolve_type_annotation(&param.type_annotation);
+            let param_type = self.resolve_optional_type_annotation(&param.type_annotation);
             if let Err(e) = self.type_env.define_variable(param.name.clone(), param_type) {
                 self.add_error(TypeError::new(
                     format!("Parameter '{}' already defined: {}", param.name, e),
@@ -481,7 +481,7 @@ impl SemanticAnalyzer {
         let mut method_signatures = Vec::new();
         for method in &trait_decl.methods {
             let param_types: Vec<Type> = method.parameters.iter()
-                .map(|p| self.resolve_type_annotation(&p.type_annotation))
+                .map(|p| self.resolve_optional_type_annotation(&p.type_annotation))
                 .collect();
 
             let return_type = method.return_type.as_ref()
@@ -503,7 +503,7 @@ impl SemanticAnalyzer {
 
                 // Define parameters in scope
                 for param in &method.parameters {
-                    let param_type = self.resolve_type_annotation(&param.type_annotation);
+                    let param_type = self.resolve_optional_type_annotation(&param.type_annotation);
                     if let Err(e) = self.type_env.define_variable(param.name.clone(), param_type) {
                         self.add_error(TypeError::new(
                             format!("Failed to define parameter '{}': {}", param.name, e),
@@ -649,7 +649,7 @@ impl SemanticAnalyzer {
             .filter(|method| method.is_static)
             .map(|method| {
                 let param_types: Vec<Type> = method.function.parameters.iter()
-                    .map(|p| self.type_env.resolve_type_annotation(&p.type_annotation))
+                    .map(|p| self.type_env.resolve_optional_type_annotation(&p.type_annotation))
                     .collect();
                 let return_type = method.function.return_type.as_ref()
                     .map(|t| self.type_env.resolve_type_annotation(t))
@@ -702,7 +702,7 @@ impl SemanticAnalyzer {
 
             // Add constructor parameters to scope
             for param in &constructor.parameters {
-                let param_type = self.type_env.resolve_type_annotation(&param.type_annotation);
+                let param_type = self.type_env.resolve_optional_type_annotation(&param.type_annotation);
                 if let Err(e) = self.type_env.define_variable(param.name.clone(), param_type) {
                     self.add_error(TypeError::new(
                         format!("Parameter '{}' already defined: {}", param.name, e),
@@ -753,7 +753,7 @@ impl SemanticAnalyzer {
                         static_methods: static_methods.clone(),
                     }
                 } else {
-                    self.type_env.resolve_type_annotation(&param.type_annotation)
+                    self.type_env.resolve_optional_type_annotation(&param.type_annotation)
                 };
 
                 if let Err(e) = self.type_env.define_variable(param.name.clone(), param_type) {
@@ -870,7 +870,7 @@ impl SemanticAnalyzer {
                 if class_method.function.name == method_name {
                     // Verify method signature matches
                     let param_types: Vec<Type> = class_method.function.parameters.iter()
-                        .map(|p| self.type_env.resolve_type_annotation(&p.type_annotation))
+                        .map(|p| self.type_env.resolve_optional_type_annotation(&p.type_annotation))
                         .collect();
 
                     let return_type = class_method.function.return_type.as_ref()
@@ -959,7 +959,7 @@ impl SemanticAnalyzer {
                 if let Some(base_method_entry) = base_vtable.get_method(&method.function.name) {
                     // Found the method in base class, validate signature
                     let param_types: Vec<Type> = method.function.parameters.iter()
-                        .map(|p| self.type_env.resolve_type_annotation(&p.type_annotation))
+                        .map(|p| self.type_env.resolve_optional_type_annotation(&p.type_annotation))
                         .collect();
 
                     let return_type = method.function.return_type.as_ref()

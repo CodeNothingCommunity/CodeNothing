@@ -1009,55 +1009,159 @@ impl VirtualMachine {
             }
         }
 
-        // Extract function name from the function pointer
-        let function_name = match function_pointer {
-            Value::String(name) => name.to_string(),
-            _ => {
-                println!("❌ VM: Expected String, got {:?}", function_pointer);
-                return Err(VMError::TypeMismatch("Function pointer must be a string".to_string()));
-            }
-        };
+        // Handle different types of callable values
+        match function_pointer {
+            Value::String(name) => {
+                // Legacy function pointer as string
+                let function_name = name.to_string();
 
-        // Look up the function by name in chunks
-        let mut function_index = None;
-        for (i, chunk) in self.chunks.iter().enumerate() {
-            if chunk.name == function_name {
-                function_index = Some(i);
-                break;
+                // Look up the function by name in chunks
+                let mut function_index = None;
+                for (i, chunk) in self.chunks.iter().enumerate() {
+                    if chunk.name == function_name {
+                        function_index = Some(i);
+                        break;
+                    }
+                }
+
+                let function_index = match function_index {
+                    Some(index) => index,
+                    None => return Err(VMError::RuntimeError(format!("Function '{}' not found", function_name))),
+                };
+
+                if self.debug_mode {
+                    println!("🔧 VM: CallIndirect resolved '{}' to function index {}", function_name, function_index);
+                }
+
+                // Check and potentially compile with JIT
+                self.check_jit_compilation(function_index);
+
+                // Create an instruction with the correct parameter count for the function call
+                let function_index_bytes = (function_index as u16).to_le_bytes();
+                let mut operands = Vec::new();
+                operands.extend_from_slice(&function_index_bytes);
+                operands.push(param_count as u8);
+
+                let call_instruction = crate::core::bytecode::Instruction {
+                    opcode: crate::core::bytecode::OpCode::Call,
+                    operands,
+                    line: 0,
+                };
+
+                // Call the function with the correct parameter count
+                self.call_function_by_index_with_method_name(function_index, "", &call_instruction)?;
+            }
+            Value::Closure { chunk_index, parameter_count, captured_variables } => {
+                // Closure call
+                if param_count != parameter_count {
+                    return Err(VMError::RuntimeError(format!(
+                        "Closure expects {} parameters, got {}",
+                        parameter_count, param_count
+                    )));
+                }
+
+                if self.debug_mode {
+                    println!("🔧 VM: Calling closure at chunk index {} with {} parameters", chunk_index, param_count);
+                }
+
+                self.call_closure(chunk_index, param_count, captured_variables)?;
+            }
+            _ => {
+                println!("❌ VM: Expected String or Closure, got {:?}", function_pointer);
+                return Err(VMError::TypeMismatch("Function pointer must be a string or closure".to_string()));
             }
         }
+        Ok(ExecutionResult::Continue)
+    }
 
-        let function_index = match function_index {
-            Some(index) => index,
-            None => return Err(VMError::RuntimeError(format!("Function '{}' not found", function_name))),
-        };
+    /// Call a closure
+    fn call_closure(&mut self, chunk_index: usize, param_count: usize, captured_variables: Vec<Value>) -> VMResult<()> {
+        if chunk_index >= self.chunks.len() {
+            return Err(VMError::RuntimeError(format!("Invalid closure chunk index: {}", chunk_index)));
+        }
+
+        // Save current state
+        let return_address = self.ip + 1;
+        let chunk_name = self.chunks[chunk_index].name.clone();
 
         if self.debug_mode {
-            println!("🔧 VM: CallIndirect resolved '{}' to function index {}", function_name, function_index);
+            println!("🔧 VM: Calling closure '{}' at chunk index {}", chunk_name, chunk_index);
         }
 
-        // 现在栈上只有参数：[arg1, arg2, ..., argN]
-        // 这正是我们调用函数所需要的布局
+        // Pop parameters from stack and store them
+        let mut parameters = Vec::new();
+        for _ in 0..param_count {
+            parameters.push(self.stack.pop()?);
+        }
+        // Reverse to get correct order (first parameter first)
+        parameters.reverse();
 
-        // Check and potentially compile with JIT
-        self.check_jit_compilation(function_index);
+        if self.debug_mode {
+            println!("🔧 VM: Closure parameters: {:?}", parameters);
+        }
 
-        // Create an instruction with the correct parameter count for the function call
-        // Call instruction format: function_index (u16), arg_count (u8)
-        let function_index_bytes = (function_index as u16).to_le_bytes();
-        let mut operands = Vec::new();
-        operands.extend_from_slice(&function_index_bytes);  // function_index (u16)
-        operands.push(param_count as u8);                   // arg_count (u8)
+        // Record the stack size after popping parameters
+        let stack_size_before_call = self.stack.len();
 
-        let call_instruction = crate::core::bytecode::Instruction {
-            opcode: crate::core::bytecode::OpCode::Call,
-            operands,
-            line: 0,
-        };
+        // Create call frame for closure
+        let mut frame = crate::core::stack::CallFrame::new(
+            chunk_name.clone(),
+            return_address,
+            stack_size_before_call,
+            (param_count + captured_variables.len()) as u8, // locals_count for closure parameters + captured vars
+        );
 
-        // Call the function with the correct parameter count
-        self.call_function_by_index_with_method_name(function_index, "", &call_instruction)?;
-        Ok(ExecutionResult::Continue)
+        // Set function index for the closure
+        frame.function_index = chunk_index;
+
+        // Push the call frame
+        self.call_stack.push(frame).map_err(|_| {
+            VMError::RuntimeError("Call stack overflow".to_string())
+        })?;
+
+        // Save current locals
+        let saved_locals = self.locals.take();
+
+        // Create new local memory for closure
+        let total_locals = param_count + captured_variables.len();
+        let mut closure_locals = crate::core::memory::LocalMemory::new(total_locals);
+
+        // Set parameters as local variables (starting from index 0)
+        for (i, param) in parameters.into_iter().enumerate() {
+            closure_locals.set(i, param)?;
+            if self.debug_mode {
+                println!("🔧 VM: Set closure parameter {} to local index {}", i, i);
+            }
+        }
+
+        // Set captured variables as local variables (after parameters)
+        for (i, captured_var) in captured_variables.into_iter().enumerate() {
+            let local_index = param_count + i;
+            closure_locals.set(local_index, captured_var)?;
+            if self.debug_mode {
+                println!("🔧 VM: Set captured variable {} to local index {}", i, local_index);
+            }
+        }
+
+        // Set the new locals
+        self.locals = Some(closure_locals);
+
+        // Save current chunk and switch to closure chunk
+        let saved_chunk = self.current_chunk.take();
+        self.current_chunk = Some(self.chunks[chunk_index].clone());
+        self.ip = 0; // Start at the beginning of the closure
+
+        // Store saved state in the call frame
+        if let Ok(mut frame) = self.call_stack.peek_mut() {
+            frame.saved_locals = saved_locals;
+            frame.saved_chunk = saved_chunk;
+        }
+
+        if self.debug_mode {
+            println!("🔧 VM: Closure call setup complete, starting execution");
+        }
+
+        Ok(())
     }
 
     /// Execute static method call instruction

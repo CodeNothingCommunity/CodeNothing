@@ -551,7 +551,7 @@ pub struct CaseClause {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
     pub name: String,
-    pub type_annotation: TypeAnnotation,
+    pub type_annotation: Option<TypeAnnotation>,
     pub position: Position,
 }
 
@@ -898,7 +898,13 @@ impl AstPrinter {
     
     pub fn print_function(&mut self, function: &FunctionDeclaration) -> String {
         let params: Vec<String> = function.parameters.iter()
-            .map(|p| format!("{} : {}", p.name, p.type_annotation))
+            .map(|p| {
+                if let Some(type_annotation) = &p.type_annotation {
+                    format!("{} : {}", p.name, type_annotation)
+                } else {
+                    p.name.clone()
+                }
+            })
             .collect();
         
         let return_type = function.return_type.as_ref()

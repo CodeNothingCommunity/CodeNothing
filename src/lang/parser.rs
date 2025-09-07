@@ -338,13 +338,13 @@ impl Parser {
                 Position::new(name_token.line, name_token.column)
             ));
         };
-        
+
         self.expect(TokenType::Colon, "Expected ':' after parameter name")?;
         let type_annotation = self.parse_type_annotation()?;
-        
+
         Ok(Parameter {
             name,
-            type_annotation,
+            type_annotation: Some(type_annotation),
             position: Position::new(name_token.line, name_token.column),
         })
     }
@@ -453,6 +453,33 @@ impl Parser {
                     let return_type = Box::new(self.parse_type_annotation()?);
 
                     Ok(TypeAnnotation::FunctionPointer {
+                        parameters,
+                        return_type,
+                    })
+                }
+                TokenType::Pipe => {
+                    // Closure type: |T1, T2| -> T3
+                    self.advance(); // consume first '|'
+
+                    let mut parameters = Vec::new();
+
+                    if !self.check(&TokenType::Pipe) {
+                        loop {
+                            let param_type = self.parse_type_annotation()?;
+                            parameters.push(param_type);
+
+                            if !self.match_token(TokenType::Comma) {
+                                break;
+                            }
+                        }
+                    }
+
+                    self.expect(TokenType::Pipe, "Expected '|' after closure parameters")?;
+                    self.expect(TokenType::Arrow, "Expected '->' after closure parameters")?;
+
+                    let return_type = Box::new(self.parse_type_annotation()?);
+
+                    Ok(TypeAnnotation::Function {
                         parameters,
                         return_type,
                     })
@@ -2330,7 +2357,7 @@ impl Parser {
 
                     parameters.push(Parameter {
                         name: param_name,
-                        type_annotation: param_type,
+                        type_annotation: Some(param_type),
                         position: Position::new(param_token.line, param_token.column),
                     });
 
@@ -2878,7 +2905,7 @@ impl Parser {
 
                 parameters.push(Parameter {
                     name: param_name,
-                    type_annotation: param_type,
+                    type_annotation: Some(param_type),
                     position: param_position,
                 });
 
@@ -3002,9 +3029,9 @@ impl Parser {
                 // Optional type annotation
                 let param_type = if self.check(&TokenType::Colon) {
                     self.advance();
-                    self.parse_type()?
+                    Some(self.parse_type()?)
                 } else {
-                    TypeAnnotation::Auto // Infer type
+                    None // Infer type
                 };
 
                 parameters.push(Parameter {
@@ -3327,7 +3354,7 @@ impl Parser {
 
                             params.push(Parameter {
                                 name: param_name,
-                                type_annotation: type_annotation.unwrap_or(TypeAnnotation::Auto),
+                                type_annotation: type_annotation,
                                 position: Position::new(token_line, token_column),
                             });
                         } else {
@@ -3354,9 +3381,9 @@ impl Parser {
 
                 // Check for type annotation: x: type => ...
                 let type_annotation = if self.match_token(TokenType::Colon) {
-                    self.parse_type()?
+                    Some(self.parse_type()?)
                 } else {
-                    TypeAnnotation::Auto
+                    None
                 };
 
                 let param = Parameter {

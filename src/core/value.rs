@@ -38,6 +38,13 @@ pub enum Value {
     /// Native function pointer
     NativeFunction(NativeFunctionRef),
 
+    /// Closure (lambda function with captured variables)
+    Closure {
+        chunk_index: usize,
+        parameter_count: usize,
+        captured_variables: Vec<Value>,
+    },
+
     /// Exception value
     Exception(ExceptionRef),
 
@@ -132,6 +139,7 @@ impl Value {
             Value::Object(o) => !o.is_empty(),
             Value::Function(_) => true,
             Value::NativeFunction(_) => true,
+            Value::Closure { .. } => true, // Closures are always truthy
             Value::Exception(_) => true, // Exceptions are always truthy
             Value::Reference { address, .. } => *address != 0, // Non-null references are truthy
             Value::MutableReference { address, .. } => *address != 0, // Non-null references are truthy
@@ -156,6 +164,7 @@ impl Value {
             Value::Object(_) => "object",
             Value::Function(_) => "function",
             Value::NativeFunction(_) => "native_function",
+            Value::Closure { .. } => "closure",
             Value::Exception(_) => "exception",
             Value::Reference { .. } => "reference",
             Value::MutableReference { .. } => "mutable_reference",
@@ -183,6 +192,7 @@ impl Value {
             }
             Value::Function(f) => format!("function {}", f.name),
             Value::NativeFunction(f) => format!("native function {}", f.name),
+            Value::Closure { parameter_count, .. } => format!("closure/{}", parameter_count),
             Value::Exception(e) => format!("{}: {}", e.exception_type, e.message),
             Value::Reference { address, target_type, .. } => {
                 format!("&{} @ 0x{:x}", target_type, address)

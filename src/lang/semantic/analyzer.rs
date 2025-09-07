@@ -215,6 +215,15 @@ impl SemanticAnalyzer {
             },
         }
     }
+
+    /// Resolve optional type annotation to concrete type
+    pub(super) fn resolve_optional_type_annotation(&self, annotation: &Option<TypeAnnotation>) -> Type {
+        if let Some(type_annotation) = annotation {
+            self.resolve_type_annotation(type_annotation)
+        } else {
+            Type::Unknown
+        }
+    }
 }
 
 impl Default for SemanticAnalyzer {

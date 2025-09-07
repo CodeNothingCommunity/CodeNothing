@@ -158,6 +158,52 @@ impl VirtualMachine {
                 Ok(ExecutionResult::Continue)
             }
 
+            crate::core::bytecode::OpCode::CreateClosureWithCaptures => {
+                let capture_count = instruction.get_u8(0)
+                    .ok_or_else(|| VMError::InvalidOperand("Missing capture count".to_string()))?;
+
+                if self.debug_mode {
+                    println!("🔧 VM: Creating closure with {} captured variables", capture_count);
+                }
+
+                // Pop captured variables from stack (in reverse order)
+                let mut captured_variables = Vec::with_capacity(capture_count as usize);
+                for i in 0..capture_count {
+                    let captured_var = self.stack.pop()?;
+                    if self.debug_mode {
+                        println!("🔧 VM: Captured variable {}: {:?}", i, captured_var);
+                    }
+                    captured_variables.push(captured_var);
+                }
+                // Reverse to get correct order
+                captured_variables.reverse();
+
+                // Pop the closure template from stack
+                let closure_template = self.stack.pop()?;
+
+                if let Value::Closure { chunk_index, parameter_count, .. } = closure_template {
+                    // Create new closure with captured variables
+                    let captured_count = captured_variables.len();
+                    let new_closure = Value::Closure {
+                        chunk_index,
+                        parameter_count,
+                        captured_variables,
+                    };
+
+                    if self.debug_mode {
+                        println!("🔧 VM: Created closure with {} parameters and {} captured variables",
+                                 parameter_count, captured_count);
+                    }
+
+                    self.stack.push(new_closure)?;
+                } else {
+                    return Err(VMError::TypeMismatch("Expected closure template on stack".to_string()));
+                }
+
+                self.ip += 1;
+                Ok(ExecutionResult::Continue)
+            }
+
             crate::core::bytecode::OpCode::LoadField => {
                 self.execute_field_access(instruction)
             }
