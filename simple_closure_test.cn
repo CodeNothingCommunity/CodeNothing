@@ -1,0 +1,28 @@
+// 简单的闭包插值测试
+// 测试基础的闭包插值功能
+
+using ns lang;
+
+fn main() : int {
+    lang::println("Simple Closure Interpolation Test");
+    lang::println("=================================");
+    
+    // 测试简单的立即执行闭包
+    var result1 : string = "Add one: ${|x| x + 1}(5)";
+    lang::println(result1);
+    
+    var result2 : string = "Double: ${|x| x * 2}(10)";
+    lang::println(result2);
+    
+    var result3 : string = "Subtract: ${|x| x - 1}(7)";
+    lang::println(result3);
+    
+    // 测试不支持的闭包（应该显示占位符）
+    var complex : string = "Complex: ${|x, y| x + y}(3, 4)";
+    lang::println(complex);
+    
+    lang::println("");
+    lang::println("Closure interpolation test completed!");
+    
+    return 0;
+}

@@ -1,0 +1,7 @@
+using ns lang;
+
+fn main() : int {
+    var numbers : array<int> = [10, 20, 30];
+    lang::println("Array created");
+    return 0;
+}

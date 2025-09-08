@@ -1,0 +1,22 @@
+// CodeNothing 语言 - 闭包插值演示
+// 这个文件展示了在字符串插值中使用闭包的强大功能
+
+using ns lang;
+
+fn main() : int {
+    // 基本闭包插值
+    lang::println("=== 基本闭包插值演示 ===");
+    lang::println("加法闭包: ${|x| x + 1}");
+    lang::println("乘法闭包: ${|x| x * 2}");
+    lang::println("减法闭包: ${|x| x - 1}");
+
+    // 数学运算闭包
+    lang::println("=== 数学运算闭包 ===");
+    lang::println("平方运算: ${|x| x * x}");
+    lang::println("立方运算: ${|x| x * x * x}");
+    lang::println("双倍加一: ${|x| x * 2 + 1}");
+
+    lang::println("=== 闭包插值演示完成 ===");
+
+    return 0;
+}

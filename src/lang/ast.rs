@@ -213,6 +213,7 @@ pub enum Expression {
     Range {
         start: Box<Expression>,
         end: Box<Expression>,
+        inclusive: bool, // true for ..=, false for ..
         position: Position,
     },
 
@@ -460,6 +461,21 @@ pub enum Statement {
         position: Position,
     },
 
+    // For-in loops: for (variable in iterable) { ... }
+    ForIn {
+        variable: String,
+        iterable: Expression,
+        body: Box<Statement>,
+        position: Position,
+    },
+
+    // Do-while loops: do { ... } while (condition);
+    DoWhile {
+        body: Box<Statement>,
+        condition: Expression,
+        position: Position,
+    },
+
 
     
     // Block statements
@@ -525,6 +541,8 @@ impl Statement {
             Statement::Try { position, .. } => position,
             Statement::Throw { position, .. } => position,
             Statement::ForRange { position, .. } => position,
+            Statement::ForIn { position, .. } => position,
+            Statement::DoWhile { position, .. } => position,
             Statement::LibImport { position, .. } => position,
         }
     }
@@ -551,7 +569,7 @@ pub struct CaseClause {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
     pub name: String,
-    pub type_annotation: TypeAnnotation,
+    pub type_annotation: Option<TypeAnnotation>,
     pub position: Position,
 }
 
@@ -934,7 +952,13 @@ impl AstPrinter {
     
     pub fn print_function(&mut self, function: &FunctionDeclaration) -> String {
         let params: Vec<String> = function.parameters.iter()
-            .map(|p| format!("{} : {}", p.name, p.type_annotation))
+            .map(|p| {
+                if let Some(type_annotation) = &p.type_annotation {
+                    format!("{} : {}", p.name, type_annotation)
+                } else {
+                    p.name.clone()
+                }
+            })
             .collect();
         
         let return_type = function.return_type.as_ref()

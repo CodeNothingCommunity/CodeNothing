@@ -304,6 +304,11 @@ impl CallStack {
         self.frames.last().ok_or(StackUnderflowError)
     }
 
+    /// Peek at the top call frame (mutable)
+    pub fn peek_mut(&mut self) -> Result<&mut CallFrame, StackUnderflowError> {
+        self.frames.last_mut().ok_or(StackUnderflowError)
+    }
+
     /// Get the current call depth
     pub fn depth(&self) -> usize {
         self.frames.len()

@@ -1,0 +1,8 @@
+using ns lang;
+
+fn main() : int {
+    for (x in [1]) {
+        lang::println("test");
+    }
+    return 0;
+}

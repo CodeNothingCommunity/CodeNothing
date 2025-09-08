@@ -39,6 +39,8 @@ pub enum TokenType {
     Else,       // else
     While,      // while
     For,        // for
+    In,         // in (for..in loops)
+    Do,         // do (do-while loops)
     Break,      // break
     Continue,   // continue
     Switch,     // switch
@@ -107,6 +109,8 @@ pub enum TokenType {
     Or,         // ||
     Not,        // !
     Range,      // ...
+    DotDot,     // .. (exclusive range)
+    DotDotEqual, // ..= (inclusive range)
 
     // Increment/Decrement operators
     PlusPlus,   // ++
@@ -349,26 +353,75 @@ impl Lexer {
                 self.advance(); // Skip $
                 self.advance(); // Skip {
 
-                // 读取表达式直到 }
+                // 读取表达式直到 }，正确处理字符串字面量
                 let mut expression = String::new();
                 let mut brace_count = 1;
+                let mut in_string = false;
+                let mut escape_next = false;
+                let mut in_closure = false;
+                let mut closure_pipe_count = 0;
 
                 while let Some(expr_ch) = self.peek() {
-                    if expr_ch == '{' {
-                        brace_count += 1;
-                    } else if expr_ch == '}' {
-                        brace_count -= 1;
-                        if brace_count == 0 {
-                            self.advance(); // Skip closing }
-                            break;
+                    if escape_next {
+                        // 转义字符，直接添加
+                        expression.push(expr_ch);
+                        self.advance();
+                        escape_next = false;
+                    } else if expr_ch == '\\' && in_string {
+                        // 在字符串中遇到转义字符
+                        expression.push(expr_ch);
+                        self.advance();
+                        escape_next = true;
+                    } else if expr_ch == '"' {
+                        // 字符串开始或结束
+                        in_string = !in_string;
+                        expression.push(expr_ch);
+                        self.advance();
+                    } else if !in_string && expr_ch == '|' {
+                        // 处理闭包管道符号
+                        if !in_closure {
+                            in_closure = true;
+                            closure_pipe_count = 1;
+                        } else {
+                            closure_pipe_count += 1;
+                            if closure_pipe_count == 2 {
+                                in_closure = false;
+                                closure_pipe_count = 0;
+                            }
                         }
+                        expression.push(expr_ch);
+                        self.advance();
+                    } else if !in_string && expr_ch == '}' {
+                        // 不在字符串中遇到 }，检查是否是结束大括号
+                        if !in_closure {
+                            brace_count -= 1;
+                            if brace_count == 0 {
+                                self.advance(); // Skip closing }
+                                break;
+                            }
+                        }
+                        expression.push(expr_ch);
+                        self.advance();
+                    } else if !in_string && expr_ch == '{' {
+                        // 不在字符串中遇到 {，增加嵌套计数
+                        if !in_closure {
+                            brace_count += 1;
+                        }
+                        expression.push(expr_ch);
+                        self.advance();
+                    } else {
+                        // 其他字符，直接添加
+                        expression.push(expr_ch);
+                        self.advance();
                     }
-                    expression.push(expr_ch);
-                    self.advance();
                 }
 
                 if brace_count > 0 {
                     return Err("Unterminated interpolation expression".to_string());
+                }
+
+                if in_string {
+                    return Err("Unterminated string literal in interpolation expression".to_string());
                 }
 
                 parts.push(InterpolationPart::Expression(expression));
@@ -449,6 +502,8 @@ impl Lexer {
             "else" => TokenType::Else,
             "while" => TokenType::While,
             "for" => TokenType::For,
+            "in" => TokenType::In,
+            "do" => TokenType::Do,
             "break" => TokenType::Break,
             "continue" => TokenType::Continue,
             "switch" => TokenType::Switch,
@@ -686,11 +741,21 @@ impl Lexer {
                 }
                 '.' => {
                     self.advance();
-                    // Check for range operator ...
-                    if self.peek() == Some('.') && self.peek_ahead(1) == Some('.') {
+                    // Check for range operators
+                    if self.peek() == Some('.') {
                         self.advance(); // consume second .
-                        self.advance(); // consume third .
-                        TokenType::Range
+                        // Check for inclusive range ..=
+                        if self.peek() == Some('=') {
+                            self.advance(); // consume =
+                            TokenType::DotDotEqual
+                        } else if self.peek() == Some('.') {
+                            // Check for ... (three dots)
+                            self.advance(); // consume third .
+                            TokenType::Range
+                        } else {
+                            // Just .. (exclusive range)
+                            TokenType::DotDot
+                        }
                     } else {
                         TokenType::Dot
                     }

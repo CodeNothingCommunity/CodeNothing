@@ -1,0 +1,9 @@
+// Debug tokens
+using ns lang;
+
+fn main() : int {
+    for (num in [1, 2, 3]) {
+        lang::println("test");
+    }
+    return 0;
+}

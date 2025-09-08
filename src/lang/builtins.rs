@@ -303,6 +303,7 @@ fn value_to_string(value: &Value) -> String {
         }
         Value::Function(_) => "<function>".to_string(),
         Value::NativeFunction(_) => "<native function>".to_string(),
+        Value::Closure { parameter_count, .. } => format!("<closure/{}>", parameter_count),
         Value::Exception(e) => format!("{}: {}", e.exception_type, e.message),
         Value::Reference { address, target_type, .. } => {
             format!("&{} @ 0x{:x}", target_type, address)
@@ -332,6 +333,7 @@ fn value_type_name(value: &Value) -> &'static str {
         Value::Object(_) => "object",
         Value::Function(_) => "function",
         Value::NativeFunction(_) => "native_function",
+        Value::Closure { .. } => "closure",
         Value::Exception(_) => "exception",
         Value::Reference { .. } => "reference",
         Value::MutableReference { .. } => "mutable_reference",

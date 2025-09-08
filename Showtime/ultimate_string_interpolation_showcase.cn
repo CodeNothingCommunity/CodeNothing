@@ -1,0 +1,167 @@
+// 🌟 CodeNothing 字符串插值终极展示
+// 展示字符串插值的所有功能和复杂用法
+
+using ns lang;
+
+fn main() : int {
+    lang::println("🎯 CodeNothing 字符串插值功能展示");
+    lang::println("=====================================");
+    
+    // 基础变量插值
+    basic_interpolation();
+    
+    // 表达式插值
+    expression_interpolation();
+    
+    // 复杂表达式插值
+    complex_expression_interpolation();
+    
+    // 类型转换插值
+    type_conversion_interpolation();
+    
+    // 嵌套和多重插值
+    nested_interpolation();
+    
+    lang::println("");
+    lang::println("✅ 字符串插值功能展示完成！");
+    
+    return 0;
+}
+
+// 基础变量插值
+fn basic_interpolation() : int {
+    lang::println("🔸 基础变量插值");
+    lang::println("================");
+    
+    var name : string = "CodeNothing";
+    var version : string = "1.0";
+    var year : int = 2024;
+    
+    var greeting : string = "欢迎使用 ${name} 编程语言！";
+    lang::println(greeting);
+    
+    var info : string = "版本：${version}，发布年份：${year}";
+    lang::println(info);
+    
+    var message : string = "${name} v${version} - 让编程变得简单有趣！";
+    lang::println(message);
+    
+    lang::println("");
+    return 0;
+}
+
+// 表达式插值
+fn expression_interpolation() : int {
+    lang::println("🔸 表达式插值");
+    lang::println("==============");
+    
+    var x : int = 15;
+    var y : int = 25;
+    
+    var sum_msg : string = "计算结果：${x} + ${y} = ${x + y}";
+    lang::println(sum_msg);
+    
+    var product_msg : string = "乘法运算：${x} × ${y} = ${x * y}";
+    lang::println(product_msg);
+    
+    var comparison : string = "比较：${x} > ${y} 结果是 ${x > y}";
+    lang::println(comparison);
+    
+    var logic : string = "逻辑：${x} > 10 且 ${y} < 30 = ${x > 10 && y < 30}";
+    lang::println(logic);
+    
+    lang::println("");
+    return 0;
+}
+
+// 复杂表达式插值
+fn complex_expression_interpolation() : int {
+    lang::println("🔸 复杂表达式插值");
+    lang::println("==================");
+    
+    var a : int = 8;
+    var b : int = 6;
+    var c : int = 3;
+    
+    var complex1 : string = "复杂运算：(${a} + ${b}) × ${c} = ${(a + b) * c}";
+    lang::println(complex1);
+    
+    var complex2 : string = "嵌套计算：${a} × (${b} - ${c}) + ${a} = ${a * (b - c) + a}";
+    lang::println(complex2);
+    
+    var complex3 : string = "混合运算：${a} ÷ ${c} + ${b} × 2 = ${a / c + b * 2}";
+    lang::println(complex3);
+    
+    lang::println("");
+    return 0;
+}
+
+// 类型转换插值
+fn type_conversion_interpolation() : int {
+    lang::println("🔸 类型转换插值");
+    lang::println("================");
+    
+    var integer_val : int = 42;
+    var float_val : float = 3.14159;
+    var bool_val : bool = true;
+    var null_val : auto = null;
+    
+    var int_msg : string = "整数值：${integer_val}";
+    lang::println(int_msg);
+    
+    var float_msg : string = "浮点值：${float_val}";
+    lang::println(float_msg);
+    
+    var bool_msg : string = "布尔值：${bool_val}";
+    lang::println(bool_msg);
+    
+    var null_msg : string = "空值：${null_val}";
+    lang::println(null_msg);
+    
+    var mixed : string = "混合类型：整数=${integer_val}, 浮点=${float_val}, 布尔=${bool_val}";
+    lang::println(mixed);
+    
+    lang::println("");
+    return 0;
+}
+
+// 嵌套和多重插值
+fn nested_interpolation() : int {
+    lang::println("🔸 嵌套和多重插值");
+    lang::println("==================");
+    
+    var student : string = "张三";
+    var subject : string = "数学";
+    var score : int = 95;
+    var total : int = 100;
+    
+    var grade : string = "成绩报告：学生 ${student} 在 ${subject} 科目中得分 ${score}/${total}";
+    lang::println(grade);
+    
+    var percentage : float = 87.5;
+    var status : string = "状态：${student} 的 ${subject} 成绩为 ${score} 分（${percentage}%）";
+    lang::println(status);
+    
+    var performance : string = "优秀";
+    if (percentage < 90.0) {
+        if (percentage >= 80.0) {
+            performance = "良好";
+        } else {
+            performance = "一般";
+        }
+    }
+
+    var level : string = "出色";
+    if (percentage < 85.0) {
+        level = "不错";
+    }
+
+    var detailed : string = "详细信息：${student} 同学在 ${subject} 考试中获得 ${score} 分，占总分 ${total} 的 ${percentage}%，表现${performance}";
+    lang::println(detailed);
+
+    var summary : string = "总结：在本次 ${subject} 测试中，${student} 以 ${score}/${total} 的成绩（${percentage}%）展现了${level}的水平";
+    lang::println(summary);
+    
+    lang::println("");
+    return 0;
+}

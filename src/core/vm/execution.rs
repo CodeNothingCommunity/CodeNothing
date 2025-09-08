@@ -233,7 +233,7 @@ impl VirtualMachine {
             OpCode::CreateArray | OpCode::CreateObject | OpCode::LoadField | OpCode::StoreField |
             OpCode::LoadIndex | OpCode::StoreIndex | OpCode::NewObject | OpCode::NewArray |
             OpCode::ArrayLength | OpCode::SuperFieldLoad | OpCode::SuperFieldStore | OpCode::StoreThrough |
-            OpCode::Dereference => {
+            OpCode::Dereference | OpCode::CreateClosureWithCaptures => {
                 self.execute_memory_instruction(instruction)
             }
 
@@ -257,6 +257,7 @@ impl VirtualMachine {
             // Special operations
             OpCode::Halt => Ok(ExecutionResult::Halt),
             OpCode::Print => self.execute_print(),
+            OpCode::ToString => self.execute_to_string(),
             OpCode::Nop => self.execute_nop(),
             OpCode::Debug => self.execute_debug(),
 
@@ -657,6 +658,46 @@ impl VirtualMachine {
     fn execute_print(&mut self) -> VMResult<ExecutionResult> {
         let value = self.stack.pop()?;
         println!("{}", value);
+        self.ip += 1;
+        Ok(ExecutionResult::Continue)
+    }
+
+    fn execute_to_string(&mut self) -> VMResult<ExecutionResult> {
+        let value = self.stack.pop()?;
+        let string_value = match value {
+            Value::String(s) => Value::String(s), // Already a string
+            Value::Int(i) => Value::String(std::rc::Rc::new(i.to_string())),
+            Value::Float(f) => Value::String(std::rc::Rc::new(f.to_string())),
+            Value::Bool(b) => Value::String(std::rc::Rc::new(b.to_string())),
+            Value::Null => Value::String(std::rc::Rc::new("null".to_string())),
+            Value::Array(arr) => {
+                // Convert array to string representation
+                let elements: Vec<String> = arr.iter()
+                    .map(|v| match v {
+                        Value::String(s) => format!("\"{}\"", s),
+                        _ => v.to_string(),
+                    })
+                    .collect();
+                Value::String(std::rc::Rc::new(format!("[{}]", elements.join(", "))))
+            },
+            Value::Object(obj) => {
+                // Convert object to string representation
+                let mut parts = Vec::new();
+                for (key, value) in obj.iter() {
+                    if !key.starts_with("__") { // Skip internal fields
+                        let value_str = match value {
+                            Value::String(s) => format!("\"{}\"", s),
+                            _ => value.to_string(),
+                        };
+                        parts.push(format!("{}: {}", key, value_str));
+                    }
+                }
+                Value::String(std::rc::Rc::new(format!("{{{}}}", parts.join(", "))))
+            },
+            _ => Value::String(std::rc::Rc::new(value.to_string())),
+        };
+
+        self.stack.push(string_value)?;
         self.ip += 1;
         Ok(ExecutionResult::Continue)
     }

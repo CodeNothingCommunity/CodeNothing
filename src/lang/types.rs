@@ -914,6 +914,15 @@ impl TypeEnvironment {
         }
     }
 
+    /// Resolve optional type annotation to concrete type
+    pub fn resolve_optional_type_annotation(&self, annotation: &Option<TypeAnnotation>) -> Type {
+        if let Some(type_annotation) = annotation {
+            self.resolve_type_annotation(type_annotation)
+        } else {
+            Type::Unknown
+        }
+    }
+
     /// Alias for enter_scope
     pub fn push_scope(&mut self) {
         self.enter_scope();
