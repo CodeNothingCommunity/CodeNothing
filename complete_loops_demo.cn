@@ -1,0 +1,109 @@
+// CodeNothing Complete Enhanced Loops Demo
+// 展示所有新增的循环语句功能
+
+using ns lang;
+
+fn main() : int {
+    lang::println("=== CodeNothing Enhanced Loops Demo ===");
+    lang::println("");
+    
+    // 1. 传统 for 循环 (已存在)
+    lang::println("1. Traditional for loop:");
+    for (var i : int = 1; i <= 3; i = i + 1) {
+        lang::print("  Traditional: ");
+        lang::println(lang::to_string(i));
+    }
+    lang::println("");
+    
+    // 2. 范围 for 循环 (增强版)
+    lang::println("2. Range-based for loops:");
+    
+    // 排除范围 (1..4 = 1, 2, 3)
+    lang::println("  Exclusive range (1..4):");
+    for (i : 1..4) {
+        lang::print("    ");
+        lang::println(lang::to_string(i));
+    }
+    
+    // 包含范围 (1..=3 = 1, 2, 3)
+    lang::println("  Inclusive range (1..=3):");
+    for (j : 1..=3) {
+        lang::print("    ");
+        lang::println(lang::to_string(j));
+    }
+    
+    // 传统三点范围 (向后兼容)
+    lang::println("  Traditional range (1...3):");
+    for (k : 1...3) {
+        lang::print("    ");
+        lang::println(lang::to_string(k));
+    }
+    lang::println("");
+    
+    // 3. For-in 循环 (新功能)
+    lang::println("3. For-in loops:");
+    var numbers : array<int> = [10, 20, 30, 40];
+    lang::println("  Array iteration:");
+    for (value in numbers) {
+        lang::print("    Value: ");
+        lang::println(lang::to_string(value));
+    }
+    
+    var fruits : array<string> = ["apple", "banana", "cherry"];
+    lang::println("  String array iteration:");
+    for (fruit in fruits) {
+        lang::print("    Fruit: ");
+        lang::println(fruit);
+    }
+    lang::println("");
+    
+    // 4. Do-while 循环 (新功能)
+    lang::println("4. Do-while loop:");
+    var counter : int = 1;
+    do {
+        lang::print("  Do-while: ");
+        lang::println(lang::to_string(counter));
+        counter = counter + 1;
+    } while (counter <= 3);
+    lang::println("");
+    
+    // 5. While 循环 (已存在)
+    lang::println("5. Traditional while loop:");
+    var x : int = 1;
+    while (x <= 3) {
+        lang::print("  While: ");
+        lang::println(lang::to_string(x));
+        x = x + 1;
+    }
+    lang::println("");
+    
+    // 6. 嵌套循环示例
+    lang::println("6. Nested loops example:");
+    for (outer : 1..=2) {
+        lang::print("  Outer: ");
+        lang::println(lang::to_string(outer));
+        
+        var inner_array : array<int> = [100, 200];
+        for (inner_value in inner_array) {
+            lang::print("    Inner: ");
+            lang::println(lang::to_string(inner_value));
+        }
+    }
+    lang::println("");
+    
+    // 7. 混合使用示例
+    lang::println("7. Mixed usage example:");
+    var data : array<int> = [5, 10, 15];
+    var index : int = 0;
+    for (item in data) {
+        lang::print("  Index ");
+        lang::print(lang::to_string(index));
+        lang::print(": ");
+        lang::println(lang::to_string(item));
+        index = index + 1;
+    }
+    
+    lang::println("");
+    lang::println("=== Enhanced Loops Demo Complete ===");
+    return 0;
+}

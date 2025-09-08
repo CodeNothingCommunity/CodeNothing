@@ -315,6 +315,57 @@ impl SemanticAnalyzer {
 
                 self.type_env.exit_scope();
             }
+
+            Statement::ForIn { variable, iterable, body, position: _ } => {
+                self.type_env.enter_scope();
+
+                // Analyze iterable expression
+                let iterable_type = self.analyze_expression(iterable);
+                let element_type = match iterable_type {
+                    Type::Array(ref element_type) => (**element_type).clone(),
+                    _ => {
+                        self.add_error(TypeError::new(
+                            format!("For-in requires array type, got '{}'", iterable_type),
+                            iterable.position().clone(),
+                        ));
+                        Type::Unknown
+                    }
+                };
+
+                // Define loop variable in scope
+                if let Err(e) = self.type_env.define_variable(variable.clone(), element_type) {
+                    self.add_error(TypeError::new(
+                        format!("Loop variable '{}' already defined: {}", variable, e),
+                        iterable.position().clone(),
+                    ));
+                }
+
+                let old_in_loop = self.in_loop;
+                self.in_loop = true;
+                self.analyze_statement(body);
+                self.in_loop = old_in_loop;
+
+                self.type_env.exit_scope();
+            }
+
+            Statement::DoWhile { body, condition, position: _ } => {
+                let old_in_loop = self.in_loop;
+                self.in_loop = true;
+
+                // Analyze body first (since it executes at least once)
+                self.analyze_statement(body);
+
+                // Analyze condition
+                let condition_type = self.analyze_expression(condition);
+                if !matches!(condition_type, Type::Bool) {
+                    self.add_error(TypeError::new(
+                        format!("Do-while condition must be boolean, got '{}'", condition_type),
+                        condition.position().clone(),
+                    ));
+                }
+
+                self.in_loop = old_in_loop;
+            }
         }
     }
 }

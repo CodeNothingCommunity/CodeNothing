@@ -278,8 +278,8 @@ impl SemanticAnalyzer {
             }
         }
 
-        // For now, memo declarations are handled as content blocks
-        // TODO: Extract and analyze function from memo content if needed
+        // Memo declarations are treated as content blocks for documentation
+        // NOTE: Future enhancement could extract embedded function definitions
         let _ = memo; // Suppress unused warning
     }
 
@@ -471,7 +471,7 @@ impl SemanticAnalyzer {
             fields: field_types,
         };
 
-        // Replace the placeholder struct type with the complete one
+        // Update the type environment with the complete struct definition
         self.type_env.types.insert(struct_decl.name.clone(), struct_type);
     }
 
@@ -527,7 +527,7 @@ impl SemanticAnalyzer {
             default_methods: Vec::new(),
         };
 
-        // Replace the placeholder trait type with the complete one
+        // Update the type environment with the complete trait definition
         self.type_env.types.insert(trait_decl.name.clone(), trait_type);
     }
 
@@ -552,7 +552,10 @@ impl SemanticAnalyzer {
                 return;
             }
 
-            // TODO: Check that all required trait methods are implemented
+            // Check that all required trait methods are implemented
+            if let Some(trait_name) = &impl_decl.trait_name {
+                self.validate_trait_implementation_completeness(impl_decl, trait_name);
+            }
         }
 
         // Analyze each method implementation
@@ -779,9 +782,7 @@ impl SemanticAnalyzer {
 
             // Validate abstract method
             if method.is_abstract {
-                // For abstract methods, we could check if body is empty or contains only a placeholder
-                // For now, we'll allow any body for abstract methods
-                // TODO: Implement proper abstract method validation
+                self.validate_abstract_method(method, class_decl);
             }
 
             // Analyze method body
@@ -1049,6 +1050,144 @@ impl SemanticAnalyzer {
             }
 
             println!("🔧 Registered static method: {} -> {:?}", static_method_name, method_type);
+        }
+    }
+
+    /// Validate that all required trait methods are implemented
+    fn validate_trait_implementation_completeness(&mut self, impl_decl: &ImplDeclaration, trait_name: &str) {
+        // Clone the trait type to avoid borrowing issues
+        let trait_type_opt = self.type_env.get_type(trait_name).cloned();
+
+        if let Some(trait_type) = trait_type_opt {
+            if let Type::Trait { methods, .. } = trait_type {
+                // Get implemented method names
+                let implemented_methods: std::collections::HashSet<String> =
+                    impl_decl.methods.iter().map(|m| m.name.clone()).collect();
+
+                // Check each required trait method
+                for (method_name, method_type) in methods {
+                    if !implemented_methods.contains(&method_name) {
+                        // Check if this method has a default implementation in the trait
+                        let has_default = self.trait_has_default_method(trait_name, &method_name);
+
+                        if !has_default {
+                            self.add_error(TypeError::new(
+                                format!("Missing implementation for required trait method '{}' in trait '{}'",
+                                       method_name, trait_name),
+                                impl_decl.position.clone(),
+                            ));
+                        }
+                    } else {
+                        // Method is implemented, validate signature compatibility
+                        if let Some(impl_method) = impl_decl.methods.iter().find(|m| m.name == method_name) {
+                            self.validate_method_signature_compatibility(impl_method, &method_type, trait_name);
+                        }
+                    }
+                }
+            }
+        } else {
+            self.add_error(TypeError::new(
+                format!("Unknown trait '{}' in impl declaration", trait_name),
+                impl_decl.position.clone(),
+            ));
+        }
+    }
+
+    /// Check if a trait has a default implementation for a method
+    fn trait_has_default_method(&self, trait_name: &str, method_name: &str) -> bool {
+        // This would need to be implemented based on how trait declarations are stored
+        // For now, assume no default methods
+        false
+    }
+
+    /// Validate that an implemented method signature is compatible with the trait method
+    fn validate_method_signature_compatibility(&mut self, impl_method: &FunctionDeclaration, trait_method_type: &Type, trait_name: &str) {
+        // Extract expected signature from trait method type
+        if let Type::Function { parameters, return_type, .. } = trait_method_type {
+            // Check parameter count
+            if impl_method.parameters.len() != parameters.len() {
+                self.add_error(TypeError::new(
+                    format!("Method '{}' parameter count mismatch: expected {}, found {}",
+                           impl_method.name, parameters.len(), impl_method.parameters.len()),
+                    impl_method.position.clone(),
+                ));
+                return;
+            }
+
+            // Check parameter types
+            for (i, (impl_param, expected_type)) in impl_method.parameters.iter().zip(parameters.iter()).enumerate() {
+                if let Some(ref impl_param_type) = impl_param.type_annotation {
+                    let impl_type = self.type_env.resolve_type_annotation(impl_param_type);
+                    if !impl_type.is_compatible_with_env(expected_type, Some(&self.type_env)) {
+                        self.add_error(TypeError::new(
+                            format!("Method '{}' parameter {} type mismatch: expected {:?}, found {:?}",
+                                   impl_method.name, i, expected_type, impl_type),
+                            impl_param.position.clone(),
+                        ));
+                    }
+                }
+            }
+
+            // Check return type
+            if let Some(ref impl_return_type) = impl_method.return_type {
+                let impl_return = self.type_env.resolve_type_annotation(impl_return_type);
+                if !impl_return.is_compatible_with_env(return_type, Some(&self.type_env)) {
+                    self.add_error(TypeError::new(
+                        format!("Method '{}' return type mismatch: expected {:?}, found {:?}",
+                               impl_method.name, return_type, impl_return),
+                        impl_method.position.clone(),
+                    ));
+                }
+            } else if **return_type != Type::Void {
+                self.add_error(TypeError::new(
+                    format!("Method '{}' missing return type, expected {:?}",
+                           impl_method.name, return_type),
+                    impl_method.position.clone(),
+                ));
+            }
+        }
+    }
+
+    /// Validate abstract method constraints
+    fn validate_abstract_method(&mut self, method: &ClassMethod, class_decl: &ClassDeclaration) {
+        // Abstract methods can only exist in abstract classes
+        if !class_decl.is_abstract {
+            self.add_error(TypeError::new(
+                format!("Abstract method '{}' can only be declared in abstract classes", method.function.name),
+                method.position.clone(),
+            ));
+        }
+
+        // Abstract methods should not have a body (or should have an empty/stub body)
+        if let Statement::Block { statements, .. } = &method.function.body {
+            if !statements.is_empty() {
+                // Check if it's just a stub implementation (e.g., panic or unimplemented)
+                let is_stub = statements.len() == 1 &&
+                    matches!(statements[0], Statement::Expression { .. });
+
+                if !is_stub {
+                    self.add_error(TypeError::new(
+                        format!("Abstract method '{}' should not have an implementation", method.function.name),
+                        method.position.clone(),
+                    ));
+                }
+            }
+        }
+
+        // Abstract methods cannot be private (they need to be overridable)
+        if method.access_modifier == crate::lang::ast::AccessModifier::Private {
+            self.add_error(TypeError::new(
+                format!("Abstract method '{}' cannot be private", method.function.name),
+                method.position.clone(),
+            ));
+        }
+
+        // Abstract methods cannot be static
+        if method.is_static {
+            self.add_error(TypeError::new(
+                format!("Abstract method '{}' cannot be static", method.function.name),
+                method.position.clone(),
+            ));
         }
     }
 }

@@ -38,6 +38,8 @@ pub enum TokenType {
     Else,       // else
     While,      // while
     For,        // for
+    In,         // in (for..in loops)
+    Do,         // do (do-while loops)
     Break,      // break
     Continue,   // continue
     Switch,     // switch
@@ -106,6 +108,8 @@ pub enum TokenType {
     Or,         // ||
     Not,        // !
     Range,      // ...
+    DotDot,     // .. (exclusive range)
+    DotDotEqual, // ..= (inclusive range)
 
     // Increment/Decrement operators
     PlusPlus,   // ++
@@ -496,6 +500,8 @@ impl Lexer {
             "else" => TokenType::Else,
             "while" => TokenType::While,
             "for" => TokenType::For,
+            "in" => TokenType::In,
+            "do" => TokenType::Do,
             "break" => TokenType::Break,
             "continue" => TokenType::Continue,
             "switch" => TokenType::Switch,
@@ -733,11 +739,21 @@ impl Lexer {
                 }
                 '.' => {
                     self.advance();
-                    // Check for range operator ...
-                    if self.peek() == Some('.') && self.peek_ahead(1) == Some('.') {
+                    // Check for range operators
+                    if self.peek() == Some('.') {
                         self.advance(); // consume second .
-                        self.advance(); // consume third .
-                        TokenType::Range
+                        // Check for inclusive range ..=
+                        if self.peek() == Some('=') {
+                            self.advance(); // consume =
+                            TokenType::DotDotEqual
+                        } else if self.peek() == Some('.') {
+                            // Check for ... (three dots)
+                            self.advance(); // consume third .
+                            TokenType::Range
+                        } else {
+                            // Just .. (exclusive range)
+                            TokenType::DotDot
+                        }
                     } else {
                         TokenType::Dot
                     }

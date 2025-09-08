@@ -1,0 +1,31 @@
+// Test working features
+using ns lang;
+
+fn main() : int {
+    lang::println("=== Testing Working Features ===");
+    
+    // 1. Range operators
+    lang::println("1. Range operators:");
+    
+    lang::println("  Exclusive range 1..4:");
+    for (i : 1..4) {
+        lang::println(lang::to_string(i));
+    }
+    
+    lang::println("  Inclusive range 1..=3:");
+    for (j : 1..=3) {
+        lang::println(lang::to_string(j));
+    }
+    
+    // 2. Do-while loop
+    lang::println("2. Do-while loop:");
+    var counter : int = 1;
+    do {
+        lang::print("  Count: ");
+        lang::println(lang::to_string(counter));
+        counter = counter + 1;
+    } while (counter <= 3);
+    
+    lang::println("=== All tests completed ===");
+    return 0;
+}

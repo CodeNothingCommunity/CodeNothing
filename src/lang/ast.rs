@@ -213,6 +213,7 @@ pub enum Expression {
     Range {
         start: Box<Expression>,
         end: Box<Expression>,
+        inclusive: bool, // true for ..=, false for ..
         position: Position,
     },
 
@@ -460,6 +461,21 @@ pub enum Statement {
         position: Position,
     },
 
+    // For-in loops: for (variable in iterable) { ... }
+    ForIn {
+        variable: String,
+        iterable: Expression,
+        body: Box<Statement>,
+        position: Position,
+    },
+
+    // Do-while loops: do { ... } while (condition);
+    DoWhile {
+        body: Box<Statement>,
+        condition: Expression,
+        position: Position,
+    },
+
 
     
     // Block statements
@@ -525,6 +541,8 @@ impl Statement {
             Statement::Try { position, .. } => position,
             Statement::Throw { position, .. } => position,
             Statement::ForRange { position, .. } => position,
+            Statement::ForIn { position, .. } => position,
+            Statement::DoWhile { position, .. } => position,
             Statement::LibImport { position, .. } => position,
         }
     }

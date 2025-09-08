@@ -1358,9 +1358,12 @@ impl VirtualMachine {
                 // Check if this method overrides a parent method
                 let is_override = vtable.methods.contains_key(method_name);
 
-                // For now, we'll determine if a method is abstract based on whether it has a real implementation
-                // In a more complete implementation, this would come from the class definition metadata
-                let is_abstract = false; // TODO: Get from class definition metadata
+                // Get abstract status from class definition metadata
+                let is_abstract = if let Some(class_def) = self.class_definitions.get(class_name) {
+                    class_def.abstract_methods.get(method_name).copied().unwrap_or(false)
+                } else {
+                    false
+                };
 
                 // Get access modifier from class definition
                 let access_modifier = if let Some(class_def) = self.class_definitions.get(class_name) {

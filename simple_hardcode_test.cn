@@ -1,0 +1,32 @@
+function main() : void {
+    lang::println("=== 硬编码修复测试 ===");
+    
+    // 测试范围循环
+    lang::println("1. 范围循环 (1..4):");
+    for (i : 1..4) {
+        lang::println("   i = " + lang::to_string(i));
+    }
+    
+    // 测试包含范围循环
+    lang::println("2. 包含范围循环 (1..=3):");
+    for (i : 1..=3) {
+        lang::println("   i = " + lang::to_string(i));
+    }
+    
+    // 测试for-in循环
+    lang::println("3. For-in循环:");
+    var numbers : array<int> = [100, 200, 300];
+    for (value in numbers) {
+        lang::println("   value = " + lang::to_string(value));
+    }
+    
+    // 测试do-while循环
+    lang::println("4. Do-while循环:");
+    var counter : int = 1;
+    do {
+        lang::println("   counter = " + lang::to_string(counter));
+        counter = counter + 1;
+    } while (counter <= 3);
+    
+    lang::println("=== 测试完成 ===");
+}

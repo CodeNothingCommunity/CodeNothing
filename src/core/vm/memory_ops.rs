@@ -669,8 +669,14 @@ impl VirtualMachine {
             }
         }
 
-        // TODO: Implement actual garbage collection logic
-        // For now, just simulate some collection
+        // Implement mark-and-sweep garbage collection
+        let mut marked_objects = std::collections::HashSet::new();
+
+        // Mark phase: Mark all reachable objects
+        self.mark_reachable_objects(&mut marked_objects)?;
+
+        // Sweep phase: Collect unmarked objects
+        objects_collected = self.sweep_unreachable_objects(&marked_objects)?;
 
         if self.debug_mode {
             println!("🔧 VM: GC cycle {} completed, {} objects collected, {} suspected leaks",
@@ -678,6 +684,185 @@ impl VirtualMachine {
         }
 
         Ok(objects_collected)
+    }
+
+    /// Mark all reachable objects starting from GC roots
+    fn mark_reachable_objects(&self, marked: &mut std::collections::HashSet<usize>) -> Result<(), String> {
+        // Mark objects reachable from stack
+        for value in self.stack.values() {
+            self.mark_value_objects(value, marked);
+        }
+
+        // Mark objects reachable from globals
+        for i in 0..self.memory.globals.len() {
+            if let Ok(value) = self.memory.globals.get(i) {
+                self.mark_value_objects(value, marked);
+            }
+        }
+
+        // Mark objects reachable from locals
+        if let Some(ref locals) = self.locals {
+            for value in locals.variables() {
+                self.mark_value_objects(value, marked);
+            }
+        }
+
+        // Mark objects reachable from call stack frames
+        for frame in self.call_stack.frames() {
+            // Mark any objects stored in frame data
+            if let Some(chunk) = self.chunks.get(frame.function_index) {
+                // Mark constants that are objects
+                for constant in &chunk.constants {
+                    self.mark_value_objects(constant, marked);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Recursively mark objects referenced by a value
+    fn mark_value_objects(&self, value: &Value, marked: &mut std::collections::HashSet<usize>) {
+        match value {
+            Value::Object(obj_rc) => {
+                // Extract object ID from the object
+                if let Some(Value::Int(object_id)) = obj_rc.get("__object_id__") {
+                    let id = *object_id as usize;
+                    if marked.insert(id) {
+                        // First time marking this object, mark its referenced objects
+                        for field_value in obj_rc.values() {
+                            self.mark_value_objects(field_value, marked);
+                        }
+                    }
+                }
+            }
+            Value::Array(arr_rc) => {
+                // For arrays, mark all contained objects
+                for element in arr_rc.iter() {
+                    self.mark_value_objects(element, marked);
+                }
+            }
+            Value::String(_) | Value::Int(_) | Value::Float(_) | Value::Bool(_) | Value::Null => {
+                // Primitive values don't contain object references
+            }
+            Value::Function(_) | Value::NativeFunction(_) => {
+                // Functions might contain closures with captured objects
+                // For now, we don't traverse function closures
+            }
+            Value::Closure { captured_variables, .. } => {
+                // Mark captured variables in closures
+                for captured_var in captured_variables {
+                    self.mark_value_objects(captured_var, marked);
+                }
+            }
+            Value::Exception(_) => {
+                // Exceptions might contain object references
+                // For now, we don't traverse exception data
+            }
+            Value::Reference { address, .. } |
+            Value::MutableReference { address, .. } |
+            Value::RawPointer { address, .. } => {
+                // Follow pointer/reference to mark the target object
+                if let Ok(target) = self.memory.get_pointer_target(*address) {
+                    match target {
+                        crate::core::memory::PointerTarget::Heap(heap_index) => {
+                            if let Ok(heap_value) = self.memory.heap.get(*heap_index) {
+                                self.mark_value_objects(heap_value, marked);
+                            }
+                        }
+                        crate::core::memory::PointerTarget::Global(global_index) => {
+                            if let Ok(global_value) = self.memory.globals.get(*global_index) {
+                                self.mark_value_objects(global_value, marked);
+                            }
+                        }
+                        _ => {} // Local and stack pointers are handled elsewhere
+                    }
+                }
+            }
+        }
+    }
+
+    /// Sweep unmarked objects and free their memory
+    fn sweep_unreachable_objects(&mut self, marked: &std::collections::HashSet<usize>) -> Result<usize, String> {
+        let mut collected_count = 0;
+        let mut objects_to_remove = Vec::new();
+
+        // Find objects that are not marked (unreachable)
+        for (object_id, _) in &self.object_tracker {
+            if !marked.contains(object_id) {
+                objects_to_remove.push(*object_id);
+            }
+        }
+
+        // Remove unreachable objects
+        for object_id in objects_to_remove {
+            // Remove from object registry
+            self.object_registry.remove(&object_id);
+
+            // Remove from object tracker
+            if let Some(lifecycle_info) = self.object_tracker.remove(&object_id) {
+                collected_count += 1;
+
+                if self.debug_mode {
+                    println!("🔧 VM: Collected object {} ({}) - survived {} GC cycles",
+                            object_id, lifecycle_info.class_name, lifecycle_info.gc_survival_count);
+                }
+            }
+        }
+
+        Ok(collected_count)
+    }
+
+    /// Resolve super field access by looking up the inheritance hierarchy
+    fn resolve_super_field(&self, obj_map: &std::collections::HashMap<String, Value>, field_name: &str) -> VMResult<Value> {
+        // First, try to find the field in the current object
+        if let Some(value) = obj_map.get(field_name) {
+            return Ok(value.clone());
+        }
+
+        // Get the object's class name
+        let class_name = if let Some(Value::String(class_name_rc)) = obj_map.get("__class__") {
+            class_name_rc.as_ref()
+        } else {
+            return Ok(Value::Null); // No class information, field doesn't exist
+        };
+
+        // Look up the inheritance hierarchy to find the field
+        let mut current_class = class_name;
+        while let Some(parent_class) = self.class_inheritance.get(current_class) {
+            // Check if the parent class has this field defined
+            if let Some(class_def) = self.class_definitions.get(parent_class) {
+                // Check if the field exists in the parent class
+                if class_def.fields.contains(&field_name.to_string()) {
+                    // Field is defined in parent class, but we need to check access permissions
+                    if let Some(access_modifier) = class_def.field_access.get(field_name) {
+                        match access_modifier {
+                            crate::core::vm::types::AccessModifier::Private => {
+                                // Private fields are not accessible from subclasses
+                                return Err(VMError::AccessViolation(format!(
+                                    "Cannot access private field '{}' from parent class '{}'",
+                                    field_name, parent_class
+                                )));
+                            }
+                            crate::core::vm::types::AccessModifier::Protected |
+                            crate::core::vm::types::AccessModifier::Public |
+                            crate::core::vm::types::AccessModifier::Package => {
+                                // Protected, public, and package fields are accessible
+                                // Return the field value if it exists in the object
+                                return Ok(obj_map.get(field_name).cloned().unwrap_or(Value::Null));
+                            }
+                        }
+                    } else {
+                        // No access modifier specified, assume public
+                        return Ok(obj_map.get(field_name).cloned().unwrap_or(Value::Null));
+                    }
+                }
+            }
+            current_class = parent_class;
+        }
+
+        // Field not found in any parent class
+        Ok(Value::Null)
     }
 
     /// Get memory leak report
@@ -840,14 +1025,9 @@ impl VirtualMachine {
                     .ok_or_else(|| VMError::InvalidOperand(format!("Invalid field index: {}", field_index)))?;
 
                 if let Value::String(field_name_str) = field_name {
-                    // For super field access, we need to look in the parent class
-                    // For now, we'll use the same logic as regular field access
-                    // TODO: Implement proper super field resolution
-                    if let Some(value) = obj_map.get(field_name_str.as_ref()) {
-                        self.stack.push(value.clone())?;
-                    } else {
-                        self.stack.push(Value::Null)?; // Field doesn't exist
-                    }
+                    // For super field access, we need to look in the parent class hierarchy
+                    let field_value = self.resolve_super_field(&obj_map, field_name_str.as_ref())?;
+                    self.stack.push(field_value)?;
                 } else {
                     return Err(VMError::TypeMismatch("Field name must be a string".to_string()));
                 }

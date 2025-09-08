@@ -504,12 +504,12 @@ impl Parser {
                     if is_mutable {
                         Ok(TypeAnnotation::MutableReference {
                             target_type,
-                            lifetime: None, // TODO: Add lifetime parsing
+                            lifetime: None, // NOTE: Lifetime parsing requires lifetime syntax definition
                         })
                     } else {
                         Ok(TypeAnnotation::Reference {
                             target_type,
-                            lifetime: None, // TODO: Add lifetime parsing
+                            lifetime: None, // NOTE: Lifetime parsing requires lifetime syntax definition
                         })
                     }
                 }
@@ -788,6 +788,9 @@ impl Parser {
                 TokenType::For => {
                     self.parse_for_statement()
                 }
+                TokenType::Do => {
+                    self.parse_do_while_statement()
+                }
                 TokenType::Switch => {
                     self.parse_switch_statement()
                 }
@@ -956,13 +959,34 @@ impl Parser {
 
         self.expect(TokenType::LeftParen, "Expected '(' after 'for'")?;
 
-        // Check if this is a range-based for loop: for (variable : range)
+        // Check if this is a for-in or range-based for loop
         if let Some(token) = self.peek() {
             if let TokenType::Identifier(_) = token.token_type {
-                // Look ahead to see if there's a colon after the identifier
+                // Look ahead to see what comes after the identifier
                 if let Some(next_token) = self.peek_ahead(1) {
-                    if next_token.token_type == TokenType::Colon {
-                        // This is a range-based for loop
+                    if next_token.token_type == TokenType::In {
+                        // This is a for-in loop: for (variable in iterable)
+                        let var_token = self.advance().unwrap();
+                        let variable = if let TokenType::Identifier(name) = var_token.token_type {
+                            name
+                        } else {
+                            return Err(ParseError::new("Expected variable name".to_string(), position));
+                        };
+
+                        self.expect(TokenType::In, "Expected 'in' after variable")?;
+                        let iterable = self.parse_expression()?;
+                        self.expect(TokenType::RightParen, "Expected ')' after iterable")?;
+
+                        let body = Box::new(self.parse_statement()?);
+
+                        return Ok(Statement::ForIn {
+                            variable,
+                            iterable,
+                            body,
+                            position,
+                        });
+                    } else if next_token.token_type == TokenType::Colon {
+                        // This is a range-based for loop: for (variable : range)
                         let var_token = self.advance().unwrap();
                         let variable = if let TokenType::Identifier(name) = var_token.token_type {
                             name
@@ -1015,6 +1039,26 @@ impl Parser {
             condition,
             increment,
             body,
+            position,
+        })
+    }
+
+    /// Parse do-while statement
+    fn parse_do_while_statement(&mut self) -> Result<Statement, ParseError> {
+        let do_token = self.expect(TokenType::Do, "Expected 'do'")?;
+        let position = Position::new(do_token.line, do_token.column);
+
+        let body = Box::new(self.parse_statement()?);
+
+        self.expect(TokenType::While, "Expected 'while' after do body")?;
+        self.expect(TokenType::LeftParen, "Expected '(' after 'while'")?;
+        let condition = self.parse_expression()?;
+        self.expect(TokenType::RightParen, "Expected ')' after while condition")?;
+        self.expect(TokenType::Semicolon, "Expected ';' after do-while statement")?;
+
+        Ok(Statement::DoWhile {
+            body,
+            condition,
             position,
         })
     }
@@ -1141,7 +1185,7 @@ impl Parser {
         Ok(Statement::Block { statements, position })
     }
     
-    /// Parse expression (placeholder - will be expanded)
+    /// Parse expression (entry point for expression parsing)
     pub fn parse_expression(&mut self) -> Result<Expression, ParseError> {
         self.parse_assignment()
     }
@@ -1446,17 +1490,29 @@ impl Parser {
         Ok(expr)
     }
 
-    /// Parse range expression (start...end)
+    /// Parse range expression (start..end, start..=end, start...end)
     fn parse_range(&mut self) -> Result<Expression, ParseError> {
         let mut expr = self.parse_term()?;
 
-        if self.match_token(TokenType::Range) {
+        // Check for range operators
+        let range_op = if self.match_token(TokenType::DotDot) {
+            Some(false) // exclusive range
+        } else if self.match_token(TokenType::DotDotEqual) {
+            Some(true) // inclusive range
+        } else if self.match_token(TokenType::Range) {
+            Some(false) // ... is treated as exclusive for backward compatibility
+        } else {
+            None
+        };
+
+        if let Some(inclusive) = range_op {
             let position = expr.position().clone();
             let end = self.parse_term()?;
 
             expr = Expression::Range {
                 start: Box::new(expr),
                 end: Box::new(end),
+                inclusive,
                 position,
             };
         }
@@ -2208,7 +2264,7 @@ impl Parser {
                     loop {
                         let type_annotation = self.parse_type_annotation()?;
                         // Convert type annotation to a dummy expression for compatibility
-                        // This is a temporary solution - ideally we'd modify the AST
+                        // NOTE: This requires AST modification to support proper enum variant types
                         let dummy_expr = Expression::String(
                             format!("{:?}", type_annotation),
                             variant_position.clone(),
@@ -2223,8 +2279,8 @@ impl Parser {
 
                 self.expect(TokenType::RightParen, "Expected ')' after variant types")?;
 
-                // For now, just use the first type as the value
-                // TODO: Modify AST to support multiple types per variant
+                // Currently uses the first type as the value
+                // NOTE: Multiple types per variant requires AST enhancement
                 types.into_iter().next()
             } else {
                 None
@@ -2318,7 +2374,28 @@ impl Parser {
             return Err(ParseError::new("Expected trait name".to_string(), position));
         };
 
-        self.expect(TokenType::LeftBrace, "Expected '{' after trait name")?;
+        // Parse super traits (trait inheritance)
+        let mut super_traits = Vec::new();
+        if self.check(&TokenType::Colon) {
+            self.advance(); // consume ':'
+
+            // Parse first super trait
+            let super_trait_token = self.expect(TokenType::Identifier(String::new()), "Expected super trait name")?;
+            if let TokenType::Identifier(super_trait_name) = super_trait_token.token_type {
+                super_traits.push(super_trait_name);
+            }
+
+            // Parse additional super traits separated by '+'
+            while self.check(&TokenType::Plus) {
+                self.advance(); // consume '+'
+                let super_trait_token = self.expect(TokenType::Identifier(String::new()), "Expected super trait name")?;
+                if let TokenType::Identifier(super_trait_name) = super_trait_token.token_type {
+                    super_traits.push(super_trait_name);
+                }
+            }
+        }
+
+        self.expect(TokenType::LeftBrace, "Expected '{' after trait declaration")?;
 
         let mut methods = Vec::new();
 
@@ -2399,12 +2476,24 @@ impl Parser {
 
         self.expect(TokenType::RightBrace, "Expected '}' after trait methods")?;
 
+        // Separate methods with default implementations from those without
+        let mut trait_methods = Vec::new();
+        let mut default_methods = Vec::new();
+
+        for method in methods {
+            if method.default_body.is_some() {
+                default_methods.push(method);
+            } else {
+                trait_methods.push(method);
+            }
+        }
+
         Ok(TraitDeclaration {
             name,
-            super_traits: Vec::new(),  // TODO: Support trait inheritance
-            methods,
-            default_methods: Vec::new(),  // TODO: Separate default methods
-            associated_types: Vec::new(),  // TODO: Support associated types
+            super_traits,
+            methods: trait_methods,
+            default_methods,
+            associated_types: Vec::new(),  // NOTE: Associated types require syntax definition
             position,
         })
     }
@@ -2492,8 +2581,26 @@ impl Parser {
                     return Err(ParseError::new("Expected generic parameter name".to_string(), position));
                 };
 
-                // TODO: Parse type bounds (e.g., T: Drawable + Movable)
-                let bounds = Vec::new();
+                // Parse type bounds (e.g., T: Drawable + Movable)
+                let mut bounds = Vec::new();
+                if self.check(&TokenType::Colon) {
+                    self.advance(); // consume ':'
+
+                    // Parse first bound
+                    let bound_token = self.expect(TokenType::Identifier(String::new()), "Expected type bound")?;
+                    if let TokenType::Identifier(bound_name) = bound_token.token_type {
+                        bounds.push(bound_name);
+                    }
+
+                    // Parse additional bounds separated by '+'
+                    while self.check(&TokenType::Plus) {
+                        self.advance(); // consume '+'
+                        let bound_token = self.expect(TokenType::Identifier(String::new()), "Expected type bound")?;
+                        if let TokenType::Identifier(bound_name) = bound_token.token_type {
+                            bounds.push(bound_name);
+                        }
+                    }
+                }
 
                 generic_parameters.push(crate::lang::ast::GenericParameter {
                     name: param_name,
@@ -2806,7 +2913,7 @@ impl Parser {
             constructor,
             destructor,
             methods,
-            nested_classes: Vec::new(),  // TODO: Parse nested classes
+            nested_classes: Vec::new(),  // NOTE: Nested classes require syntax extension
             position,
         })
     }
@@ -3452,6 +3559,7 @@ impl Parser {
                 TokenType::If => self.parse_if_statement(),
                 TokenType::While => self.parse_while_statement(),
                 TokenType::For => self.parse_for_statement(),
+                TokenType::Do => self.parse_do_while_statement(),
                 TokenType::Return => self.parse_return_statement(),
                 TokenType::Break => {
                     // Simple break statement

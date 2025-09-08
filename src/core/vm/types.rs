@@ -280,6 +280,9 @@ pub struct ClassDefinition {
     /// Method access modifiers: method_name -> access_modifier
     pub method_access: HashMap<String, AccessModifier>,
 
+    /// Abstract methods: method_name -> is_abstract
+    pub abstract_methods: HashMap<String, bool>,
+
     /// Package/namespace this class belongs to
     pub package: Option<String>,
 

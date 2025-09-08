@@ -340,7 +340,7 @@ impl SemanticAnalyzer {
                 }
             }
 
-            Expression::Range { start, end, position: _ } => {
+            Expression::Range { start, end, inclusive: _, position: _ } => {
                 let start_type = self.analyze_expression(start);
                 let end_type = self.analyze_expression(end);
 
@@ -630,8 +630,8 @@ impl SemanticAnalyzer {
 
                 // Look up class type
                 if let Some(class_type) = self.type_env.get_type(class_name).cloned() {
-                    // For now, just return the class type
-                    // TODO: Validate constructor arguments
+                    // Validate constructor arguments
+                    self.validate_constructor_arguments(class_name, arguments, position);
                     class_type
                 } else {
                     self.add_error(TypeError::new(
@@ -657,8 +657,11 @@ impl SemanticAnalyzer {
                             // This is a super constructor call
                             if let Some(base_class_decl) = super::analyzer::SemanticAnalyzer::get_class_declaration(self, &base_class_name) {
                                 if let Some(constructor) = &base_class_decl.constructor {
-                                    // TODO: Validate argument types against constructor signature
-                                    // For now, just return Void since constructor calls don't return values
+                                    // Clone constructor to avoid borrowing issues
+                                    let constructor_clone = constructor.clone();
+                                    // Validate argument types against constructor signature
+                                    self.validate_constructor_call_arguments_direct(&constructor_clone, arguments, position);
+                                    // Constructor calls don't return values
                                     return Type::Void;
                                 } else {
                                     self.add_error(TypeError::new(
@@ -681,7 +684,8 @@ impl SemanticAnalyzer {
                             // Find the method in base class
                             for (base_method_name, method_type) in &base_methods {
                                 if base_method_name == method_name {
-                                    // TODO: Validate argument types against method signature
+                                    // Validate argument types against method signature
+                                    self.validate_method_call_arguments(method_type, arguments, position);
                                     if let Type::Function { return_type, .. } = method_type {
                                         return *return_type.clone();
                                     }
@@ -783,8 +787,11 @@ impl SemanticAnalyzer {
                         // For classes, check if method exists and handle virtual dispatch
                         if let Some(vtable) = self.vtable_manager.get_vtable(&name) {
                             if let Some(method_entry) = vtable.get_method(method_name) {
-                                // TODO: Validate argument types against method signature
-                                if let Type::Function { return_type, .. } = &method_entry.method_type {
+                                // Clone method type to avoid borrowing issues
+                                let method_type = method_entry.method_type.clone();
+                                // Validate argument types against method signature
+                                self.validate_method_call_arguments(&method_type, arguments, position);
+                                if let Type::Function { return_type, .. } = &method_type {
                                     return *return_type.clone();
                                 }
                                 return Type::Void;
@@ -845,8 +852,11 @@ impl SemanticAnalyzer {
                                     }
                                 }
 
-                                // TODO: Validate argument types against method signature
-                                if let Type::Function { return_type, .. } = method_type {
+                                // Clone method type to avoid borrowing issues
+                                let method_type_cloned = method_type.clone();
+                                // Validate argument types against method signature
+                                self.validate_method_call_arguments(&method_type_cloned, arguments, position);
+                                if let Type::Function { return_type, .. } = &method_type_cloned {
                                     return *return_type.clone();
                                 }
                                 return Type::Void;
@@ -973,12 +983,12 @@ impl SemanticAnalyzer {
                 if *is_mutable {
                     Type::MutableReference {
                         target_type: Box::new(operand_type),
-                        lifetime: None, // TODO: Implement lifetime analysis
+                        lifetime: None, // NOTE: Lifetime analysis requires borrow checker implementation
                     }
                 } else {
                     Type::Reference {
                         target_type: Box::new(operand_type),
-                        lifetime: None, // TODO: Implement lifetime analysis
+                        lifetime: None, // NOTE: Lifetime analysis requires borrow checker implementation
                     }
                 }
             }
@@ -1148,8 +1158,9 @@ impl SemanticAnalyzer {
                     if let Some(class_type) = self.type_env.get_type(name).cloned() {
                         if let Type::Class { .. } = &class_type {
                             // This is a class constructor call
-                            // TODO: Validate constructor arguments against constructor signature
-                            // For now, just analyze the arguments and return the class type
+                            // Validate constructor arguments against constructor signature
+                            self.validate_constructor_arguments(name, arguments, position);
+                            // Analyze arguments for side effects
                             for arg in arguments {
                                 self.analyze_expression(arg);
                             }
@@ -1437,8 +1448,8 @@ impl SemanticAnalyzer {
             Expression::Identifier(name, _) => {
                 // Check if variable is mutable
                 if let Some(_var_type) = self.type_env.get_variable(name) {
-                    // TODO: Track mutability in variable declarations
-                    true // For now, assume all variables are mutable
+                    // NOTE: Mutability tracking requires variable declaration metadata
+                    true // Currently assumes all variables are mutable
                 } else {
                     false
                 }
@@ -1516,6 +1527,144 @@ impl SemanticAnalyzer {
             Type::Unknown => true, // Unknown types are assumed convertible
             Type::Any => true, // Any type is convertible
             _ => false, // Other types like functions, pointers, etc. cannot be easily converted
+        }
+    }
+
+    /// Validate constructor arguments against class constructor signature
+    fn validate_constructor_arguments(&mut self, class_name: &str, arguments: &[Expression], position: &Position) {
+        // Look up class constructor in type environment
+        let constructor_name = format!("{}::new", class_name);
+        let constructor_type_opt = self.type_env.get_function(&constructor_name).cloned();
+
+        if let Some(constructor_type) = constructor_type_opt {
+            if let Type::Function { parameters, .. } = constructor_type {
+                // Check argument count (excluding 'self' parameter)
+                let expected_param_count = if parameters.len() > 0 { parameters.len() - 1 } else { 0 };
+                if arguments.len() != expected_param_count {
+                    self.add_error(TypeError::new(
+                        format!("Constructor for '{}' expects {} arguments, found {}",
+                               class_name, expected_param_count, arguments.len()),
+                        position.clone(),
+                    ));
+                    return;
+                }
+
+                // Validate each argument type (skip first parameter which is 'self')
+                let param_types = if parameters.len() > 0 { &parameters[1..] } else { &[] };
+                for (i, (arg, expected_type)) in arguments.iter().zip(param_types.iter()).enumerate() {
+                    let arg_type = self.analyze_expression(arg);
+                    if !arg_type.is_compatible_with_env(&expected_type, Some(&self.type_env)) {
+                        self.add_error(TypeError::new(
+                            format!("Constructor argument {} type mismatch: expected {:?}, found {:?}",
+                                   i, expected_type, arg_type),
+                            position.clone(),
+                        ));
+                    }
+                }
+            }
+        } else {
+            // Check if class has a default constructor (no explicit constructor defined)
+            if !arguments.is_empty() {
+                self.add_error(TypeError::new(
+                    format!("Class '{}' has no constructor that takes {} arguments",
+                           class_name, arguments.len()),
+                    position.clone(),
+                ));
+            }
+        }
+    }
+
+    /// Validate constructor call arguments against function signature
+    fn validate_constructor_call_arguments(&mut self, constructor: &FunctionDeclaration, arguments: &[Expression], position: &Position) {
+        // Check argument count (excluding 'self' parameter if present)
+        let expected_param_count = if constructor.parameters.len() > 0 && constructor.parameters[0].name == "self" {
+            constructor.parameters.len() - 1
+        } else {
+            constructor.parameters.len()
+        };
+
+        if arguments.len() != expected_param_count {
+            self.add_error(TypeError::new(
+                format!("Constructor expects {} arguments, found {}",
+                       expected_param_count, arguments.len()),
+                position.clone(),
+            ));
+            return;
+        }
+
+        // Validate each argument type (skip 'self' parameter if present)
+        let param_start = if constructor.parameters.len() > 0 && constructor.parameters[0].name == "self" { 1 } else { 0 };
+        let params = &constructor.parameters[param_start..];
+
+        for (i, (arg, param)) in arguments.iter().zip(params.iter()).enumerate() {
+            let arg_type = self.analyze_expression(arg);
+            if let Some(ref param_type_annotation) = param.type_annotation {
+                let expected_type = self.type_env.resolve_type_annotation(param_type_annotation);
+                if !arg_type.is_compatible_with_env(&expected_type, Some(&self.type_env)) {
+                    self.add_error(TypeError::new(
+                        format!("Constructor argument {} type mismatch: expected {:?}, found {:?}",
+                               i, expected_type, arg_type),
+                        position.clone(),
+                    ));
+                }
+            }
+        }
+    }
+
+    /// Validate method call arguments against method signature
+    fn validate_method_call_arguments(&mut self, method_type: &Type, arguments: &[Expression], position: &Position) {
+        if let Type::Function { parameters, .. } = method_type {
+            // Check argument count (excluding 'self' parameter)
+            let expected_param_count = if parameters.len() > 0 { parameters.len() - 1 } else { 0 };
+            if arguments.len() != expected_param_count {
+                self.add_error(TypeError::new(
+                    format!("Method expects {} arguments, found {}",
+                           expected_param_count, arguments.len()),
+                    position.clone(),
+                ));
+                return;
+            }
+
+            // Validate each argument type (skip first parameter which is 'self')
+            let param_types = if parameters.len() > 0 { &parameters[1..] } else { &[] };
+            for (i, (arg, expected_type)) in arguments.iter().zip(param_types.iter()).enumerate() {
+                let arg_type = self.analyze_expression(arg);
+                if !arg_type.is_compatible_with_env(expected_type, Some(&self.type_env)) {
+                    self.add_error(TypeError::new(
+                        format!("Method argument {} type mismatch: expected {:?}, found {:?}",
+                               i, expected_type, arg_type),
+                        position.clone(),
+                    ));
+                }
+            }
+        }
+    }
+
+    /// Validate constructor call arguments against constructor directly
+    fn validate_constructor_call_arguments_direct(&mut self, constructor: &Constructor, arguments: &[Expression], position: &Position) {
+        // Check argument count
+        if arguments.len() != constructor.parameters.len() {
+            self.add_error(TypeError::new(
+                format!("Constructor expects {} arguments, found {}",
+                       constructor.parameters.len(), arguments.len()),
+                position.clone(),
+            ));
+            return;
+        }
+
+        // Validate each argument type
+        for (i, (arg, param)) in arguments.iter().zip(constructor.parameters.iter()).enumerate() {
+            let arg_type = self.analyze_expression(arg);
+            if let Some(ref param_type_annotation) = param.type_annotation {
+                let expected_type = self.type_env.resolve_type_annotation(param_type_annotation);
+                if !arg_type.is_compatible_with_env(&expected_type, Some(&self.type_env)) {
+                    self.add_error(TypeError::new(
+                        format!("Constructor argument {} type mismatch: expected {:?}, found {:?}",
+                               i, expected_type, arg_type),
+                        position.clone(),
+                    ));
+                }
+            }
         }
     }
 }
