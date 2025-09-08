@@ -38,9 +38,6 @@ impl SemanticAnalyzer {
             Declaration::Namespace(ns) => {
                 self.collect_namespace_declaration(ns, &[]);
             }
-            Declaration::Package(pkg) => {
-                self.collect_package_declaration(pkg, &[]);
-            }
             Declaration::Memo(memo) => {
                 self.collect_memo_declaration(memo);
             }
@@ -144,9 +141,6 @@ impl SemanticAnalyzer {
             }
             Declaration::LibImport(_) => {
                 // Library imports are handled at compile time, no collection needed
-            }
-            Declaration::Import(_) => {
-                // External package imports are handled at compile time, no collection needed
             }
         }
     }
@@ -255,118 +249,6 @@ impl SemanticAnalyzer {
                     self.collect_impl_declaration(impl_decl);
                 }
                 NamespaceItem::Class(class_decl) => {
-                    // Collect class declaration
-                    self.collect_class_declaration(class_decl);
-                }
-            }
-        }
-    }
-
-    /// Collect package declaration recursively
-    fn collect_package_declaration(&mut self, pkg: &PackageDeclaration, parent_path: &[String]) {
-        let mut current_path = parent_path.to_vec();
-        current_path.push(pkg.name.clone());
-
-        // Define the package (treated as namespace)
-        self.type_env.define_nested_namespace(&current_path);
-
-        for item in &pkg.items {
-            match item {
-                PackageItem::Function(func) => {
-                    let param_types: Vec<Type> = func.parameters.iter()
-                        .map(|p| Type::from(p.type_annotation.clone()))
-                        .collect();
-
-                    let return_type = func.return_type.as_ref()
-                        .map(|rt| Type::from(rt.clone()))
-                        .unwrap_or(Type::Void);
-
-                    let function_type = Type::Function {
-                        parameters: param_types,
-                        return_type: Box::new(return_type),
-                    };
-
-                    // Define function in package namespace
-                    let namespace_name = current_path.join("::");
-                    if let Err(e) = self.type_env.define_function_in_namespace(&namespace_name, func.name.clone(), function_type) {
-                        self.add_error(TypeError::new(
-                            format!("Function '{}' already defined in package '{}': {}",
-                                   func.name, namespace_name, e),
-                            func.position.clone(),
-                        ));
-                    }
-                }
-                PackageItem::Namespace(nested_ns) => {
-                    self.collect_namespace_declaration(nested_ns, &current_path);
-                }
-                PackageItem::Package(nested_pkg) => {
-                    self.collect_package_declaration(nested_pkg, &current_path);
-                }
-                PackageItem::Variable(stmt) => {
-                    // Handle package variable declarations in collection phase
-                    if let Statement::VarDeclaration { name, type_annotation, .. } = stmt {
-                        let var_type = type_annotation.as_ref()
-                            .map(|ta| Type::from(ta.clone()))
-                            .unwrap_or(Type::Unknown);
-
-                        if let Err(e) = self.type_env.define_variable_in_namespace(
-                            &current_path.join("::"),
-                            name.clone(),
-                            var_type
-                        ) {
-                            self.add_error(TypeError::new(
-                                format!("Package variable '{}' already defined: {}", name, e),
-                                stmt.position().clone(),
-                            ));
-                        }
-                    }
-                }
-                PackageItem::Enum(enum_decl) => {
-                    // Define enum type in package context
-                    let enum_type = Type::Enum(enum_decl.name.clone());
-                    if let Err(e) = self.type_env.define_type(enum_decl.name.clone(), enum_type) {
-                        self.add_error(TypeError::new(
-                            format!("Failed to define enum '{}' in package: {}", enum_decl.name, e),
-                            enum_decl.position.clone()
-                        ));
-                    }
-                }
-                PackageItem::Struct(struct_decl) => {
-                    // Define struct type in package context
-                    let struct_type = Type::Struct {
-                        name: struct_decl.name.clone(),
-                        fields: struct_decl.fields.iter().map(|f| (f.name.clone(), Type::from(f.type_annotation.clone()))).collect(),
-                    };
-                    if let Err(e) = self.type_env.define_type(struct_decl.name.clone(), struct_type) {
-                        self.add_error(TypeError::new(
-                            format!("Failed to define struct '{}' in package: {}", struct_decl.name, e),
-                            struct_decl.position.clone()
-                        ));
-                    }
-                }
-                PackageItem::Trait(trait_decl) => {
-                    // Define trait type in package context
-                    let trait_type = Type::Trait {
-                        name: trait_decl.name.clone(),
-                        methods: trait_decl.methods.iter().map(|m| (m.name.clone(), Type::Function {
-                            parameters: m.parameters.iter().map(|p| Type::from(p.type_annotation.clone())).collect(),
-                            return_type: Box::new(m.return_type.as_ref().map(|rt| Type::from(rt.clone())).unwrap_or(Type::Void)),
-                        })).collect(),
-                        default_methods: Vec::new(),
-                        super_traits: Vec::new(),
-                    };
-                    if let Err(e) = self.type_env.define_type(trait_decl.name.clone(), trait_type) {
-                        self.add_error(TypeError::new(
-                            format!("Failed to define trait '{}' in package: {}", trait_decl.name, e),
-                            trait_decl.position.clone()
-                        ));
-                    }
-                }
-                PackageItem::Impl(impl_decl) => {
-                    // Collect method signatures from impl blocks
-                    self.collect_impl_declaration(impl_decl);
-                }
-                PackageItem::Class(class_decl) => {
                     // Collect class declaration
                     self.collect_class_declaration(class_decl);
                 }

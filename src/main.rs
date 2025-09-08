@@ -355,27 +355,6 @@ fn compile_and_run_file(file_path: &str, memory_config: MemoryConfig, verbose: b
     generator.set_show_all_details(show_all_details);
     // Pass the type environment from semantic analysis to code generation
     generator.set_type_environment(analyzer.get_type_environment().clone());
-
-    // First, collect and compile all external module functions
-    for (module_path, external_program) in analyzer.get_external_modules() {
-        if debug {
-            println!("🔧 Main: Collecting functions from external module '{}'", module_path);
-        }
-        generator.collect_functions(external_program);
-    }
-
-    // Second pass: generate code for all external modules
-    for (module_path, external_program) in analyzer.get_external_modules() {
-        if debug {
-            println!("🔧 Main: Generating code for external module '{}'", module_path);
-        }
-        let _ = generator.generate_program(external_program);
-    }
-
-    // Finally, generate code for the main program
-    if debug {
-        println!("🔧 Main: Generating code for main program");
-    }
     let chunks = generator.generate_program(&program).map_err(|errors| {
         let error_messages: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
         format!("Code generation errors:\n{}", error_messages.join("\n"))

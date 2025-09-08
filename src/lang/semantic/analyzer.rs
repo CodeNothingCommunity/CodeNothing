@@ -15,7 +15,6 @@ pub struct SemanticAnalyzer {
     pub(super) access_checker: AccessChecker,
     pub(super) vtable_manager: VTableManager,
     pub(super) class_declarations: HashMap<String, ClassDeclaration>,
-    pub(super) external_modules: HashMap<String, Program>,
     pub(super) errors: Vec<TypeError>,
     pub(super) current_function_return_type: Option<Type>,
     pub(super) expected_type: Option<Type>,
@@ -33,7 +32,6 @@ impl SemanticAnalyzer {
             access_checker: AccessChecker::new(),
             vtable_manager: VTableManager::new(),
             class_declarations: HashMap::new(),
-            external_modules: HashMap::new(),
             errors: Vec::new(),
             current_function_return_type: None,
             expected_type: None,
@@ -70,11 +68,6 @@ impl SemanticAnalyzer {
         &self.type_env
     }
 
-    /// Get external modules
-    pub fn get_external_modules(&self) -> &HashMap<String, Program> {
-        &self.external_modules
-    }
-
     /// Get class declaration by name
     pub fn get_class_declaration(&self, class_name: &str) -> Option<&ClassDeclaration> {
         self.class_declarations.get(class_name)
@@ -101,29 +94,14 @@ impl SemanticAnalyzer {
             }
         }
 
-        // Third pass: process import declarations for external packages
-        for declaration in &program.declarations {
-            if let Declaration::Import(_) = declaration {
-                self.analyze_declaration(declaration);
-            }
-        }
-
-        // After processing imports, check external modules status
-        if self.debug_mode {
-            println!("🔧 Semantic: After import processing, found {} external modules", self.external_modules.len());
-            for (module_path, program) in &self.external_modules {
-                println!("🔧 Semantic: External module '{}' has {} declarations", module_path, program.declarations.len());
-            }
-        }
-
-        // Fourth pass: process using declarations after libraries and imports are loaded
+        // Third pass: process using declarations after libraries are loaded
         for declaration in &program.declarations {
             if let Declaration::Using(_) = declaration {
                 self.analyze_declaration(declaration);
             }
         }
 
-        // Fifth pass: collect class declarations and build VTables with dependency resolution
+        // Fourth pass: collect class declarations and build VTables with dependency resolution
         let class_declarations: Vec<&ClassDeclaration> = program.declarations.iter()
             .filter_map(|decl| if let Declaration::Class(class_decl) = decl { Some(class_decl) } else { None })
             .collect();
@@ -137,23 +115,15 @@ impl SemanticAnalyzer {
             }
         }
 
-        // Sixth pass: analyze all other declarations including class method bodies
+        // Fifth pass: analyze all other declarations including class method bodies
         for declaration in &program.declarations {
             match declaration {
-                Declaration::LibImport(_) | Declaration::Using(_) | Declaration::Import(_) => {
+                Declaration::LibImport(_) | Declaration::Using(_) => {
                     // Already processed
                 }
                 _ => {
                     self.analyze_declaration(declaration);
                 }
-            }
-        }
-
-        // Final check: verify external modules are still present
-        if self.debug_mode {
-            println!("🔧 Semantic: Final check - found {} external modules", self.external_modules.len());
-            for (module_path, program) in &self.external_modules {
-                println!("🔧 Semantic: Final - External module '{}' has {} declarations", module_path, program.declarations.len());
             }
         }
 

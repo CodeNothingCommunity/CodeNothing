@@ -780,41 +780,10 @@ pub enum NamespaceItem {
     Impl(ImplDeclaration),
 }
 
-/// Package declarations
-#[derive(Debug, Clone, PartialEq)]
-pub struct PackageDeclaration {
-    pub name: String,
-    pub items: Vec<PackageItem>,
-    pub position: Position,
-}
-
-/// Items that can appear in a package
-#[derive(Debug, Clone, PartialEq)]
-pub enum PackageItem {
-    Function(FunctionDeclaration),
-    Variable(Statement), // VarDeclaration
-    Namespace(NamespaceDeclaration), // Nested namespace
-    Package(PackageDeclaration), // Nested package
-    Enum(EnumDeclaration),
-    Struct(StructDeclaration),
-    Class(ClassDeclaration),
-    Trait(TraitDeclaration),
-    Impl(ImplDeclaration),
-}
-
 /// Using declarations
 #[derive(Debug, Clone, PartialEq)]
 pub struct UsingDeclaration {
     pub namespace: String,
-    pub position: Position,
-}
-
-/// Import declarations for external packages
-#[derive(Debug, Clone, PartialEq)]
-pub struct ImportDeclaration {
-    pub module_path: String,  // e.g., "math/geometry" or "./utils"
-    pub items: Option<Vec<String>>,  // None for wildcard import, Some for specific items
-    pub alias: Option<String>,  // Optional alias for the imported module
     pub position: Position,
 }
 
@@ -846,9 +815,7 @@ pub enum MemoContent {
 pub enum Declaration {
     Function(FunctionDeclaration),
     Namespace(NamespaceDeclaration),
-    Package(PackageDeclaration), // Package declaration
     Using(UsingDeclaration),
-    Import(ImportDeclaration), // External package import
     Variable(Statement), // Global variable declaration
     Memo(MemoDeclaration), // 记忆化声明
     Enum(EnumDeclaration),
@@ -889,7 +856,6 @@ pub trait AstVisitor<T> {
     fn visit_declaration(&mut self, declaration: &Declaration) -> T;
     fn visit_function(&mut self, function: &FunctionDeclaration) -> T;
     fn visit_namespace(&mut self, namespace: &NamespaceDeclaration) -> T;
-    fn visit_package(&mut self, package: &PackageDeclaration) -> T;
     fn visit_using(&mut self, using: &UsingDeclaration) -> T;
     fn visit_statement(&mut self, statement: &Statement) -> T;
     fn visit_expression(&mut self, expression: &Expression) -> T;
@@ -936,9 +902,7 @@ impl AstPrinter {
         match declaration {
             Declaration::Function(func) => self.print_function(func),
             Declaration::Namespace(ns) => self.print_namespace(ns),
-            Declaration::Package(pkg) => self.print_package(pkg),
             Declaration::Using(using) => format!("using ns {};", using.namespace),
-            Declaration::Import(import) => format!("import {};", import.module_path),
             Declaration::Variable(stmt) => self.print_statement(stmt),
             Declaration::Memo(memo) => format!("memo {{ ... }}"), // 简化打印
             Declaration::Enum(enum_decl) => format!("enum {} {{ ... }}", enum_decl.name),
@@ -973,10 +937,6 @@ impl AstPrinter {
     
     pub fn print_namespace(&mut self, namespace: &NamespaceDeclaration) -> String {
         format!("ns {} {{ {} items }}", namespace.name, namespace.items.len())
-    }
-
-    pub fn print_package(&mut self, package: &PackageDeclaration) -> String {
-        format!("package {} {{ {} items }}", package.name, package.items.len())
     }
     
     pub fn print_statement(&mut self, statement: &Statement) -> String {

@@ -81,19 +81,6 @@ impl Parser {
             false
         }
     }
-
-    /// Check if current token is an identifier with specific value
-    fn match_identifier(&mut self, expected: &str) -> bool {
-        if let Some(token) = self.peek() {
-            if let TokenType::Identifier(name) = &token.token_type {
-                if name == expected {
-                    self.advance();
-                    return true;
-                }
-            }
-        }
-        false
-    }
     
     /// Expect specific token type and consume it
     fn expect(&mut self, token_type: TokenType, message: &str) -> Result<Token, ParseError> {
@@ -184,17 +171,9 @@ impl Parser {
                     let ns = self.parse_namespace()?;
                     Ok(Declaration::Namespace(ns))
                 }
-                TokenType::Package => {
-                    let pkg = self.parse_package()?;
-                    Ok(Declaration::Package(pkg))
-                }
                 TokenType::Using => {
                     let using = self.parse_using()?;
                     Ok(Declaration::Using(using))
-                }
-                TokenType::Import => {
-                    let import = self.parse_import()?;
-                    Ok(Declaration::Import(import))
                 }
                 TokenType::Memo => {
                     let memo = self.parse_memo()?;
@@ -587,16 +566,6 @@ impl Parser {
         self.skip_newlines();
         
         while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
-            // Check for access modifiers first
-            let has_access_modifier = self.check(&TokenType::Public) ||
-                                    self.check(&TokenType::Private) ||
-                                    self.check(&TokenType::Protected);
-
-            // Skip access modifier if present
-            if has_access_modifier {
-                self.advance();
-            }
-
             if self.check(&TokenType::Fn) {
                 let func = self.parse_function()?;
                 items.push(NamespaceItem::Function(func));
@@ -623,201 +592,25 @@ impl Parser {
             position,
         })
     }
-
-    /// Parse package declaration
-    fn parse_package(&mut self) -> Result<PackageDeclaration, ParseError> {
-        let pkg_token = self.expect(TokenType::Package, "Expected 'package'")?;
-        let position = Position::new(pkg_token.line, pkg_token.column);
-
-        let name_token = self.expect(TokenType::Identifier(String::new()), "Expected package name")?;
-        let name = if let TokenType::Identifier(n) = name_token.token_type {
-            n
-        } else {
-            return Err(ParseError::new("Expected package name".to_string(), position));
-        };
-
-        self.expect(TokenType::LeftBrace, "Expected '{' after package name")?;
-
-        let mut items = Vec::new();
-        self.skip_newlines();
-
-        // Parse package items
-        while !self.check(&TokenType::RightBrace) && !self.check(&TokenType::Eof) {
-            // Check for access modifiers first
-            let has_access_modifier = self.check(&TokenType::Public) ||
-                                    self.check(&TokenType::Private) ||
-                                    self.check(&TokenType::Protected);
-
-            // Skip access modifier if present
-            if has_access_modifier {
-                self.advance();
-            }
-
-            if self.check(&TokenType::Fn) {
-                let func = self.parse_function()?;
-                items.push(PackageItem::Function(func));
-            } else if self.check(&TokenType::Ns) {
-                // Parse nested namespace
-                let nested_ns = self.parse_namespace()?;
-                items.push(PackageItem::Namespace(nested_ns));
-            } else if self.check(&TokenType::Package) {
-                // Parse nested package
-                let nested_pkg = self.parse_package()?;
-                items.push(PackageItem::Package(nested_pkg));
-            } else if self.check(&TokenType::Var) {
-                // Parse package variable
-                let var_stmt = self.parse_variable_declaration()?;
-                items.push(PackageItem::Variable(var_stmt));
-            } else if self.check(&TokenType::Enum) {
-                // Parse enum
-                let enum_decl = self.parse_enum()?;
-                items.push(PackageItem::Enum(enum_decl));
-            } else if self.check(&TokenType::Struct) {
-                // Parse struct
-                let struct_decl = self.parse_struct()?;
-                items.push(PackageItem::Struct(struct_decl));
-            } else if self.check(&TokenType::Class) {
-                // Parse class
-                let class_decl = self.parse_class()?;
-                items.push(PackageItem::Class(class_decl));
-            } else if self.check(&TokenType::Trait) {
-                // Parse trait
-                let trait_decl = self.parse_trait()?;
-                items.push(PackageItem::Trait(trait_decl));
-            } else if self.check(&TokenType::Impl) {
-                // Parse impl
-                let impl_decl = self.parse_impl()?;
-                items.push(PackageItem::Impl(impl_decl));
-            } else {
-                // Unknown token in package
-                break;
-            }
-            self.skip_newlines();
-        }
-
-        self.expect(TokenType::RightBrace, "Expected '}' after package body")?;
-
-        Ok(PackageDeclaration {
-            name,
-            items,
-            position,
-        })
-    }
-
+    
     /// Parse using declaration
     fn parse_using(&mut self) -> Result<UsingDeclaration, ParseError> {
         let using_token = self.expect(TokenType::Using, "Expected 'using'")?;
         let position = Position::new(using_token.line, using_token.column);
-
+        
         self.expect(TokenType::Ns, "Expected 'ns' after 'using'")?;
-
+        
         let name_token = self.expect(TokenType::Identifier(String::new()), "Expected namespace name")?;
         let namespace = if let TokenType::Identifier(n) = name_token.token_type {
             n
         } else {
             return Err(ParseError::new("Expected namespace name".to_string(), position));
         };
-
+        
         self.expect(TokenType::Semicolon, "Expected ';' after using declaration")?;
-
+        
         Ok(UsingDeclaration {
             namespace,
-            position,
-        })
-    }
-
-    /// Parse import declaration
-    fn parse_import(&mut self) -> Result<ImportDeclaration, ParseError> {
-        let import_token = self.expect(TokenType::Import, "Expected 'import'")?;
-        let position = Position::new(import_token.line, import_token.column);
-
-        // Parse module path (string literal or identifier path)
-        let module_path = if let Some(token) = self.peek() {
-            match &token.token_type {
-                TokenType::String(path) => {
-                    let path_clone = path.clone();
-                    self.advance(); // consume string
-                    path_clone
-                }
-                TokenType::Identifier(_) => {
-                    // Parse dotted identifier path like "math.geometry"
-                    let mut path_parts = Vec::new();
-
-                    loop {
-                        if let Some(token) = self.peek() {
-                            if let TokenType::Identifier(name) = &token.token_type {
-                                path_parts.push(name.clone());
-                                self.advance();
-
-                                // Check for dot separator
-                                if self.match_token(TokenType::Dot) {
-                                    continue;
-                                } else {
-                                    break;
-                                }
-                            } else {
-                                break;
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-
-                    if path_parts.is_empty() {
-                        return Err(ParseError::new("Expected module path".to_string(), position));
-                    }
-
-                    path_parts.join(".")
-                }
-                _ => {
-                    return Err(ParseError::new("Expected module path (string or identifier)".to_string(), position));
-                }
-            }
-        } else {
-            return Err(ParseError::new("Expected module path".to_string(), position));
-        };
-
-        // Parse optional import items: { item1, item2, ... }
-        let items = if self.match_token(TokenType::LeftBrace) {
-            let mut import_items = Vec::new();
-
-            if !self.check(&TokenType::RightBrace) {
-                loop {
-                    let item_token = self.expect(TokenType::Identifier(String::new()), "Expected import item name")?;
-                    if let TokenType::Identifier(item_name) = item_token.token_type {
-                        import_items.push(item_name);
-                    }
-
-                    if !self.match_token(TokenType::Comma) {
-                        break;
-                    }
-                }
-            }
-
-            self.expect(TokenType::RightBrace, "Expected '}' after import items")?;
-            Some(import_items)
-        } else {
-            None // Wildcard import
-        };
-
-        // Parse optional alias: as alias_name
-        let alias = if self.match_identifier("as") {
-            let alias_token = self.expect(TokenType::Identifier(String::new()), "Expected alias name")?;
-            if let TokenType::Identifier(alias_name) = alias_token.token_type {
-                Some(alias_name)
-            } else {
-                return Err(ParseError::new("Expected alias name".to_string(), position));
-            }
-        } else {
-            None
-        };
-
-        self.expect(TokenType::Semicolon, "Expected ';' after import declaration")?;
-
-        Ok(ImportDeclaration {
-            module_path,
-            items,
-            alias,
             position,
         })
     }

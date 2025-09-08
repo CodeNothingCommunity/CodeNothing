@@ -403,37 +403,6 @@ impl CodeGenerator {
         }
     }
 
-    /// Collect all functions from a program (first pass only)
-    pub fn collect_functions(&mut self, program: &Program) {
-        // First pass: collect function declarations only
-        for declaration in &program.declarations {
-            match declaration {
-                Declaration::Function(func) => {
-                    self.collect_function(func);
-                }
-                Declaration::Namespace(ns) => {
-                    // Collect functions from namespace recursively
-                    self.collect_nested_namespace_functions(&[], ns);
-                }
-                Declaration::Package(pkg) => {
-                    // Collect functions from package recursively
-                    self.collect_package_functions(&[], pkg);
-                }
-                Declaration::Class(class_decl) => {
-                    // Collect class methods
-                    self.collect_class_methods(class_decl);
-                }
-                Declaration::Memo(memo) => {
-                    // Collect memo functions
-                    self.collect_memo_functions(memo);
-                }
-                _ => {
-                    // Other declarations don't define functions
-                }
-            }
-        }
-    }
-
     /// Generate code for a complete program
     pub fn generate_program(&mut self, program: &Program) -> Result<Vec<Chunk>, Vec<CodeGenError>> {
         self.errors.clear();
@@ -447,10 +416,6 @@ impl CodeGenerator {
                 Declaration::Namespace(ns) => {
                     // Collect functions from namespace recursively
                     self.collect_nested_namespace_functions(&[], ns);
-                }
-                Declaration::Package(pkg) => {
-                    // Collect functions from package recursively
-                    self.collect_package_functions(&[], pkg);
                 }
                 Declaration::Variable(stmt) => {
                     // Process global variable declaration
@@ -567,69 +532,6 @@ impl CodeGenerator {
 
         // Restore namespace context
         self.current_namespace = old_namespace;
-    }
-
-    /// Collect package functions recursively (first pass)
-    fn collect_package_functions(&mut self, parent_path: &[String], pkg: &PackageDeclaration) {
-        let mut current_path = parent_path.to_vec();
-        current_path.push(pkg.name.clone());
-
-        for item in &pkg.items {
-            match item {
-                PackageItem::Function(func) => {
-                    let full_name = format!("{}::{}", current_path.join("::"), func.name);
-                    let chunk_index = self.chunks.len();
-                    let chunk = Chunk::new(full_name.clone());
-                    self.chunks.push(chunk);
-
-                    let return_type = func.return_type.as_ref()
-                        .map(|t| Type::from(t.clone()))
-                        .unwrap_or(Type::Null);
-
-                    let func_info = FunctionInfo {
-                        chunk_index,
-                        parameter_count: func.parameters.len(),
-                        return_type,
-                    };
-
-                    self.functions.insert(full_name, func_info);
-                }
-                PackageItem::Namespace(nested_ns) => {
-                    // Recursively collect nested namespace functions
-                    self.collect_nested_namespace_functions(&current_path, nested_ns);
-                }
-                PackageItem::Package(nested_pkg) => {
-                    // Recursively collect nested package functions
-                    self.collect_package_functions(&current_path, nested_pkg);
-                }
-                PackageItem::Variable(stmt) => {
-                    // Handle package variables
-                    if let Statement::VarDeclaration { name, type_annotation, .. } = stmt {
-                        let full_name = format!("{}::{}", current_path.join("::"), name);
-                        let var_type = type_annotation.as_ref()
-                            .map(|t| Type::from(t.clone()))
-                            .unwrap_or(Type::Auto(Box::new(Type::Unknown)));
-
-                        let var_info = VariableInfo {
-                            index: self.global_count,
-                            is_global: true,
-                            var_type,
-                        };
-
-                        if self.debug_mode {
-                            println!("🔧 CodeGen: Collecting package variable '{}' at index {}", full_name, self.global_count);
-                        }
-
-                        self.variables.insert(full_name, var_info);
-                        self.global_count += 1;
-                    }
-                }
-                PackageItem::Enum(_) | PackageItem::Struct(_) | PackageItem::Class(_) |
-                PackageItem::Trait(_) | PackageItem::Impl(_) => {
-                    // These don't need collection in the first pass
-                }
-            }
-        }
     }
 
     /// Collect nested namespace functions recursively (first pass)
@@ -832,17 +734,9 @@ impl CodeGenerator {
                 // Generate class methods
                 self.generate_class_methods(class_decl);
             }
-            Declaration::Package(pkg) => {
-                // Generate code for package items
-                self.generate_package_declaration(pkg);
-            },
             Declaration::LibImport(stmt) => {
                 // Library imports are handled at compile time, generate the statement
                 self.generate_statement(stmt);
-            }
-            Declaration::Import(_) => {
-                // External package imports are handled by the semantic analyzer
-                // No code generation needed for import statements
             }
         }
     }
@@ -888,110 +782,6 @@ impl CodeGenerator {
 
         // Restore namespace context
         self.current_namespace = old_namespace;
-    }
-
-    /// Generate code for package declaration
-    fn generate_package_declaration(&mut self, pkg: &PackageDeclaration) {
-        self.generate_package_items(&[], pkg);
-    }
-
-    /// Generate code for package items recursively
-    fn generate_package_items(&mut self, parent_path: &[String], pkg: &PackageDeclaration) {
-        let mut current_path = parent_path.to_vec();
-        current_path.push(pkg.name.clone());
-
-        // Save current namespace context
-        let old_namespace = self.current_namespace.clone();
-        self.current_namespace = Some(current_path.join("::"));
-
-        // Generate code for all package items
-        for item in &pkg.items {
-            match item {
-                PackageItem::Function(func) => {
-                    self.generate_package_function(&current_path, func);
-                }
-                PackageItem::Namespace(ns) => {
-                    self.generate_nested_namespace_functions(&current_path, ns);
-                }
-                PackageItem::Package(nested_pkg) => {
-                    self.generate_package_items(&current_path, nested_pkg);
-                }
-                PackageItem::Variable(stmt) => {
-                    self.generate_statement(stmt);
-                }
-                PackageItem::Enum(enum_decl) => {
-                    self.generate_declaration(&Declaration::Enum(enum_decl.clone()));
-                }
-                PackageItem::Struct(struct_decl) => {
-                    self.generate_declaration(&Declaration::Struct(struct_decl.clone()));
-                }
-                PackageItem::Class(class_decl) => {
-                    self.generate_declaration(&Declaration::Class(class_decl.clone()));
-                }
-                PackageItem::Trait(trait_decl) => {
-                    self.generate_declaration(&Declaration::Trait(trait_decl.clone()));
-                }
-                PackageItem::Impl(impl_decl) => {
-                    self.generate_declaration(&Declaration::Impl(impl_decl.clone()));
-                }
-            }
-        }
-
-        // Restore namespace context
-        self.current_namespace = old_namespace;
-    }
-
-    /// Generate code for package function
-    fn generate_package_function(&mut self, package_path: &[String], function: &FunctionDeclaration) {
-        let full_name = format!("{}::{}", package_path.join("::"), function.name);
-        if let Some(func_info) = self.functions.get(&full_name).cloned() {
-            let old_chunk = self.current_chunk;
-            let old_namespace = self.current_namespace.clone();
-            self.current_chunk = func_info.chunk_index;
-            self.current_namespace = Some(package_path.join("::"));
-
-            // Save current variables and reset local variable count
-            let old_variables = self.variables.clone();
-            let old_local_count = self.local_count;
-            self.local_count = 0;
-
-            // Add function parameters as local variables
-            for (i, param) in function.parameters.iter().enumerate() {
-                let param_type = Type::from(param.type_annotation.clone());
-
-                let var_info = VariableInfo {
-                    index: i,
-                    is_global: false,
-                    var_type: param_type,
-                };
-                self.variables.insert(param.name.clone(), var_info);
-                self.local_count += 1;
-            }
-
-            // Generate function body
-            self.generate_statement(&function.body);
-
-            // Ensure function returns a value
-            if !self.chunks[self.current_chunk].instructions.is_empty() {
-                let last_instruction = &self.chunks[self.current_chunk].instructions.last().unwrap().opcode;
-                if !matches!(last_instruction, OpCode::Return) {
-                    self.emit_instruction(Instruction::new(OpCode::Return, 0));
-                }
-            } else {
-                self.emit_instruction(Instruction::new(OpCode::Return, 0));
-            }
-
-            // Restore state
-            self.current_chunk = old_chunk;
-            self.current_namespace = old_namespace;
-            self.variables = old_variables;
-            self.local_count = old_local_count;
-
-            // Remove function parameters from variables
-            for param in &function.parameters {
-                self.variables.remove(&param.name);
-            }
-        }
     }
 
     /// Generate code for nested namespace function
@@ -2280,55 +2070,6 @@ impl CodeGenerator {
                             let const_index = self.add_constant(Value::Int(param_count as i64));
                             self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
                             self.emit_instruction(Instruction::with_u16(OpCode::Call, func_info.chunk_index as u16, 0));
-                        } else if let Some(func_type) = self.type_env.lookup_in_namespace(&namespace_path.join("::"), name) {
-                            // Look up function in type environment namespace (external module function)
-                            if let Type::Function { parameters, .. } = func_type {
-                                let param_count = parameters.len();
-                                if self.debug_mode {
-                                    println!("🔧 CodeGen: Found external module function '{}' in namespace '{}' with {} parameters", name, namespace_path.join("::"), param_count);
-                                }
-
-                                // For external module functions, we need to map the aliased name to the actual function name
-                                // Try different possible mappings for external module functions
-                                let mut found_function = None;
-
-                                // First try the full aliased name
-                                if let Some(func_info) = self.functions.get(&full_name).cloned() {
-                                    found_function = Some(func_info);
-                                } else {
-                                    // Try to find the original function name by removing the alias prefix
-                                    // For example: MathLib::math::add -> math::add
-                                    if namespace_path.len() >= 2 {
-                                        let original_namespace = &namespace_path[1..]; // Skip the alias part
-                                        let original_full_name = format!("{}::{}", original_namespace.join("::"), name);
-                                        if let Some(func_info) = self.functions.get(&original_full_name).cloned() {
-                                            if self.debug_mode {
-                                                println!("🔧 CodeGen: Found external module function '{}' mapped from '{}' to '{}'", name, full_name, original_full_name);
-                                            }
-                                            found_function = Some(func_info);
-                                        }
-                                    }
-                                }
-
-                                if let Some(func_info) = found_function {
-                                    // Function is already compiled, call it directly
-                                    let const_index = self.add_constant(Value::Int(param_count as i64));
-                                    self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
-                                    self.emit_instruction(Instruction::with_u16(OpCode::Call, func_info.chunk_index as u16, 0));
-                                } else {
-                                    // Function not compiled yet, this should be handled by ensuring all imported functions are compiled
-                                    self.errors.push(CodeGenError::new(
-                                        format!("External module function '{}' in namespace '{}' not compiled", name, namespace_path.join("::")),
-                                        position.clone()
-                                    ));
-                                }
-                            } else {
-                                let namespace_str = namespace_path.join("::");
-                                self.errors.push(CodeGenError::new(
-                                    format!("'{}' in namespace '{}' is not a function", name, namespace_str),
-                                    position.clone()
-                                ));
-                            }
                         } else {
                             // Check if this is a library function
                             if let Ok(exists) = crate::library_loader::check_library_function_exists(&full_name) {
@@ -2408,18 +2149,12 @@ impl CodeGenerator {
             }
             Expression::NamespaceAccess { namespace_path, name, position } => {
                 let full_name = format!("{}::{}", namespace_path.join("::"), name);
-                let namespace_str = namespace_path.join("::");
-
                 if let Some((_, _)) = self.builtins.get(&full_name) {
                     // Built-in function reference
                     let const_index = self.add_constant(Value::String(full_name.into()));
                     self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
                 } else if self.functions.contains_key(&full_name) {
                     // User-defined namespace function reference
-                    let const_index = self.add_constant(Value::String(full_name.into()));
-                    self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
-                } else if let Some(_func_type) = self.type_env.lookup_in_namespace(&namespace_str, name) {
-                    // Function reference from type environment namespace
                     let const_index = self.add_constant(Value::String(full_name.into()));
                     self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
                 } else if let Some(var_info) = self.variables.get(&full_name) {

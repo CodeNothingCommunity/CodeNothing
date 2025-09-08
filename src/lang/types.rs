@@ -564,25 +564,6 @@ impl TypeEnvironment {
         self.functions.insert(name, func_type);
         Ok(())
     }
-
-    /// Define a function in a specific namespace
-    pub fn define_function_in_namespace(&mut self, namespace: &str, name: String, func_type: Type) -> Result<(), String> {
-        // Create the namespace if it doesn't exist
-        if !self.namespaces.contains_key(namespace) {
-            self.namespaces.insert(namespace.to_string(), NamespaceInfo::new());
-        }
-
-        // Get the namespace and define the function
-        if let Some(ns_info) = self.namespaces.get_mut(namespace) {
-            if ns_info.functions.contains_key(&name) {
-                return Err(format!("Function '{}' already defined in namespace '{}'", name, namespace));
-            }
-            ns_info.functions.insert(name, func_type);
-            Ok(())
-        } else {
-            Err(format!("Failed to access namespace '{}'", namespace))
-        }
-    }
     
     /// Look up a function type
     pub fn lookup_function(&self, name: &str) -> Option<&Type> {
@@ -596,10 +577,7 @@ impl TypeEnvironment {
     
     /// Define a namespace
     pub fn define_namespace(&mut self, name: String) {
-        // Only create the namespace if it doesn't already exist
-        if !self.namespaces.contains_key(&name) {
-            self.namespaces.insert(name, NamespaceInfo::new());
-        }
+        self.namespaces.insert(name, NamespaceInfo::new());
     }
 
     /// Check if a namespace exists
@@ -678,32 +656,9 @@ impl TypeEnvironment {
     /// Look up item in nested namespace
     pub fn lookup_in_nested_namespace(&self, namespace_path: &[String], name: &str) -> Option<&Type> {
         if namespace_path.is_empty() {
-            println!("🔧 TypeEnv: lookup_in_nested_namespace - empty namespace path");
             return None;
         }
 
-        println!("🔧 TypeEnv: lookup_in_nested_namespace - looking for '{}' in namespace path {:?}", name, namespace_path);
-        println!("🔧 TypeEnv: Available namespaces: {:?}", self.namespaces.keys().collect::<Vec<_>>());
-
-        // First try to find the full namespace path as a single namespace
-        let full_namespace = namespace_path.join("::");
-        println!("🔧 TypeEnv: Trying full namespace: '{}'", full_namespace);
-        if let Some(namespace_info) = self.namespaces.get(&full_namespace) {
-            println!("🔧 TypeEnv: Found full namespace '{}' with {} functions", full_namespace, namespace_info.functions.len());
-            println!("🔧 TypeEnv: Functions in namespace: {:?}", namespace_info.functions.keys().collect::<Vec<_>>());
-            let result = namespace_info.functions.get(name)
-                .or_else(|| namespace_info.variables.get(name));
-            if result.is_some() {
-                println!("🔧 TypeEnv: Found function '{}' in full namespace '{}'", name, full_namespace);
-            } else {
-                println!("🔧 TypeEnv: Function '{}' not found in full namespace '{}'", name, full_namespace);
-            }
-            return result;
-        }
-
-        println!("🔧 TypeEnv: Full namespace '{}' not found, trying hierarchical lookup", full_namespace);
-
-        // Fallback to hierarchical lookup
         let root_name = &namespace_path[0];
         let mut current_namespace = self.namespaces.get(root_name)?;
 
