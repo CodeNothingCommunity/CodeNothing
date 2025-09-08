@@ -1,0 +1,20 @@
+// Test selective include functionality
+using ns lang;
+
+include "include_test_utils.cn" { add_numbers, MAX_VALUE };
+
+fn main() : int {
+    lang::println("=== Selective Include Test ===");
+    
+    // Test included function
+    var result : int = add_numbers(15, 25);
+    lang::print("add_numbers(15, 25) = ");
+    lang::println(lang::to_string(result));
+    
+    // Test included variable
+    lang::print("MAX_VALUE = ");
+    lang::println(lang::to_string(MAX_VALUE));
+    
+    lang::println("=== Selective include test completed ===");
+    return 0;
+}

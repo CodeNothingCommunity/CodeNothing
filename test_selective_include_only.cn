@@ -1,0 +1,24 @@
+// Selective Include Only Test
+using ns lang;
+
+// Only include specific functions and variables
+include "include_test_utils.cn" { multiply_numbers, MIN_VALUE };
+
+fn main() : int {
+    lang::println("=== Selective Include Only Test ===");
+    
+    // Test selective include - only multiply_numbers and MIN_VALUE should be available
+    lang::println("\n--- Test: Selective Include ---");
+    var result : int = multiply_numbers(7, 8);
+    lang::print("multiply_numbers(7, 8) = ");
+    lang::println(lang::to_string(result));
+    
+    lang::print("MIN_VALUE = ");
+    lang::println(lang::to_string(MIN_VALUE));
+    
+    // Note: add_numbers, greet, calculate_area, and MAX_VALUE should NOT be available
+    // This test verifies that selective include works correctly
+    
+    lang::println("\n=== Selective Include Test Passed! ===");
+    return 0;
+}

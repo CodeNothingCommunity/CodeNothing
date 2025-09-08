@@ -13,6 +13,7 @@ pub mod types;
 pub mod semantic;
 pub mod codegen;
 pub mod builtins;
+pub mod include_processor;
 
 pub use lexer::*;
 pub use parser::*;

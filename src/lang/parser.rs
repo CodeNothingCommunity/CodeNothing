@@ -175,6 +175,10 @@ impl Parser {
                     let using = self.parse_using()?;
                     Ok(Declaration::Using(using))
                 }
+                TokenType::Include => {
+                    let include_decl = self.parse_include()?;
+                    Ok(Declaration::Include(include_decl))
+                }
                 TokenType::Memo => {
                     let memo = self.parse_memo()?;
                     Ok(Declaration::Memo(memo))
@@ -207,6 +211,11 @@ impl Parser {
                 TokenType::Lib => {
                     let lib_import = self.parse_lib_import_statement()?;
                     Ok(Declaration::LibImport(lib_import))
+                }
+                TokenType::Var | TokenType::Let | TokenType::Const => {
+                    // Global variable declaration: var/let/const name : type = value;
+                    let stmt = self.parse_variable_declaration()?;
+                    Ok(Declaration::Variable(stmt))
                 }
                 TokenType::Identifier(_) => {
                     // Global variable declaration: name : type = value;
@@ -597,20 +606,81 @@ impl Parser {
     fn parse_using(&mut self) -> Result<UsingDeclaration, ParseError> {
         let using_token = self.expect(TokenType::Using, "Expected 'using'")?;
         let position = Position::new(using_token.line, using_token.column);
-        
+
         self.expect(TokenType::Ns, "Expected 'ns' after 'using'")?;
-        
+
         let name_token = self.expect(TokenType::Identifier(String::new()), "Expected namespace name")?;
         let namespace = if let TokenType::Identifier(n) = name_token.token_type {
             n
         } else {
             return Err(ParseError::new("Expected namespace name".to_string(), position));
         };
-        
+
         self.expect(TokenType::Semicolon, "Expected ';' after using declaration")?;
-        
+
         Ok(UsingDeclaration {
             namespace,
+            position,
+        })
+    }
+
+    /// Parse include declaration
+    fn parse_include(&mut self) -> Result<IncludeDeclaration, ParseError> {
+        let include_token = self.expect(TokenType::Include, "Expected 'include'")?;
+        let position = Position::new(include_token.line, include_token.column);
+
+        // Parse file path (string literal)
+        let path_token = self.expect(TokenType::String(String::new()), "Expected file path string after 'include'")?;
+        let path = if let TokenType::String(p) = path_token.token_type {
+            p
+        } else {
+            return Err(ParseError::new("Expected file path string".to_string(), position));
+        };
+
+        // Parse optional alias: "as alias"
+        let alias = if self.match_token(TokenType::Identifier("as".to_string())) {
+            let alias_token = self.expect(TokenType::Identifier(String::new()), "Expected alias name after 'as'")?;
+            if let TokenType::Identifier(a) = alias_token.token_type {
+                Some(a)
+            } else {
+                return Err(ParseError::new("Expected alias name".to_string(), position));
+            }
+        } else {
+            None
+        };
+
+        // Parse optional selective imports: { item1, item2, ... }
+        let selective_imports = if self.match_token(TokenType::LeftBrace) {
+            let mut imports = Vec::new();
+
+            // Parse first import
+            if !self.check(&TokenType::RightBrace) {
+                let import_token = self.expect(TokenType::Identifier(String::new()), "Expected import name")?;
+                if let TokenType::Identifier(name) = import_token.token_type {
+                    imports.push(name);
+                }
+
+                // Parse additional imports
+                while self.match_token(TokenType::Comma) {
+                    let import_token = self.expect(TokenType::Identifier(String::new()), "Expected import name after ','")?;
+                    if let TokenType::Identifier(name) = import_token.token_type {
+                        imports.push(name);
+                    }
+                }
+            }
+
+            self.expect(TokenType::RightBrace, "Expected '}' after selective imports")?;
+            Some(imports)
+        } else {
+            None
+        };
+
+        self.expect(TokenType::Semicolon, "Expected ';' after include declaration")?;
+
+        Ok(IncludeDeclaration {
+            path,
+            alias,
+            selective_imports,
             position,
         })
     }

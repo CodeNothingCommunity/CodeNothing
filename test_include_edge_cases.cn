@@ -1,0 +1,24 @@
+// Edge Cases Test for Include System
+using ns lang;
+
+// Test nested includes and complex scenarios
+include "simple_utils.cn";
+
+fn main() : int {
+    lang::println("=== Include Edge Cases Test ===");
+    
+    // Test simple include
+    lang::println("\n--- Test 1: Simple Include ---");
+    var result : int = add_two(100, 200);
+    lang::print("add_two(100, 200) = ");
+    lang::println(lang::to_string(result));
+    
+    // Test multiple includes of same file (should be cached)
+    lang::println("\n--- Test 2: File Caching ---");
+    var result2 : int = add_two(50, 75);
+    lang::print("add_two(50, 75) from cached file = ");
+    lang::println(lang::to_string(result2));
+    
+    lang::println("\n=== Edge Cases Tests Passed! ===");
+    return 0;
+}

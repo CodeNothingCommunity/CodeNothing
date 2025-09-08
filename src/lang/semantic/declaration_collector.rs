@@ -142,6 +142,10 @@ impl SemanticAnalyzer {
             Declaration::LibImport(_) => {
                 // Library imports are handled at compile time, no collection needed
             }
+            Declaration::Include(_) => {
+                // Include declarations are processed before semantic analysis
+                // No additional symbol collection needed here
+            }
         }
     }
 

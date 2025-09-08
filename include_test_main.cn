@@ -1,0 +1,42 @@
+// Main file testing include functionality
+using ns lang;
+
+// Test basic include
+include "include_test_utils.cn";
+
+// Test selective include (when implemented)
+// include "include_test_utils.cn" { add_numbers, greet };
+
+// Test aliased include (when implemented)  
+// include "include_test_utils.cn" as utils;
+
+fn main() : int {
+    lang::println("=== Include System Test ===");
+    
+    // Test included functions
+    var result1 : int = add_numbers(10, 20);
+    lang::print("add_numbers(10, 20) = ");
+    lang::println(lang::to_string(result1));
+    
+    var result2 : int = multiply_numbers(5, 6);
+    lang::print("multiply_numbers(5, 6) = ");
+    lang::println(lang::to_string(result2));
+    
+    var greeting : string = greet("CodeNothing");
+    lang::print("greet(\"CodeNothing\") = ");
+    lang::println(greeting);
+    
+    var area : int = calculate_area(8, 12);
+    lang::print("calculate_area(8, 12) = ");
+    lang::println(lang::to_string(area));
+    
+    // Test included constants
+    lang::print("MAX_VALUE = ");
+    lang::println(lang::to_string(MAX_VALUE));
+    
+    lang::print("MIN_VALUE = ");
+    lang::println(lang::to_string(MIN_VALUE));
+    
+    lang::println("=== Include test completed ===");
+    return 0;
+}

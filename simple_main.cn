@@ -1,0 +1,12 @@
+// Simple main file
+using ns lang;
+
+include "simple_utils.cn";
+
+fn main() : int {
+    lang::println("Testing simple include...");
+    var result : int = add_two(5, 3);
+    lang::print("5 + 3 = ");
+    lang::println(lang::to_string(result));
+    return 0;
+}

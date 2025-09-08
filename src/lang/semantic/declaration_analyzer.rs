@@ -49,6 +49,10 @@ impl SemanticAnalyzer {
                 // Library imports are handled by statement analyzer
                 self.analyze_statement(stmt);
             }
+            Declaration::Include(_) => {
+                // Include declarations are processed before semantic analysis
+                // No additional analysis needed here
+            }
         }
     }
     

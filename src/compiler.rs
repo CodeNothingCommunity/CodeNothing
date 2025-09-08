@@ -8,6 +8,7 @@ use std::fs;
 
 use crate::core::bytecode_file::ComcnFile;
 use crate::lang::{Lexer, Parser, SemanticAnalyzer, CodeGenerator};
+use crate::lang::include_processor::{IncludeProcessor, IncludeError};
 
 /// Compilation options
 #[derive(Debug, Clone)]
@@ -153,7 +154,34 @@ impl Compiler {
         };
         
         if self.options.verbose {
-            messages.push("3. Semantic analysis...".to_string());
+            messages.push("3. Processing includes...".to_string());
+        }
+
+        // Process includes
+        let input_path = input_file.as_ref();
+        let mut include_processor = IncludeProcessor::new(
+            input_path.parent().unwrap_or(Path::new(".")).to_path_buf()
+        );
+        let ast = match include_processor.process_program(ast, input_path.to_path_buf()) {
+            Ok(processed_ast) => {
+                if self.options.verbose {
+                    messages.push(format!("   Include processing completed successfully. Declarations: {}", processed_ast.declarations.len()));
+                }
+                processed_ast
+            }
+            Err(include_error) => {
+                messages.push(format!("Include error: {}", include_error));
+                return CompileResult {
+                    output_file: output_path,
+                    success: false,
+                    messages,
+                    bytecode: None,
+                };
+            }
+        };
+
+        if self.options.verbose {
+            messages.push("4. Semantic analysis...".to_string());
         }
         
         // Semantic analysis
@@ -190,7 +218,7 @@ impl Compiler {
         }
         
         if self.options.verbose {
-            messages.push("4. Code generation...".to_string());
+            messages.push("5. Code generation...".to_string());
         }
         
         // Code generation
@@ -216,7 +244,7 @@ impl Compiler {
         }
 
         if self.options.verbose {
-            messages.push("5. Creating bytecode file...".to_string());
+            messages.push("6. Creating bytecode file...".to_string());
         }
 
         // Create bytecode file

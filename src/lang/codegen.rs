@@ -420,15 +420,15 @@ impl CodeGenerator {
                 Declaration::Variable(stmt) => {
                     // Process global variable declaration
                     if let Statement::VarDeclaration { scope, name, .. } = stmt {
-                        // Only collect variables with Global scope
-                        if matches!(scope, VarScope::Global) {
+                        // Collect variables with Global scope or top-level Var/Let/Const scope
+                        if matches!(scope, VarScope::Global | VarScope::Var | VarScope::Let | VarScope::Const) {
                             let var_info = VariableInfo {
                                 index: self.global_count,
                                 is_global: true,
                                 var_type: constants::DEFAULT_GLOBAL_VAR_TYPE, // Will be determined later
                             };
                             if self.debug_mode {
-                                println!("🔧 CodeGen: Collecting global variable '{}' at index {}", name, self.global_count);
+                                println!("🔧 CodeGen: Collecting global variable '{}' at index {} with scope {:?}", name, self.global_count, scope);
                             }
                             self.variables.insert(name.clone(), var_info);
                             self.global_count += 1;
@@ -488,9 +488,9 @@ impl CodeGenerator {
     fn generate_global_initializers(&mut self, declaration: &Declaration) {
         match declaration {
             Declaration::Variable(stmt) => {
-                // Generate global variable initialization only for global scope variables
+                // Generate global variable initialization for global scope and top-level variables
                 if let Statement::VarDeclaration { scope, .. } = stmt {
-                    if matches!(scope, VarScope::Global) {
+                    if matches!(scope, VarScope::Global | VarScope::Var | VarScope::Let | VarScope::Const) {
                         self.generate_statement(stmt);
                     }
                 }
@@ -737,6 +737,10 @@ impl CodeGenerator {
             Declaration::LibImport(stmt) => {
                 // Library imports are handled at compile time, generate the statement
                 self.generate_statement(stmt);
+            }
+            Declaration::Include(_) => {
+                // Include declarations are processed before code generation
+                // No bytecode generation needed here
             }
         }
     }

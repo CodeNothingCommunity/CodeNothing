@@ -1,0 +1,7 @@
+using ns lang;
+
+var TEST_VAR : int = 42;
+
+fn main() : int {
+    return 0;
+}

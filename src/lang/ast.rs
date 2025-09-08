@@ -787,6 +787,15 @@ pub struct UsingDeclaration {
     pub position: Position,
 }
 
+/// Include declarations
+#[derive(Debug, Clone, PartialEq)]
+pub struct IncludeDeclaration {
+    pub path: String,
+    pub alias: Option<String>,
+    pub selective_imports: Option<Vec<String>>, // For selective imports: include "file.cn" { func1, Class1 }
+    pub position: Position,
+}
+
 /// Memo declaration parameters
 #[derive(Debug, Clone, PartialEq)]
 pub struct MemoParams {
@@ -816,6 +825,7 @@ pub enum Declaration {
     Function(FunctionDeclaration),
     Namespace(NamespaceDeclaration),
     Using(UsingDeclaration),
+    Include(IncludeDeclaration), // Include declaration
     Variable(Statement), // Global variable declaration
     Memo(MemoDeclaration), // 记忆化声明
     Enum(EnumDeclaration),
@@ -903,6 +913,17 @@ impl AstPrinter {
             Declaration::Function(func) => self.print_function(func),
             Declaration::Namespace(ns) => self.print_namespace(ns),
             Declaration::Using(using) => format!("using ns {};", using.namespace),
+            Declaration::Include(include) => {
+                let mut result = format!("include \"{}\"", include.path);
+                if let Some(alias) = &include.alias {
+                    result.push_str(&format!(" as {}", alias));
+                }
+                if let Some(imports) = &include.selective_imports {
+                    result.push_str(&format!(" {{ {} }}", imports.join(", ")));
+                }
+                result.push(';');
+                result
+            },
             Declaration::Variable(stmt) => self.print_statement(stmt),
             Declaration::Memo(memo) => format!("memo {{ ... }}"), // 简化打印
             Declaration::Enum(enum_decl) => format!("enum {} {{ ... }}", enum_decl.name),

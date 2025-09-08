@@ -1,0 +1,22 @@
+// Include test utilities module
+using ns lang;
+
+fn add_numbers(a : int, b : int) : int {
+    return a + b;
+}
+
+fn multiply_numbers(a : int, b : int) : int {
+    return a * b;
+}
+
+fn greet(name : string) : string {
+    return "Hello, " + name + "!";
+}
+
+fn calculate_area(width : int, height : int) : int {
+    return width * height;
+}
+
+// Test constants
+var MAX_VALUE : int = 1000;
+var MIN_VALUE : int = 0;

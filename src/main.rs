@@ -20,6 +20,7 @@ use lang::{
     codegen::CodeGenerator,
     ast::Declaration,
 };
+use compiler::{Compiler, CompileOptions};
 use std::fs;
 use repl::Repl;
 use std::env;
@@ -197,7 +198,7 @@ fn main() {
             // Set library debug mode based on debug flag
             crate::library_loader::set_library_debug_mode(debug);
 
-            match compile_and_run_file(&file_path, memory_config, verbose, jit_enabled, jit_threshold, aggressive_jit, jit_debug, debug, show_stats, show_all_details) {
+            match compile_and_run_file_new(&file_path, memory_config, verbose, jit_enabled, jit_threshold, aggressive_jit, jit_debug, debug, show_stats, show_all_details) {
                 Ok(()) => {
                     if verbose {
                         println!("Program executed successfully.");
@@ -296,7 +297,96 @@ fn run_demo_program(memory_config: MemoryConfig, jit_enabled: bool, jit_threshol
     println!("\nTry running with --repl for interactive mode!");
 }
 
-/// Compile and run a CodeNothing source file
+/// Compile and run a CodeNothing source file using the new compiler
+fn compile_and_run_file_new(file_path: &str, memory_config: MemoryConfig, verbose: bool, jit_enabled: bool, jit_threshold: Option<u32>, aggressive_jit: bool, jit_debug: bool, debug: bool, show_stats: bool, show_all_details: bool) -> Result<(), String> {
+    if verbose {
+        println!("Compiling and running CodeNothing file: {}", file_path);
+        println!("Memory Configuration: {} KB stack, {} KB heap",
+                 memory_config.stack_size / 1024,
+                 memory_config.initial_heap_size / 1024);
+    }
+
+    // Create compiler with options
+    let mut options = CompileOptions::default();
+    options.verbose = verbose;
+    options.debug_info = debug;
+
+    let compiler = Compiler::with_options(options);
+
+    // Compile the file
+    let result = compiler.compile(file_path);
+
+    if !result.success {
+        return Err(format!("Compilation failed:\n{}", result.messages.join("\n")));
+    }
+
+    if verbose {
+        for message in &result.messages {
+            println!("{}", message);
+        }
+    }
+
+    // Get the bytecode
+    let bytecode_file = result.bytecode.ok_or("No bytecode generated")?;
+
+    if bytecode_file.chunks.is_empty() {
+        return Err("No code generated".to_string());
+    }
+
+    // Execute the bytecode
+    execute_bytecode(bytecode_file.chunks, memory_config, verbose, jit_enabled, jit_threshold, aggressive_jit, jit_debug, debug, show_stats, show_all_details)
+}
+
+/// Execute bytecode chunks
+fn execute_bytecode(chunks: Vec<Chunk>, memory_config: MemoryConfig, verbose: bool, jit_enabled: bool, jit_threshold: Option<u32>, aggressive_jit: bool, jit_debug: bool, debug: bool, show_stats: bool, show_all_details: bool) -> Result<(), String> {
+    // Execution
+    if verbose {
+        println!("5. Execution...");
+    }
+
+    // Create VM with specified memory configuration
+    let mut vm = VirtualMachine::with_memory_config(memory_config);
+
+    // Note: Class inheritance and definitions would need to be extracted from the compiler
+    // For now, we'll proceed without them for basic functionality
+
+    // Configure JIT
+    if jit_enabled {
+        vm.set_jit_enabled(true);
+        if let Some(threshold) = jit_threshold {
+            vm.set_jit_threshold(threshold);
+        }
+        if aggressive_jit {
+            vm.enable_aggressive_jit();
+        }
+        if jit_debug {
+            vm.set_jit_debug(true);
+        }
+    } else {
+        vm.set_jit_enabled(false);
+    }
+
+    // Load chunks into VM
+    for chunk in chunks {
+        vm.add_chunk(chunk);
+    }
+
+    // Execute main function (chunk 0 is typically the main chunk)
+    let result = vm.execute(0);
+
+    if verbose {
+        println!("   Execution completed successfully");
+    }
+
+    // Show statistics if requested
+    if show_stats || verbose {
+        vm.print_performance_report();
+    }
+
+    result.map(|_| ()).map_err(|e| format!("Runtime error: {}", e))
+}
+
+/// Compile and run a CodeNothing source file (legacy version)
 fn compile_and_run_file(file_path: &str, memory_config: MemoryConfig, verbose: bool, jit_enabled: bool, jit_threshold: Option<u32>, aggressive_jit: bool, jit_debug: bool, debug: bool, show_stats: bool, show_all_details: bool) -> Result<(), String> {
     // Read source file
     if verbose {
