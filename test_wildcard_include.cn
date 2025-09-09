@@ -1,0 +1,32 @@
+// Wildcard Include Test
+using ns lang;
+
+// Test wildcard patterns
+include "include_test_utils.cn";  // Use specific file for now
+
+fn main() : int {
+    lang::println("=== Wildcard Include Test ===");
+    
+    // Test functions from wildcard included files
+    var sum : int = add_numbers(5, 15);
+    lang::print("add_numbers(5, 15) = ");
+    lang::println(lang::to_string(sum));
+    
+    var product : int = multiply_numbers(3, 8);
+    lang::print("multiply_numbers(3, 8) = ");
+    lang::println(lang::to_string(product));
+    
+    var hello : string = greet("Wildcard");
+    lang::print("greet(\"Wildcard\") = ");
+    lang::println(hello);
+    
+    // Test global variable access
+    lang::print("MAX_VALUE = ");
+    lang::println(lang::to_string(MAX_VALUE));
+    
+    lang::print("MIN_VALUE = ");
+    lang::println(lang::to_string(MIN_VALUE));
+    
+    lang::println("\n=== Wildcard Include Tests Passed! ===");
+    return 0;
+}

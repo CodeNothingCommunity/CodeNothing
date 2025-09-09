@@ -1,0 +1,26 @@
+// Enhanced Include System Test
+using ns lang;
+
+// Test 1: Selective include with aliased imports
+include "include_test_utils.cn" { add_numbers as add, MAX_VALUE };
+
+fn main() : int {
+    lang::println("=== Enhanced Include System Test ===");
+    
+    // Test aliased import
+    lang::println("\n--- Test 1: Aliased Import ---");
+    var result1 : int = add(15, 25);
+    lang::print("add(15, 25) = ");
+    lang::println(lang::to_string(result1));
+    
+    // Test MAX_VALUE access
+    lang::print("MAX_VALUE = ");
+    lang::println(lang::to_string(MAX_VALUE));
+    
+    // Test that we can't access the original function name
+    lang::println("\n--- Test 2: Original function should not be accessible ---");
+    // This would cause an error: add_numbers(1, 2);
+    
+    lang::println("\n=== Enhanced Include Tests Passed! ===");
+    return 0;
+}

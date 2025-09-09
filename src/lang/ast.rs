@@ -787,12 +787,35 @@ pub struct UsingDeclaration {
     pub position: Position,
 }
 
+/// Include path specification
+#[derive(Debug, Clone, PartialEq)]
+pub enum IncludePath {
+    /// Simple file path: "file.cn"
+    Simple(String),
+    /// Wildcard path: "utils/*.cn" or "**/*.cn"
+    Wildcard(String),
+    /// Search path: <std/io> or <math>
+    Search(String),
+}
+
+/// Import specification for selective includes
+#[derive(Debug, Clone, PartialEq)]
+pub enum ImportSpec {
+    /// Import specific symbol: func1
+    Symbol(String),
+    /// Import with alias: func1 as my_func
+    Aliased { name: String, alias: String },
+    /// Import all: *
+    All,
+}
+
 /// Include declarations
 #[derive(Debug, Clone, PartialEq)]
 pub struct IncludeDeclaration {
-    pub path: String,
+    pub path: IncludePath,
     pub alias: Option<String>,
-    pub selective_imports: Option<Vec<String>>, // For selective imports: include "file.cn" { func1, Class1 }
+    pub selective_imports: Option<Vec<ImportSpec>>, // For selective imports: include "file.cn" { func1, Class1 as MyClass }
+    pub search_paths: Vec<String>, // Additional search paths for resolution
     pub position: Position,
 }
 
@@ -914,13 +937,32 @@ impl AstPrinter {
             Declaration::Namespace(ns) => self.print_namespace(ns),
             Declaration::Using(using) => format!("using ns {};", using.namespace),
             Declaration::Include(include) => {
-                let mut result = format!("include \"{}\"", include.path);
+                let mut result = String::from("include ");
+
+                // Print path
+                match &include.path {
+                    IncludePath::Simple(path) => result.push_str(&format!("\"{}\"", path)),
+                    IncludePath::Wildcard(pattern) => result.push_str(&format!("\"{}\"", pattern)),
+                    IncludePath::Search(name) => result.push_str(&format!("<{}>", name)),
+                }
+
+                // Print alias
                 if let Some(alias) = &include.alias {
                     result.push_str(&format!(" as {}", alias));
                 }
+
+                // Print selective imports
                 if let Some(imports) = &include.selective_imports {
-                    result.push_str(&format!(" {{ {} }}", imports.join(", ")));
+                    let import_strs: Vec<String> = imports.iter().map(|spec| {
+                        match spec {
+                            ImportSpec::Symbol(name) => name.clone(),
+                            ImportSpec::Aliased { name, alias } => format!("{} as {}", name, alias),
+                            ImportSpec::All => "*".to_string(),
+                        }
+                    }).collect();
+                    result.push_str(&format!(" {{ {} }}", import_strs.join(", ")));
                 }
+
                 result.push(';');
                 result
             },

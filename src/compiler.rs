@@ -159,9 +159,16 @@ impl Compiler {
 
         // Process includes
         let input_path = input_file.as_ref();
-        let mut include_processor = IncludeProcessor::new(
-            input_path.parent().unwrap_or(Path::new(".")).to_path_buf()
-        );
+        let base_dir = if let Some(parent) = input_path.parent() {
+            if parent.as_os_str().is_empty() {
+                std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+            } else {
+                parent.to_path_buf()
+            }
+        } else {
+            std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+        };
+        let mut include_processor = IncludeProcessor::new(base_dir);
         let ast = match include_processor.process_program(ast, input_path.to_path_buf()) {
             Ok(processed_ast) => {
                 if self.options.verbose {

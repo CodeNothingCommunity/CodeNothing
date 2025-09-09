@@ -1,0 +1,12 @@
+// Simple wildcard test
+using ns lang;
+
+include "simple*.cn";
+
+fn main() : int {
+    lang::println("Testing simple wildcard...");
+    var result : int = add_two(3, 7);
+    lang::print("add_two(3, 7) = ");
+    lang::println(lang::to_string(result));
+    return 0;
+}

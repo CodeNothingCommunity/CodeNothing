@@ -629,19 +629,54 @@ impl Parser {
         let include_token = self.expect(TokenType::Include, "Expected 'include'")?;
         let position = Position::new(include_token.line, include_token.column);
 
-        // Parse file path (string literal)
-        let path_token = self.expect(TokenType::String(String::new()), "Expected file path string after 'include'")?;
-        let path = if let TokenType::String(p) = path_token.token_type {
-            p
+        // Parse include path - can be string literal or search path
+        let path = if self.check(&TokenType::String(String::new())) {
+            // String literal: "file.cn" or "pattern/*.cn"
+            if let Some(path_token) = self.advance() {
+                if let TokenType::String(p) = &path_token.token_type {
+                    if p.contains('*') {
+                        IncludePath::Wildcard(p.clone())
+                    } else {
+                        IncludePath::Simple(p.clone())
+                    }
+                } else {
+                    return Err(ParseError::new("Expected file path string".to_string(), position));
+                }
+            } else {
+                return Err(ParseError::new("Unexpected end of input".to_string(), position));
+            }
+        } else if self.check(&TokenType::Less) {
+            // Search path: <std/io> or <math>
+            self.advance(); // consume '<'
+            let name_token = self.expect(TokenType::Identifier(String::new()), "Expected search path name")?;
+            let name = if let TokenType::Identifier(n) = &name_token.token_type {
+                n.clone()
+            } else {
+                return Err(ParseError::new("Expected search path name".to_string(), position));
+            };
+
+            // Handle nested paths like <std/io>
+            let mut full_name = name;
+            while self.check(&TokenType::Divide) {
+                self.advance(); // consume '/'
+                let part_token = self.expect(TokenType::Identifier(String::new()), "Expected path component")?;
+                if let TokenType::Identifier(part) = &part_token.token_type {
+                    full_name.push('/');
+                    full_name.push_str(part);
+                }
+            }
+
+            self.expect(TokenType::Greater, "Expected '>' after search path")?;
+            IncludePath::Search(full_name)
         } else {
-            return Err(ParseError::new("Expected file path string".to_string(), position));
+            return Err(ParseError::new("Expected file path string or search path".to_string(), position));
         };
 
         // Parse optional alias: "as alias"
         let alias = if self.match_token(TokenType::Identifier("as".to_string())) {
             let alias_token = self.expect(TokenType::Identifier(String::new()), "Expected alias name after 'as'")?;
-            if let TokenType::Identifier(a) = alias_token.token_type {
-                Some(a)
+            if let TokenType::Identifier(a) = &alias_token.token_type {
+                Some(a.clone())
             } else {
                 return Err(ParseError::new("Expected alias name".to_string(), position));
             }
@@ -649,22 +684,18 @@ impl Parser {
             None
         };
 
-        // Parse optional selective imports: { item1, item2, ... }
+        // Parse optional selective imports: { item1, item2 as alias, * }
         let selective_imports = if self.match_token(TokenType::LeftBrace) {
             let mut imports = Vec::new();
 
             // Parse first import
             if !self.check(&TokenType::RightBrace) {
-                let import_token = self.expect(TokenType::Identifier(String::new()), "Expected import name")?;
-                if let TokenType::Identifier(name) = import_token.token_type {
-                    imports.push(name);
-                }
+                imports.push(self.parse_import_spec()?);
 
                 // Parse additional imports
                 while self.match_token(TokenType::Comma) {
-                    let import_token = self.expect(TokenType::Identifier(String::new()), "Expected import name after ','")?;
-                    if let TokenType::Identifier(name) = import_token.token_type {
-                        imports.push(name);
+                    if !self.check(&TokenType::RightBrace) {
+                        imports.push(self.parse_import_spec()?);
                     }
                 }
             }
@@ -681,8 +712,39 @@ impl Parser {
             path,
             alias,
             selective_imports,
+            search_paths: Vec::new(), // TODO: Add support for custom search paths
             position,
         })
+    }
+
+    /// Parse import specification for selective imports
+    fn parse_import_spec(&mut self) -> Result<ImportSpec, ParseError> {
+        if self.check(&TokenType::Multiply) {
+            // Import all: * (using Multiply token as wildcard in import context)
+            self.advance();
+            Ok(ImportSpec::All)
+        } else {
+            // Import symbol or aliased symbol
+            let name_token = self.expect(TokenType::Identifier(String::new()), "Expected import name")?;
+            let name = if let TokenType::Identifier(n) = &name_token.token_type {
+                n.clone()
+            } else {
+                return Err(ParseError::new("Expected import name".to_string(), Position::new(0, 0)));
+            };
+
+            // Check for alias: name as alias
+            if self.match_token(TokenType::Identifier("as".to_string())) {
+                let alias_token = self.expect(TokenType::Identifier(String::new()), "Expected alias name after 'as'")?;
+                let alias = if let TokenType::Identifier(a) = &alias_token.token_type {
+                    a.clone()
+                } else {
+                    return Err(ParseError::new("Expected alias name".to_string(), Position::new(0, 0)));
+                };
+                Ok(ImportSpec::Aliased { name, alias })
+            } else {
+                Ok(ImportSpec::Symbol(name))
+            }
+        }
     }
 
     /// Parse memo declaration

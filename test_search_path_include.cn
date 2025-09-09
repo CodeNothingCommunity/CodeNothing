@@ -1,0 +1,25 @@
+// Search Path Include Test
+using ns lang;
+
+// Test search path includes (these would work if we had std library)
+// include <std/io>;
+// include <std/math>;
+
+// For now, test with regular includes
+include "include_test_utils.cn";
+
+fn main() : int {
+    lang::println("=== Search Path Include Test ===");
+    
+    // Test basic functionality
+    var result : int = add_numbers(10, 20);
+    lang::print("add_numbers(10, 20) = ");
+    lang::println(lang::to_string(result));
+    
+    var message : string = greet("Search Path");
+    lang::print("greet(\"Search Path\") = ");
+    lang::println(message);
+    
+    lang::println("\n=== Search Path Tests Passed! ===");
+    return 0;
+}

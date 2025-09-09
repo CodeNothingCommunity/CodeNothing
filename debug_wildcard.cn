@@ -1,0 +1,15 @@
+// Debug wildcard include
+using ns lang;
+
+// Test specific file first
+include "include_test_utils.cn";
+
+fn main() : int {
+    lang::println("=== Debug Wildcard Test ===");
+    
+    var result : int = add_numbers(1, 2);
+    lang::print("add_numbers(1, 2) = ");
+    lang::println(lang::to_string(result));
+    
+    return 0;
+}

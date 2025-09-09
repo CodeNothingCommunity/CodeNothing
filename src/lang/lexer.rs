@@ -95,7 +95,9 @@ pub enum TokenType {
     Plus,       // +
     Minus,      // -
     Multiply,   // *
+    Star,       // * (for wildcard imports)
     Divide,     // /
+    Slash,      // / (for path separators)
     Modulo,     // %
     Assign,     // =
     ColonAssign, // := for type inference

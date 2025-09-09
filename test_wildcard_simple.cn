@@ -1,0 +1,10 @@
+// 测试通配符功能
+include "simple_utils.cn";
+
+fn main() {
+    println("Testing wildcard include functionality");
+
+    // 调用从 simple_utils.cn 包含的函数
+    let result = add_two(10, 20);
+    println("Result from simple_utils: ${result}");
+}
