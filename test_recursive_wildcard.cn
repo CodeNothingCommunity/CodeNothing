@@ -1,0 +1,18 @@
+// Test recursive wildcard
+using ns lang;
+
+include "**/nested_utils.cn";
+
+fn main() : int {
+    lang::println("=== Recursive Wildcard Test ===");
+    
+    // Should include nested_func from subdir/nested_utils.cn
+    var result : int = nested_func(5);
+    lang::print("nested_func(5) = ");
+    lang::println(lang::to_string(result));
+    
+    lang::print("NESTED_CONST = ");
+    lang::println(lang::to_string(NESTED_CONST));
+    
+    return 0;
+}

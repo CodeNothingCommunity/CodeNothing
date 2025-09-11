@@ -1,0 +1,10 @@
+// Test error cases
+using ns lang;
+
+// This should fail - non-existent file pattern
+include "nonexistent_*.cn";
+
+fn main() : int {
+    lang::println("This should not compile");
+    return 0;
+}

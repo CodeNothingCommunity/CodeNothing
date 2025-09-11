@@ -1,0 +1,21 @@
+// Test compilation logic
+using ns lang;
+
+include "wildcard_utils_a.cn";
+include "wildcard_utils_b.cn";
+
+fn main() : int {
+    lang::println("=== Compilation Logic Test ===");
+    
+    // These functions should be compiled into this bytecode
+    var result1 : int = func_a(10);
+    var result2 : int = func_b(20);
+    
+    lang::print("func_a(10) = ");
+    lang::println(lang::to_string(result1));
+    
+    lang::print("func_b(20) = ");
+    lang::println(lang::to_string(result2));
+    
+    return 0;
+}

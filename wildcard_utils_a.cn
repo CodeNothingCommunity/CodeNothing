@@ -1,0 +1,8 @@
+// Wildcard utils A
+using ns lang;
+
+fn func_a(x: int) : int {
+    return x * 2;
+}
+
+var CONST_A : int = 100;

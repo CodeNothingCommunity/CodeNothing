@@ -1,0 +1,8 @@
+// Nested utilities
+using ns lang;
+
+fn nested_func(x: int) : int {
+    return x * 3;
+}
+
+var NESTED_CONST : int = 999;
