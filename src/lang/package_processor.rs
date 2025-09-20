@@ -15,6 +15,7 @@ pub struct PackageContext {
     pub author: Option<String>,
     pub dependencies: Vec<String>,
     pub exported_symbols: HashMap<String, Declaration>,
+    pub all_functions: HashMap<String, Declaration>, // All functions including private ones
     pub imported_symbols: HashMap<String, String>, // symbol -> source_package
 }
 
@@ -26,12 +27,17 @@ impl PackageContext {
             author: None,
             dependencies: Vec::new(),
             exported_symbols: HashMap::new(),
+            all_functions: HashMap::new(),
             imported_symbols: HashMap::new(),
         }
     }
 
     pub fn add_export(&mut self, symbol_name: String, declaration: Declaration) {
         self.exported_symbols.insert(symbol_name, declaration);
+    }
+
+    pub fn add_function(&mut self, function_name: String, declaration: Declaration) {
+        self.all_functions.insert(function_name, declaration);
     }
 
     pub fn add_import(&mut self, symbol_name: String, source_package: String) {
@@ -92,7 +98,16 @@ impl PackageProcessor {
             }
         }
 
-        // Second pass: process imports and exports
+        // Second pass: collect all functions (including private ones)
+        for declaration in &program.declarations {
+            if let Declaration::Function(func_decl) = declaration {
+                if let Some(current_package) = self.get_current_package_mut() {
+                    current_package.add_function(func_decl.name.clone(), declaration.clone());
+                }
+            }
+        }
+
+        // Third pass: process imports and exports
         for declaration in &mut program.declarations {
             match declaration {
                 Declaration::Import(import_decl) => {
@@ -237,12 +252,18 @@ impl PackageProcessor {
         // Process the package program
         let mut context = PackageContext::new(package_name.to_string());
 
-        // Extract exports from the parsed program
+        // Extract exports and all functions from the parsed program
         for declaration in &program.declarations {
             match declaration {
                 crate::lang::ast::Declaration::Export(export_decl) => {
                     let symbol_name = self.extract_symbol_name(&export_decl.declaration)?;
-                    context.add_export(symbol_name, *export_decl.declaration.clone());
+                    context.add_export(symbol_name.clone(), *export_decl.declaration.clone());
+                    // Also add to all_functions for code generation
+                    context.add_function(symbol_name, *export_decl.declaration.clone());
+                }
+                crate::lang::ast::Declaration::Function(func_decl) => {
+                    // Add private functions to all_functions
+                    context.add_function(func_decl.name.clone(), crate::lang::ast::Declaration::Function(func_decl.clone()));
                 }
                 _ => {}
             }

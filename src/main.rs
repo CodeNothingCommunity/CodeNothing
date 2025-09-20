@@ -198,7 +198,7 @@ fn main() {
             // Set library debug mode based on debug flag
             crate::library_loader::set_library_debug_mode(debug);
 
-            match compile_and_run_file_new(&file_path, memory_config, verbose, jit_enabled, jit_threshold, aggressive_jit, jit_debug, debug, show_stats, show_all_details) {
+            match compile_and_run_file(&file_path, memory_config, verbose, jit_enabled, jit_threshold, aggressive_jit, jit_debug, debug, show_stats, show_all_details) {
                 Ok(()) => {
                     if verbose {
                         println!("Program executed successfully.");
@@ -233,68 +233,12 @@ fn main() {
 
 /// Run demo program
 fn run_demo_program(memory_config: MemoryConfig, jit_enabled: bool, jit_threshold: Option<u32>, aggressive_jit: bool, verbose: bool, show_stats: bool) {
-    println!("CodeNothing");
-    println!("==============================");
-    println!("Use --repl or -r to start interactive mode");
+    println!("CodeNothing Programming Language");
     println!();
-
-    // Create a simple test program
-    let mut chunk = Chunk::new("demo".to_string());
-
-    // Add some constants
-    let const_42 = chunk.add_constant(Value::Int(42));
-    let const_10 = chunk.add_constant(Value::Int(10));
-    let const_hello = chunk.add_constant(Value::String(Rc::new("Hello, VM!".to_string())));
-
-    // Create a simple program: print "Hello, VM!", then 42 + 10
-    chunk.add_instruction(Instruction::with_u16(OpCode::Const, const_hello, 1));
-    chunk.add_instruction(Instruction::new(OpCode::Print, 2));
-    chunk.add_instruction(Instruction::with_u16(OpCode::Const, const_42, 3));
-    chunk.add_instruction(Instruction::with_u16(OpCode::Const, const_10, 4));
-    chunk.add_instruction(Instruction::new(OpCode::Add, 5));
-    chunk.add_instruction(Instruction::new(OpCode::Print, 6));
-    chunk.add_instruction(Instruction::new(OpCode::Halt, 7));
-
-    // Print disassembly
-    println!("Bytecode Disassembly:");
-    println!("{}", chunk.disassemble());
-
-    // Create and run VM with specified memory configuration
-    let mut vm = VirtualMachine::with_memory_config(memory_config.clone());
-    vm.set_debug_mode(false); // Disable debug for demo
-
-    // Configure JIT
-    vm.set_jit_enabled(jit_enabled);
-    if aggressive_jit {
-        vm.enable_aggressive_jit();
-    } else if let Some(threshold) = jit_threshold {
-        vm.set_jit_threshold(threshold);
-    }
-
-    println!("VM Memory Configuration: {}", memory_config.memory_usage_string());
-
-    let chunk_index = vm.add_chunk(chunk);
-
-    println!("Executing program...");
-    println!("====================");
-
-    match vm.execute(chunk_index) {
-        Ok(result) => {
-            println!("\nProgram completed successfully!");
-            println!("Result: {}", result);
-        }
-        Err(e) => {
-            println!("\nExecution error: {}", e);
-        }
-    }
-
-    // Print VM statistics and performance report if requested
-    if show_stats || verbose {
-        println!("\n{}", vm.stats());
-        vm.print_performance_report();
-    }
-
-    println!("\nTry running with --repl for interactive mode!");
+    println!("Usage:");
+    println!("   CodeNothing <file.cn>     # Compile and run a CodeNothing file");
+    println!("   CodeNothing --help       # Show detailed help");
+    println!();
 }
 
 /// Compile and run a CodeNothing source file using the new compiler
@@ -366,10 +310,25 @@ fn execute_bytecode(chunks: Vec<Chunk>, memory_config: MemoryConfig, verbose: bo
         vm.set_jit_enabled(false);
     }
 
-    // Load chunks into VM
-    for chunk in chunks {
-        vm.add_chunk(chunk);
+    // Create function index mapping: original_index -> vm_index
+    let mut index_mapping = std::collections::HashMap::new();
+
+    // Load chunks into VM and create index mapping
+    for (vm_index, chunk) in chunks.iter().enumerate() {
+        vm.add_chunk(chunk.clone());
+        index_mapping.insert(vm_index, vm_index); // For now, use identity mapping
+        if verbose {
+            println!("   Loaded chunk '{}' at VM index {}", chunk.name, vm_index);
+        }
     }
+
+    if verbose {
+        println!("   Total chunks loaded: {}", chunks.len());
+        println!("   Function index mapping: {:?}", index_mapping);
+    }
+
+    // Set the index mapping in the VM
+    vm.set_function_index_mapping(index_mapping);
 
     // Execute main function (chunk 0 is typically the main chunk)
     let result = vm.execute(0);
@@ -414,16 +373,33 @@ fn compile_and_run_file(file_path: &str, memory_config: MemoryConfig, verbose: b
         println!("2. Syntax analysis...");
     }
     let mut parser = Parser::new(tokens);
-    let program = parser.parse_program().map_err(|e| format!("Parser error: {}", e))?;
+    let mut program = parser.parse_program().map_err(|e| format!("Parser error: {}", e))?;
     if verbose {
         println!("   Parsed {} declarations", program.declarations.len());
     }
 
+    // Package processing
+    if verbose {
+        println!("3. Package processing...");
+    }
+    let mut package_processor = crate::lang::package_processor::PackageProcessor::new();
+    match package_processor.process_program(&mut program) {
+        Ok(()) => {
+            if verbose {
+                println!("   Package processing completed successfully");
+            }
+        }
+        Err(package_error) => {
+            return Err(format!("Package error: {}", package_error));
+        }
+    }
+
     // Semantic analysis
     if verbose {
-        println!("3. Semantic analysis...");
+        println!("4. Semantic analysis...");
     }
     let mut analyzer = SemanticAnalyzer::new();
+    analyzer.set_package_processor(package_processor.clone());
     // Set debug mode for semantic analysis
     analyzer.set_debug_mode(debug);
     analyzer.analyze_program(&program).map_err(|errors| {
@@ -436,26 +412,33 @@ fn compile_and_run_file(file_path: &str, memory_config: MemoryConfig, verbose: b
 
     // Code generation
     if verbose {
-        println!("4. Code generation...");
+        println!("5. Code generation...");
     }
     let mut generator = CodeGenerator::new();
     // Set debug mode for code generation
     generator.set_debug_mode(debug);
     // Set show all details mode for arrow function display
     generator.set_show_all_details(show_all_details);
+    // Pass package processor to code generator for namespace function resolution
+    generator.set_package_processor(package_processor);
     // Pass the type environment from semantic analysis to code generation
     generator.set_type_environment(analyzer.get_type_environment().clone());
+    // Collect package functions for code generation
+    generator.collect_package_functions();
     let chunks = generator.generate_program(&program).map_err(|errors| {
         let error_messages: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
         format!("Code generation errors:\n{}", error_messages.join("\n"))
     })?;
     if verbose {
         println!("   Generated {} chunks", chunks.len());
+        for (i, chunk) in chunks.iter().enumerate() {
+            println!("   Chunk {}: '{}' ({} instructions)", i, chunk.name, chunk.instructions.len());
+        }
     }
 
     // Execution
     if verbose {
-        println!("5. Execution...");
+        println!("6. Execution...");
     }
     if chunks.is_empty() {
         return Err("No code generated".to_string());
@@ -559,7 +542,7 @@ fn compile_and_run_file(file_path: &str, memory_config: MemoryConfig, verbose: b
 }
 
 fn print_help() {
-    println!("CodeNothing VM & JIT Compiler");
+    println!("CodeNothing");
     println!("==============================");
     println!();
     println!("USAGE:");

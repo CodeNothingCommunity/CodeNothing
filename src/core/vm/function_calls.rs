@@ -244,8 +244,15 @@ impl VirtualMachine {
             VMError::RuntimeError("Call stack overflow".to_string())
         })?;
 
-        // Create new local memory for the function - optimized capacity
-        let mut new_locals = LocalMemory::new(params.len().max(4)); // Pre-allocate for common cases
+        // Create new local memory for the function - use the chunk's local_count
+        let chunk = &self.chunks[function_index];
+        let required_locals = chunk.local_count.max(params.len()).max(4); // Ensure we have enough space
+        let mut new_locals = LocalMemory::new(required_locals);
+
+        // Initialize all local variables to Null first
+        for i in 0..required_locals {
+            new_locals.set(i, Value::Null)?;
+        }
 
         // Store parameters in local variables (optimized)
         for (i, param_value) in params.into_iter().enumerate() {
@@ -874,10 +881,15 @@ impl VirtualMachine {
         self.current_chunk = Some(self.chunks[chunk_index].clone());
         self.ip = 0;
 
-        // Create new local memory for the function
-        // For now, we'll create a local memory with a reasonable capacity
-        // In a full implementation, we'd get the local count from the chunk metadata
-        let mut local_memory = crate::core::memory::LocalMemory::new(16);
+        // Create new local memory for the function using chunk's local_count
+        let chunk = &self.chunks[chunk_index];
+        let required_locals = chunk.local_count.max(param_count).max(4); // Ensure we have enough space
+        let mut local_memory = crate::core::memory::LocalMemory::new(required_locals);
+
+        // Initialize all local variables to Null first
+        for i in 0..required_locals {
+            local_memory.set(i, Value::Null)?;
+        }
 
         if self.debug_mode {
             println!("🔧 VM: Function call - param_count: {}, stack_size: {}", param_count, self.stack.len());
@@ -1123,8 +1135,14 @@ impl VirtualMachine {
         let saved_locals = self.locals.take();
 
         // Create new local memory for closure
-        let total_locals = param_count + captured_variables.len();
+        let chunk = &self.chunks[chunk_index];
+        let total_locals = chunk.local_count.max(param_count + captured_variables.len()).max(4);
         let mut closure_locals = crate::core::memory::LocalMemory::new(total_locals);
+
+        // Initialize all local variables to Null first
+        for i in 0..total_locals {
+            closure_locals.set(i, Value::Null)?;
+        }
 
         // Set parameters as local variables (starting from index 0)
         for (i, param) in parameters.into_iter().enumerate() {

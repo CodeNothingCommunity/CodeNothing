@@ -274,30 +274,55 @@ impl CodeGenerator {
 
     /// Set package processor for namespace function resolution
     pub fn set_package_processor(&mut self, package_processor: PackageProcessor) {
-        // Collect package functions and register them
-        self.collect_package_functions(&package_processor);
         self.package_processor = Some(package_processor);
+        // Collect package functions and register them
+        self.collect_package_functions();
     }
 
     /// Collect functions from packages and register them in the functions map
-    fn collect_package_functions(&mut self, package_processor: &PackageProcessor) {
-        for (package_name, package_context) in package_processor.get_all_packages() {
-            for (symbol_name, declaration) in &package_context.exported_symbols {
-                if let Declaration::Function(func_decl) = declaration {
-                    let full_name = format!("{}::{}", package_name, symbol_name);
+    pub fn collect_package_functions(&mut self) {
+        if let Some(package_processor) = &self.package_processor {
+            for (package_name, package_context) in package_processor.get_all_packages() {
+                // Register exported symbols
+                for (symbol_name, declaration) in &package_context.exported_symbols {
+                    if let Declaration::Function(func_decl) = declaration {
+                        let full_name = format!("{}::{}", package_name, symbol_name);
 
-                    // Create a function info for the package function
-                    let func_info = FunctionInfo {
-                        chunk_index: self.chunks.len(), // Will be set when we generate the chunk
-                        parameter_count: func_decl.parameters.len(),
-                        return_type: func_decl.return_type.as_ref().map(|t| self.convert_type_annotation_to_type(t)).unwrap_or(Type::Void),
-                    };
+                        // Create a function info for the package function
+                        let func_info = FunctionInfo {
+                            chunk_index: self.chunks.len(), // Will be set when we generate the chunk
+                            parameter_count: func_decl.parameters.len(),
+                            return_type: func_decl.return_type.as_ref().map(|t| self.convert_type_annotation_to_type(t)).unwrap_or(Type::Void),
+                        };
 
-                    if self.debug_mode {
-                        println!("🔧 CodeGen: Registering package function '{}' with {} parameters", full_name, func_decl.parameters.len());
+                        if self.debug_mode {
+                            println!("🔧 CodeGen: Registering exported package function '{}' with {} parameters", full_name, func_decl.parameters.len());
+                        }
+
+                        self.functions.insert(full_name, func_info);
                     }
+                }
 
-                    self.functions.insert(full_name, func_info);
+                // Register all functions (including private ones)
+                for (function_name, declaration) in &package_context.all_functions {
+                    if let Declaration::Function(func_decl) = declaration {
+                        let full_name = format!("{}::{}", package_name, function_name);
+
+                        // Only register if not already registered
+                        if !self.functions.contains_key(&full_name) {
+                            let func_info = FunctionInfo {
+                                chunk_index: self.chunks.len(), // Will be set when we generate the chunk
+                                parameter_count: func_decl.parameters.len(),
+                                return_type: func_decl.return_type.as_ref().map(|t| self.convert_type_annotation_to_type(t)).unwrap_or(Type::Void),
+                            };
+
+                            if self.debug_mode {
+                                println!("🔧 CodeGen: Registering package function '{}' with {} parameters", full_name, func_decl.parameters.len());
+                            }
+
+                            self.functions.insert(full_name, func_info);
+                        }
+                    }
                 }
             }
         }
@@ -369,13 +394,35 @@ impl CodeGenerator {
 
     /// Generate code for package functions
     fn generate_package_functions(&mut self) {
+        if self.debug_mode {
+            println!("🔧 CodeGen: Starting generate_package_functions()");
+        }
+
         if let Some(package_processor) = &self.package_processor {
             let package_processor = package_processor.clone(); // Clone to avoid borrow checker issues
 
+            if self.debug_mode {
+                println!("🔧 CodeGen: Found package processor with {} packages", package_processor.get_all_packages().len());
+            }
+
             for (package_name, package_context) in package_processor.get_all_packages() {
-                for (symbol_name, declaration) in &package_context.exported_symbols {
+                if self.debug_mode {
+                    println!("🔧 CodeGen: Processing package '{}' with {} functions", package_name, package_context.all_functions.len());
+                }
+                // Generate code for all functions (including private ones)
+                for (function_name, declaration) in &package_context.all_functions {
                     if let Declaration::Function(func_decl) = declaration {
-                        let full_name = format!("{}::{}", package_name, symbol_name);
+                        let full_name = format!("{}::{}", package_name, function_name);
+
+                        // Create function info if it doesn't exist
+                        if !self.functions.contains_key(&full_name) {
+                            let func_info = FunctionInfo {
+                                chunk_index: self.chunks.len(), // Will be set when we generate the chunk
+                                parameter_count: func_decl.parameters.len(),
+                                return_type: func_decl.return_type.as_ref().map(|t| self.convert_type_annotation_to_type(t)).unwrap_or(Type::Void),
+                            };
+                            self.functions.insert(full_name.clone(), func_info);
+                        }
 
                         if let Some(mut func_info) = self.functions.get(&full_name).cloned() {
                             // Create a new chunk for this package function
@@ -638,19 +685,19 @@ impl CodeGenerator {
             }
         }
 
-        // Second pass: generate global variable initialization code first
+        // Second pass: generate code for package functions first (before main function)
+        self.generate_package_functions();
+
+        // Third pass: generate global variable initialization code
         self.current_chunk = 0; // Ensure we're in the main chunk
         for declaration in &program.declarations {
             self.generate_global_initializers(declaration);
         }
 
-        // Third pass: generate code for all declarations
+        // Fourth pass: generate code for all declarations (including main function)
         for declaration in &program.declarations {
             self.generate_declaration(declaration);
         }
-
-        // Fourth pass: generate code for package functions
-        self.generate_package_functions();
         
         // Add halt instruction to main function
         if let Some(main_info) = self.functions.get(constants::MAIN_FUNCTION_NAME).cloned() {
@@ -2223,10 +2270,41 @@ impl CodeGenerator {
                                 }
 
                                 if !found {
-                                    self.errors.push(CodeGenError::new(
-                                        format!("Undefined function '{}'", name),
-                                        position.clone()
-                                    ));
+                                    // Check if this is a package function call (e.g., factorial(n-1), internal_swap(a, b))
+                                    if let Some(package_processor) = &self.package_processor {
+                                        // Check all packages for this function
+                                        for (package_name, package_context) in package_processor.get_all_packages() {
+                                            if package_context.all_functions.contains_key(name) {
+                                                let full_name = format!("{}::{}", package_name, name);
+                                                if let Some(func_info) = self.functions.get(&full_name).cloned() {
+                                                    if func_info.parameter_count != arguments.len() {
+                                                        self.errors.push(CodeGenError::new(
+                                                            format!("Function '{}' expects {} arguments, got {}",
+                                                                name, func_info.parameter_count, arguments.len()),
+                                                            position.clone()
+                                                        ));
+                                                    }
+
+                                                    // Package function call
+                                                    let param_count_const = self.add_constant(Value::Int(arguments.len() as i64));
+                                                    self.emit_instruction(Instruction::with_u16(OpCode::Const, param_count_const, 0));
+                                                    self.emit_instruction(Instruction::with_u16(OpCode::Call, func_info.chunk_index as u16, 0));
+                                                    if self.debug_mode {
+                                                        println!("🔧 CodeGen: Generated Call for intra-package function '{}' (chunk: {}, params: {})", full_name, func_info.chunk_index, arguments.len());
+                                                    }
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if !found {
+                                        self.errors.push(CodeGenError::new(
+                                            format!("Undefined function '{}'", name),
+                                            position.clone()
+                                        ));
+                                    }
                                 }
                             }
                             } else {
@@ -2246,17 +2324,81 @@ impl CodeGenerator {
                                             let const_index = self.add_constant(Value::String(full_name.clone().into()));
                                             self.emit_instruction(Instruction::with_u16_u8(OpCode::CallMethod, const_index, arguments.len() as u8, 0));
                                         } else {
+                                            // Check if this is a package function call (e.g., factorial(n-1), internal_swap(a, b))
+                                            let mut found_package_function = false;
+                                            if let Some(package_processor) = &self.package_processor {
+                                                // Check all packages for this function
+                                                for (package_name, package_context) in package_processor.get_all_packages() {
+                                                    if package_context.all_functions.contains_key(name) {
+                                                        let full_name = format!("{}::{}", package_name, name);
+                                                        if let Some(func_info) = self.functions.get(&full_name).cloned() {
+                                                            if func_info.parameter_count != arguments.len() {
+                                                                self.errors.push(CodeGenError::new(
+                                                                    format!("Function '{}' expects {} arguments, got {}",
+                                                                        name, func_info.parameter_count, arguments.len()),
+                                                                    position.clone()
+                                                                ));
+                                                            }
+
+                                                            // Package function call
+                                                            let param_count_const = self.add_constant(Value::Int(arguments.len() as i64));
+                                                            self.emit_instruction(Instruction::with_u16(OpCode::Const, param_count_const, 0));
+                                                            self.emit_instruction(Instruction::with_u16(OpCode::Call, func_info.chunk_index as u16, 0));
+                                                            if self.debug_mode {
+                                                                println!("🔧 CodeGen: Generated Call for intra-package function '{}' (chunk: {}, params: {})", full_name, func_info.chunk_index, arguments.len());
+                                                            }
+                                                            found_package_function = true;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            if !found_package_function {
+                                                self.errors.push(CodeGenError::new(
+                                                    format!("Undefined function '{}'", name),
+                                                    position.clone()
+                                                ));
+                                            }
+                                        }
+                                    }
+                                    Err(_) => {
+                                        // Check if this is a package function call (e.g., factorial(n-1), internal_swap(a, b))
+                                        let mut found_package_function = false;
+                                        if let Some(package_processor) = &self.package_processor {
+                                            // Check all packages for this function
+                                            for (package_name, package_context) in package_processor.get_all_packages() {
+                                                if package_context.all_functions.contains_key(name) {
+                                                    let full_name = format!("{}::{}", package_name, name);
+                                                    if let Some(func_info) = self.functions.get(&full_name).cloned() {
+                                                        if func_info.parameter_count != arguments.len() {
+                                                            self.errors.push(CodeGenError::new(
+                                                                format!("Function '{}' expects {} arguments, got {}",
+                                                                    name, func_info.parameter_count, arguments.len()),
+                                                                position.clone()
+                                                            ));
+                                                        }
+
+                                                        // Package function call
+                                                        let param_count_const = self.add_constant(Value::Int(arguments.len() as i64));
+                                                        self.emit_instruction(Instruction::with_u16(OpCode::Const, param_count_const, 0));
+                                                        self.emit_instruction(Instruction::with_u16(OpCode::Call, func_info.chunk_index as u16, 0));
+                                                        if self.debug_mode {
+                                                            println!("🔧 CodeGen: Generated Call for intra-package function '{}' (chunk: {}, params: {})", full_name, func_info.chunk_index, arguments.len());
+                                                        }
+                                                        found_package_function = true;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if !found_package_function {
                                             self.errors.push(CodeGenError::new(
                                                 format!("Undefined function '{}'", name),
                                                 position.clone()
                                             ));
                                         }
-                                    }
-                                    Err(_) => {
-                                        self.errors.push(CodeGenError::new(
-                                            format!("Undefined function '{}'", name),
-                                            position.clone()
-                                        ));
                                     }
                                 }
                             }
@@ -2620,10 +2762,36 @@ impl CodeGenerator {
                 self.emit_instruction(Instruction::with_u16(OpCode::SuperFieldLoad, field_const, 0));
             }
             Expression::MethodCall { object, method_name, arguments, position } => {
-                // Check if this is a namespace function call (e.g., math.add)
-                if let Expression::Identifier(namespace_name, _) = object.as_ref() {
-                    // Check if this is a namespace function call
-                    let full_name = format!("{}::{}", namespace_name, method_name);
+                // Check if this is a simple function call (e.g., internal_swap(a, b), factorial(n-1))
+                if let Expression::Identifier(function_name, _) = object.as_ref() {
+                    // Try to find the function in all packages
+                    if let Some(package_processor) = &self.package_processor {
+                        // Check all packages for this function
+                        for (package_name, package_context) in package_processor.get_all_packages() {
+                            if package_context.all_functions.contains_key(function_name) {
+                                let full_name = format!("{}::{}", package_name, function_name);
+                                if let Some(func_info) = self.functions.get(&full_name).cloned() {
+                                    // Generate code for all arguments
+                                    for arg in arguments {
+                                        self.generate_expression(arg);
+                                    }
+
+                                    // Package function call
+                                    let param_count = func_info.parameter_count;
+                                    let const_index = self.add_constant(Value::Int(param_count as i64));
+                                    self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+                                    self.emit_instruction(Instruction::with_u16(OpCode::Call, func_info.chunk_index as u16, 0));
+                                    if self.debug_mode {
+                                        println!("🔧 CodeGen: Generated Call for intra-package function '{}' (chunk: {}, params: {})", full_name, func_info.chunk_index, param_count);
+                                    }
+                                    return;
+                                }
+                            }
+                        }
+                    }
+
+                    // Check if this is a namespace function call (e.g., math.add)
+                    let full_name = format!("{}::{}", function_name, method_name);
 
                     // Try to find as a built-in function first
                     if let Some((_, _)) = self.builtins.get(&full_name) {
@@ -2666,7 +2834,7 @@ impl CodeGenerator {
 
                     // Try to find in package processor
                     if let Some(package_processor) = &self.package_processor {
-                        if let Some(package) = package_processor.get_package(namespace_name) {
+                        if let Some(package) = package_processor.get_package(function_name) {
                             if package.exported_symbols.contains_key(method_name) {
                                 // Generate code for all arguments (no object for namespace calls)
                                 for arg in arguments {
