@@ -819,6 +819,43 @@ pub struct IncludeDeclaration {
     pub position: Position,
 }
 
+/// Package path specification for imports
+#[derive(Debug, Clone, PartialEq)]
+pub enum PackagePath {
+    /// Absolute path: std::io
+    Absolute(Vec<String>),
+    /// Relative path: ./utils, ../common
+    Relative(Vec<String>),
+    /// Local path: math (in current project)
+    Local(String),
+}
+
+/// Package declaration
+#[derive(Debug, Clone, PartialEq)]
+pub struct PackageDeclaration {
+    pub name: String,
+    pub version: Option<String>,
+    pub author: Option<String>,
+    pub dependencies: Vec<String>,
+    pub position: Position,
+}
+
+/// Import declaration
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportDeclaration {
+    pub package_path: PackagePath,
+    pub alias: Option<String>,
+    pub selective_imports: Option<Vec<ImportSpec>>, // Reuse ImportSpec from include system
+    pub position: Position,
+}
+
+/// Export declaration
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExportDeclaration {
+    pub declaration: Box<Declaration>,
+    pub position: Position,
+}
+
 /// Memo declaration parameters
 #[derive(Debug, Clone, PartialEq)]
 pub struct MemoParams {
@@ -849,6 +886,9 @@ pub enum Declaration {
     Namespace(NamespaceDeclaration),
     Using(UsingDeclaration),
     Include(IncludeDeclaration), // Include declaration
+    Package(PackageDeclaration), // Package declaration
+    Import(ImportDeclaration), // Import declaration
+    Export(ExportDeclaration), // Export declaration
     Variable(Statement), // Global variable declaration
     Memo(MemoDeclaration), // 记忆化声明
     Enum(EnumDeclaration),
@@ -974,6 +1014,9 @@ impl AstPrinter {
             Declaration::Trait(trait_decl) => format!("trait {} {{ ... }}", trait_decl.name),
             Declaration::Impl(impl_decl) => format!("impl {} {{ ... }}", impl_decl.type_name),
             Declaration::LibImport(stmt) => self.print_statement(stmt),
+            Declaration::Package(package) => format!("package {} version {:?};", package.name, package.version),
+            Declaration::Import(import) => format!("import {:?};", import.package_path),
+            Declaration::Export(export) => format!("export {};", self.print_declaration(&export.declaration)),
         }
     }
     

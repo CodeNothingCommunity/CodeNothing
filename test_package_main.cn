@@ -1,0 +1,34 @@
+// Main program testing package system
+package main version "1.0.0" author "Test User";
+
+// Import entire math package
+import math;
+
+// Import specific functions from utils
+import utils { concat_strings, max as maximum };
+
+// Import with alias
+import utils as util_lib;
+
+fn main() {
+    // Test basic math functions
+    var sum = math.add(5, 3);
+    var fact = math.factorial(5);
+    
+    // Test imported specific functions
+    var text = concat_strings("Hello", " World");
+    var bigger = maximum(10, 20);
+    
+    // Test aliased import
+    var area = util_lib.calculate_circle_area(5.0);
+    var added = util_lib.add_ten(15);
+    
+    // Print results
+    print("Sum: " + sum);
+    print("Factorial: " + fact);
+    print("Text: " + text);
+    print("Max: " + bigger);
+    print("Area: " + area);
+    print("Added: " + added);
+    print("PI: " + math.PI);
+}

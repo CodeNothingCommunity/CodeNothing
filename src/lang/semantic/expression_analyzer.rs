@@ -749,6 +749,57 @@ impl SemanticAnalyzer {
                 }
             }
             Expression::MethodCall { object, method_name, arguments, position } => {
+                // Check if this is a namespace access (e.g., math.add)
+                if let Expression::Identifier(namespace_name, _) = object.as_ref() {
+                    // Only treat as namespace if it's not a local variable or function
+                    if self.type_env.has_namespace(namespace_name) &&
+                       self.type_env.lookup_variable(namespace_name).is_none() &&
+                       self.type_env.lookup_function(namespace_name).is_none() {
+                        // This is a namespace function call
+                        if let Some(func_type) = self.type_env.lookup_in_namespace(namespace_name, method_name).cloned() {
+                            // Analyze arguments
+                            let mut arg_types = Vec::new();
+                            for arg in arguments {
+                                let arg_type = self.analyze_expression(arg);
+                                arg_types.push(arg_type);
+                            }
+
+                            // Validate function call
+                            if let Type::Function { parameters, return_type } = func_type {
+                                if parameters.len() != arg_types.len() {
+                                    self.add_error(TypeError::new(
+                                        format!("Function '{}::{}' expects {} arguments, got {}",
+                                               namespace_name, method_name, parameters.len(), arg_types.len()),
+                                        position.clone(),
+                                    ));
+                                    return Type::Unknown;
+                                }
+
+                                // Type check arguments
+                                for (i, (expected, actual)) in parameters.iter().zip(arg_types.iter()).enumerate() {
+                                    if !expected.is_compatible_with(actual) {
+                                        self.add_error(TypeError::new(
+                                            format!("Argument {} of '{}::{}': expected {:?}, got {:?}",
+                                                   i + 1, namespace_name, method_name, expected, actual),
+                                            position.clone(),
+                                        ));
+                                    }
+                                }
+
+                                return *return_type;
+                            }
+                            return func_type;
+                        } else {
+                            self.add_error(TypeError::new(
+                                format!("Function '{}' not found in namespace '{}'", method_name, namespace_name),
+                                position.clone(),
+                            ));
+                            return Type::Unknown;
+                        }
+                    }
+                }
+
+                // Regular method call processing
                 let object_type = self.analyze_expression(object);
 
                 // Analyze arguments

@@ -146,6 +146,16 @@ impl SemanticAnalyzer {
                 // Include declarations are processed before semantic analysis
                 // No additional symbol collection needed here
             }
+            Declaration::Package(_) => {
+                // Package declarations are metadata only
+            }
+            Declaration::Import(_) => {
+                // Import declarations are processed by package processor
+            }
+            Declaration::Export(export_decl) => {
+                // Process the exported declaration
+                self.collect_declaration(&export_decl.declaration);
+            }
         }
     }
 

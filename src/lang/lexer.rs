@@ -34,6 +34,8 @@ pub enum TokenType {
     Using,      // using
     Lib,        // lib
     Include,    // include
+    Import,     // import (for package system)
+    Export,     // export (for package system)
     Return,     // return
     If,         // if
     Else,       // else
@@ -499,6 +501,8 @@ impl Lexer {
             "using" => TokenType::Using,
             "lib" => TokenType::Lib,
             "include" => TokenType::Include,
+            "import" => TokenType::Import,
+            "export" => TokenType::Export,
             "return" => TokenType::Return,
             "if" => TokenType::If,
             "else" => TokenType::Else,

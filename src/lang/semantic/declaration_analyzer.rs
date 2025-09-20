@@ -53,6 +53,17 @@ impl SemanticAnalyzer {
                 // Include declarations are processed before semantic analysis
                 // No additional analysis needed here
             }
+            Declaration::Package(_) => {
+                // Package declarations are metadata only
+            }
+            Declaration::Import(import_decl) => {
+                // Process import declarations to add symbols to current scope
+                self.analyze_import_declaration(import_decl);
+            }
+            Declaration::Export(export_decl) => {
+                // Analyze the exported declaration
+                self.analyze_declaration(&export_decl.declaration);
+            }
         }
     }
     
@@ -1192,6 +1203,109 @@ impl SemanticAnalyzer {
                 format!("Abstract method '{}' cannot be static", method.function.name),
                 method.position.clone(),
             ));
+        }
+    }
+
+    /// Analyze import declaration and add symbols to current scope
+    fn analyze_import_declaration(&mut self, import_decl: &ImportDeclaration) {
+        // Get package name from import path
+        let package_name = match &import_decl.package_path {
+            PackagePath::Local(name) => name.clone(),
+            PackagePath::Relative(components) => components.join("/"),
+            PackagePath::Absolute(components) => components.join("::"),
+        };
+
+        // Create namespace for the package if it doesn't exist
+        if !self.type_env.has_namespace(&package_name) {
+            self.type_env.define_namespace(package_name.clone());
+        }
+
+        // Process selective imports or import all
+        if let Some(selective_imports) = &import_decl.selective_imports {
+            for import_spec in selective_imports {
+                match import_spec {
+                    ImportSpec::Symbol(symbol) => {
+                        self.import_symbol_from_package(symbol, &package_name, None);
+                    }
+                    ImportSpec::Aliased { name, alias } => {
+                        self.import_symbol_from_package(name, &package_name, Some(alias));
+                    }
+                    ImportSpec::All => {
+                        self.import_all_symbols_from_package(&package_name);
+                    }
+                }
+            }
+        } else {
+            // Import entire package as namespace
+            self.import_all_symbols_from_package(&package_name);
+        }
+    }
+
+    /// Import a specific symbol from a package
+    fn import_symbol_from_package(&mut self, symbol: &str, package_name: &str, alias: Option<&str>) {
+        let symbol_name = alias.unwrap_or(symbol);
+
+        // Try to get the actual function type from the package processor
+        let function_type = if let Some(package_processor) = &self.package_processor {
+            if let Some(actual_type) = package_processor.get_function_type(package_name, symbol) {
+                actual_type
+            } else {
+                // Fallback to a default function type if not found
+                self.add_error(TypeError::new(
+                    format!("Symbol '{}' not found in package '{}'", symbol, package_name),
+                    Position::new(0, 0),
+                ));
+                Type::Function {
+                    parameters: vec![Type::Int],
+                    return_type: Box::new(Type::Int),
+                }
+            }
+        } else {
+            // No package processor available, use default
+            self.add_error(TypeError::new(
+                format!("Package processor not available for symbol '{}'", symbol),
+                Position::new(0, 0),
+            ));
+            Type::Function {
+                parameters: vec![Type::Int],
+                return_type: Box::new(Type::Int),
+            }
+        };
+
+        // Add to namespace
+        if let Err(e) = self.type_env.define_in_namespace(package_name, symbol_name.to_string(), function_type.clone()) {
+            self.add_error(TypeError::new(
+                format!("Failed to import symbol '{}' from package '{}': {}", symbol_name, package_name, e),
+                Position::new(0, 0), // TODO: Use actual position from import declaration
+            ));
+        }
+    }
+
+    /// Import all symbols from a package
+    fn import_all_symbols_from_package(&mut self, package_name: &str) {
+        // Get all exported symbols from the package processor
+        let symbol_names: Vec<String> = if let Some(package_processor) = &self.package_processor {
+            if let Some(package) = package_processor.get_package(package_name) {
+                // Collect all exported symbol names first
+                package.exported_symbols.keys().cloned().collect()
+            } else {
+                self.add_error(TypeError::new(
+                    format!("Package '{}' not found", package_name),
+                    Position::new(0, 0),
+                ));
+                return;
+            }
+        } else {
+            self.add_error(TypeError::new(
+                format!("Package processor not available for package '{}'", package_name),
+                Position::new(0, 0),
+            ));
+            return;
+        };
+
+        // Now import all symbols
+        for symbol_name in symbol_names {
+            self.import_symbol_from_package(&symbol_name, package_name, None);
         }
     }
 }

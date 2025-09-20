@@ -1,0 +1,60 @@
+// Math package - Core mathematical functions
+package math version "1.0.0" author "CodeNothing Team";
+
+// Export basic arithmetic functions
+export fn add(a: int, b: int) : int {
+    return a + b;
+}
+
+export fn subtract(a: int, b: int) : int {
+    return a - b;
+}
+
+export fn multiply(a: int, b: int) : int {
+    return a * b;
+}
+
+export fn divide(a: int, b: int) : int {
+    if (b == 0) {
+        return 0; // Simple error handling
+    }
+    return a / b;
+}
+
+// Export mathematical constants
+export const PI: float = 3.14159;
+export const E: float = 2.71828;
+
+// Export advanced functions
+export fn factorial(n: int) : int {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+export fn power(base: int, exp: int) : int {
+    if (exp == 0) {
+        return 1;
+    }
+    var result: int = 1;
+    var i: int = 0;
+    while (i < exp) {
+        result = result * base;
+        i = i + 1;
+    }
+    return result;
+}
+
+// Private helper function (not exported)
+fn internal_gcd(a: int, b: int) : int {
+    if (b == 0) {
+        return a;
+    }
+    return internal_gcd(b, a % b);
+}
+
+// Export GCD function
+export fn gcd(a: int, b: int) : int {
+    return internal_gcd(a, b);
+}

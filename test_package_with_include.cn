@@ -1,0 +1,20 @@
+// Test package system using include syntax
+include "packages/math/package.cn";
+
+fn main() : int {
+    // Test basic math functions
+    var a: int = 10;
+    var b: int = 5;
+    
+    var sum: int = add(a, b);
+    var diff: int = subtract(a, b);
+    var prod: int = multiply(a, b);
+    var quot: int = divide(a, b);
+    
+    // Test advanced functions
+    var fact5: int = factorial(5);
+    var pow23: int = power(2, 3);
+    var gcd_result: int = gcd(12, 8);
+    
+    return 0;
+}

@@ -9,6 +9,7 @@ use std::fs;
 use crate::core::bytecode_file::ComcnFile;
 use crate::lang::{Lexer, Parser, SemanticAnalyzer, CodeGenerator};
 use crate::lang::include_processor::{IncludeProcessor, IncludeError};
+use crate::lang::package_processor::PackageProcessor;
 
 /// Compilation options
 #[derive(Debug, Clone)]
@@ -169,7 +170,7 @@ impl Compiler {
             std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
         };
         let mut include_processor = IncludeProcessor::new(base_dir);
-        let ast = match include_processor.process_program(ast, input_path.to_path_buf()) {
+        let mut ast = match include_processor.process_program(ast, input_path.to_path_buf()) {
             Ok(processed_ast) => {
                 if self.options.verbose {
                     messages.push(format!("   Include processing completed successfully. Declarations: {}", processed_ast.declarations.len()));
@@ -188,11 +189,36 @@ impl Compiler {
         };
 
         if self.options.verbose {
+            messages.push("3.5. Package processing...".to_string());
+        }
+
+        // Package processing
+        let mut package_processor = PackageProcessor::new();
+        let mut ast = match package_processor.process_program(&mut ast) {
+            Ok(_) => {
+                if self.options.verbose {
+                    messages.push("   Package processing completed successfully".to_string());
+                }
+                ast
+            }
+            Err(package_error) => {
+                messages.push(format!("Package error: {}", package_error));
+                return CompileResult {
+                    output_file: output_path,
+                    success: false,
+                    messages,
+                    bytecode: None,
+                };
+            }
+        };
+
+        if self.options.verbose {
             messages.push("4. Semantic analysis...".to_string());
         }
         
         // Semantic analysis
         let mut analyzer = SemanticAnalyzer::new();
+        analyzer.set_package_processor(package_processor.clone());
         if let Err(semantic_errors) = analyzer.analyze_program(&ast) {
             messages.push("Semantic errors:".to_string());
             for error in &semantic_errors {
@@ -231,6 +257,10 @@ impl Compiler {
         // Code generation
         let mut generator = CodeGenerator::new();
         generator.set_debug_mode(self.options.verbose);
+
+        // Pass package processor to code generator for namespace function resolution
+        generator.set_package_processor(package_processor);
+
         generator.generate_program(&ast);
 
         if !generator.get_errors().is_empty() {

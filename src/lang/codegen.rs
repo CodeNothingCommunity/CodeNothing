@@ -7,6 +7,7 @@ use crate::core::value::Value;
 use crate::lang::ast::*;
 use crate::lang::types::{Type, TypeEnvironment};
 use crate::lang::builtins::BuiltinRegistry;
+use crate::lang::package_processor::PackageProcessor;
 use std::collections::{HashMap, HashSet};
 
 /// Constants for code generation
@@ -231,6 +232,7 @@ pub struct CodeGenerator {
     debug_mode: bool,           // Debug mode flag
     show_all_details: bool,     // Show full details for arrow functions
     inside_function: bool,      // Track whether we're inside a function
+    package_processor: Option<PackageProcessor>, // Package processor for namespace functions
 }
 
 impl CodeGenerator {
@@ -256,6 +258,7 @@ impl CodeGenerator {
             debug_mode: false,
             show_all_details: false,
             inside_function: false,
+            package_processor: None,
         };
         
         // Populate type environment with built-ins
@@ -267,6 +270,169 @@ impl CodeGenerator {
     /// Set debug mode
     pub fn set_debug_mode(&mut self, enabled: bool) {
         self.debug_mode = enabled;
+    }
+
+    /// Set package processor for namespace function resolution
+    pub fn set_package_processor(&mut self, package_processor: PackageProcessor) {
+        // Collect package functions and register them
+        self.collect_package_functions(&package_processor);
+        self.package_processor = Some(package_processor);
+    }
+
+    /// Collect functions from packages and register them in the functions map
+    fn collect_package_functions(&mut self, package_processor: &PackageProcessor) {
+        for (package_name, package_context) in package_processor.get_all_packages() {
+            for (symbol_name, declaration) in &package_context.exported_symbols {
+                if let Declaration::Function(func_decl) = declaration {
+                    let full_name = format!("{}::{}", package_name, symbol_name);
+
+                    // Create a function info for the package function
+                    let func_info = FunctionInfo {
+                        chunk_index: self.chunks.len(), // Will be set when we generate the chunk
+                        parameter_count: func_decl.parameters.len(),
+                        return_type: func_decl.return_type.as_ref().map(|t| self.convert_type_annotation_to_type(t)).unwrap_or(Type::Void),
+                    };
+
+                    if self.debug_mode {
+                        println!("🔧 CodeGen: Registering package function '{}' with {} parameters", full_name, func_decl.parameters.len());
+                    }
+
+                    self.functions.insert(full_name, func_info);
+                }
+            }
+        }
+    }
+
+    /// Convert TypeAnnotation to Type
+    fn convert_type_annotation_to_type(&self, type_annotation: &TypeAnnotation) -> Type {
+        match type_annotation {
+            TypeAnnotation::Int => Type::Int,
+            TypeAnnotation::Long => Type::Long,
+            TypeAnnotation::Float(size) => Type::Float(size.unwrap_or(32)),
+            TypeAnnotation::Num(size) => Type::Num(size.unwrap_or(32)),
+            TypeAnnotation::String => Type::String,
+            TypeAnnotation::Bool => Type::Bool,
+            TypeAnnotation::Obj => Type::Obj,
+            TypeAnnotation::Auto => Type::Unknown, // Auto type inference
+            TypeAnnotation::Null => Type::Null,
+            TypeAnnotation::Void => Type::Void,
+            TypeAnnotation::Custom(name) => Type::Custom(name.clone()),
+            TypeAnnotation::Array(inner) => Type::Array(Box::new(self.convert_type_annotation_to_type(inner))),
+            TypeAnnotation::Enum(name) => Type::Enum(name.clone()),
+            TypeAnnotation::Trait(name) => Type::Trait {
+                name: name.clone(),
+                super_traits: Vec::new(),
+                methods: Vec::new(),
+                default_methods: Vec::new(),
+            },
+            TypeAnnotation::Generic { name, parameters } => {
+                let type_args: Vec<Type> = parameters.iter()
+                    .map(|t| self.convert_type_annotation_to_type(t))
+                    .collect();
+                Type::Generic { base_name: name.clone(), type_arguments: type_args }
+            }
+            TypeAnnotation::TypeParameter(name) => Type::TypeParameter(name.clone()),
+            TypeAnnotation::Function { parameters, return_type } => {
+                let param_types: Vec<Type> = parameters.iter()
+                    .map(|t| self.convert_type_annotation_to_type(t))
+                    .collect();
+                let ret_type = Box::new(self.convert_type_annotation_to_type(return_type));
+                Type::Function { parameters: param_types, return_type: ret_type }
+            }
+            TypeAnnotation::FunctionPointer { parameters, return_type } => {
+                let param_types: Vec<Type> = parameters.iter()
+                    .map(|t| self.convert_type_annotation_to_type(t))
+                    .collect();
+                let ret_type = Box::new(self.convert_type_annotation_to_type(return_type));
+                Type::FunctionPointer { parameters: param_types, return_type: ret_type }
+            }
+            TypeAnnotation::Reference { target_type, lifetime } => {
+                Type::Reference {
+                    target_type: Box::new(self.convert_type_annotation_to_type(target_type)),
+                    lifetime: lifetime.clone(),
+                }
+            }
+            TypeAnnotation::MutableReference { target_type, lifetime } => {
+                Type::MutableReference {
+                    target_type: Box::new(self.convert_type_annotation_to_type(target_type)),
+                    lifetime: lifetime.clone(),
+                }
+            }
+            TypeAnnotation::RawPointer { target_type, is_mutable } => {
+                Type::RawPointer {
+                    target_type: Box::new(self.convert_type_annotation_to_type(target_type)),
+                    is_mutable: *is_mutable,
+                }
+            }
+        }
+    }
+
+    /// Generate code for package functions
+    fn generate_package_functions(&mut self) {
+        if let Some(package_processor) = &self.package_processor {
+            let package_processor = package_processor.clone(); // Clone to avoid borrow checker issues
+
+            for (package_name, package_context) in package_processor.get_all_packages() {
+                for (symbol_name, declaration) in &package_context.exported_symbols {
+                    if let Declaration::Function(func_decl) = declaration {
+                        let full_name = format!("{}::{}", package_name, symbol_name);
+
+                        if let Some(mut func_info) = self.functions.get(&full_name).cloned() {
+                            // Create a new chunk for this package function
+                            let chunk_index = self.chunks.len();
+                            func_info.chunk_index = chunk_index;
+                            self.functions.insert(full_name.clone(), func_info);
+
+                            // Create the chunk
+                            let chunk = Chunk::new(full_name.clone());
+                            self.chunks.push(chunk);
+
+                            // Generate the function code
+                            let old_chunk = self.current_chunk;
+                            self.current_chunk = chunk_index;
+
+                            if self.debug_mode {
+                                println!("🔧 CodeGen: Generating code for package function '{}' in chunk {}", full_name, chunk_index);
+                            }
+
+                            // Clear only local variables, keep global variables
+                            self.variables.retain(|_, var_info| var_info.is_global);
+
+                            // Add function parameters to local variables
+                            for (param_index, param) in func_decl.parameters.iter().enumerate() {
+                                let var_info = VariableInfo {
+                                    index: param_index,
+                                    is_global: false,
+                                    var_type: if let Some(type_annotation) = &param.type_annotation {
+                                        self.convert_type_annotation_to_type(type_annotation)
+                                    } else {
+                                        Type::Unknown
+                                    },
+                                };
+                                self.variables.insert(param.name.clone(), var_info);
+                                if self.debug_mode {
+                                    println!("🔧 CodeGen: Added parameter '{}' at index {} for function '{}'", param.name, param_index, full_name);
+                                }
+                            }
+                            self.local_count = func_decl.parameters.len();
+
+                            // Generate function body
+                            self.generate_statement(&func_decl.body);
+
+                            // Add return instruction if not already present
+                            if let Some(chunk) = self.chunks.get(chunk_index) {
+                                if chunk.instructions.is_empty() ||
+                                   !matches!(chunk.instructions.last().unwrap().opcode, OpCode::Return | OpCode::ReturnValue) {
+                                    self.emit_instruction(Instruction::new(OpCode::Return, 0));
+                                }
+                            }
+
+                            self.current_chunk = old_chunk;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Set show all details mode for arrow functions
@@ -437,6 +603,25 @@ impl CodeGenerator {
                         }
                     }
                 }
+                Declaration::Package(_) => {
+                    // Package declarations are handled by the package processor
+                    // The actual functions are already in the program
+                }
+                Declaration::Import(_) => {
+                    // Import declarations are handled by the semantic analyzer
+                    // The imported functions should be available through the package processor
+                }
+                Declaration::Export(export_decl) => {
+                    // Handle exported declarations
+                    match export_decl.declaration.as_ref() {
+                        Declaration::Function(func) => {
+                            self.collect_function(func);
+                        }
+                        _ => {
+                            // Other exported declarations are handled elsewhere
+                        }
+                    }
+                }
                 Declaration::Memo(memo) => {
                     // Collect functions from memo content
                     self.collect_memo_functions(memo);
@@ -463,6 +648,9 @@ impl CodeGenerator {
         for declaration in &program.declarations {
             self.generate_declaration(declaration);
         }
+
+        // Fourth pass: generate code for package functions
+        self.generate_package_functions();
         
         // Add halt instruction to main function
         if let Some(main_info) = self.functions.get(constants::MAIN_FUNCTION_NAME).cloned() {
@@ -741,6 +929,18 @@ impl CodeGenerator {
             Declaration::Include(_) => {
                 // Include declarations are processed before code generation
                 // No bytecode generation needed here
+            }
+            Declaration::Package(_) => {
+                // Package declarations are metadata only
+                // No bytecode generation needed here
+            }
+            Declaration::Import(_) => {
+                // Import declarations are processed before code generation
+                // No bytecode generation needed here
+            }
+            Declaration::Export(export_decl) => {
+                // Generate code for the exported declaration
+                self.generate_declaration(&export_decl.declaration);
             }
         }
     }
@@ -2420,8 +2620,84 @@ impl CodeGenerator {
                 self.emit_instruction(Instruction::with_u16(OpCode::SuperFieldLoad, field_const, 0));
             }
             Expression::MethodCall { object, method_name, arguments, position } => {
-                // Generate code for method call
-                // First, generate code for the object (this will be the 'self' parameter)
+                // Check if this is a namespace function call (e.g., math.add)
+                if let Expression::Identifier(namespace_name, _) = object.as_ref() {
+                    // Check if this is a namespace function call
+                    let full_name = format!("{}::{}", namespace_name, method_name);
+
+                    // Try to find as a built-in function first
+                    if let Some((_, _)) = self.builtins.get(&full_name) {
+                        // Generate code for all arguments (no object for namespace calls)
+                        for arg in arguments {
+                            self.generate_expression(arg);
+                        }
+
+                        // Built-in namespace function call
+                        let const_index = self.add_constant(Value::String(full_name.clone().into()));
+                        self.emit_instruction(Instruction::with_u16_u8(OpCode::CallMethod, const_index, arguments.len() as u8, 0));
+                        if self.debug_mode {
+                            println!("🔧 CodeGen: Generated CallMethod for built-in namespace function '{}'", full_name);
+                        }
+                        return;
+                    }
+
+                    // Try to find as a user-defined function
+                    if let Some(func_info) = self.functions.get(&full_name).cloned() {
+                        // Generate code for all arguments (no object for namespace calls)
+                        for arg in arguments {
+                            self.generate_expression(arg);
+                        }
+
+                        // User-defined namespace function call
+                        let param_count = func_info.parameter_count;
+                        let const_index = self.add_constant(Value::Int(param_count as i64));
+                        self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+                        self.emit_instruction(Instruction::with_u16(OpCode::Call, func_info.chunk_index as u16, 0));
+                        if self.debug_mode {
+                            println!("🔧 CodeGen: Generated Call for user-defined namespace function '{}' (chunk: {}, params: {})", full_name, func_info.chunk_index, param_count);
+                        }
+                        return;
+                    } else {
+                        if self.debug_mode {
+                            println!("🔧 CodeGen: Function '{}' not found in functions map", full_name);
+                            println!("🔧 CodeGen: Available functions: {:?}", self.functions.keys().collect::<Vec<_>>());
+                        }
+                    }
+
+                    // Try to find in package processor
+                    if let Some(package_processor) = &self.package_processor {
+                        if let Some(package) = package_processor.get_package(namespace_name) {
+                            if package.exported_symbols.contains_key(method_name) {
+                                // Generate code for all arguments (no object for namespace calls)
+                                for arg in arguments {
+                                    self.generate_expression(arg);
+                                }
+
+                                // Package function call - use Call instruction like regular functions
+                                if let Some(func_info) = self.functions.get(&full_name).cloned() {
+                                    let param_count = func_info.parameter_count;
+                                    let const_index = self.add_constant(Value::Int(param_count as i64));
+                                    self.emit_instruction(Instruction::with_u16(OpCode::Const, const_index, 0));
+                                    self.emit_instruction(Instruction::with_u16(OpCode::Call, func_info.chunk_index as u16, 0));
+                                    if self.debug_mode {
+                                        println!("🔧 CodeGen: Generated Call for package function '{}' with {} parameters (chunk: {})", full_name, param_count, func_info.chunk_index);
+                                    }
+                                } else {
+                                    // Fallback to CallMethod if function info not found
+                                    let const_index = self.add_constant(Value::String(full_name.clone().into()));
+                                    self.emit_instruction(Instruction::with_u16_u8(OpCode::CallMethod, const_index, arguments.len() as u8, 0));
+                                    if self.debug_mode {
+                                        println!("🔧 CodeGen: Generated CallMethod fallback for package function '{}' (function not found in functions map)", full_name);
+                                        println!("🔧 CodeGen: Available functions: {:?}", self.functions.keys().collect::<Vec<_>>());
+                                    }
+                                }
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                // Regular method call - generate code for the object (this will be the 'self' parameter)
                 self.generate_expression(object);
 
                 // Generate code for all arguments

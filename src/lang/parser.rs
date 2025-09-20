@@ -179,6 +179,18 @@ impl Parser {
                     let include_decl = self.parse_include()?;
                     Ok(Declaration::Include(include_decl))
                 }
+                TokenType::Package => {
+                    let package_decl = self.parse_package()?;
+                    Ok(Declaration::Package(package_decl))
+                }
+                TokenType::Import => {
+                    let import_decl = self.parse_import()?;
+                    Ok(Declaration::Import(import_decl))
+                }
+                TokenType::Export => {
+                    let export_decl = self.parse_export()?;
+                    Ok(Declaration::Export(export_decl))
+                }
                 TokenType::Memo => {
                     let memo = self.parse_memo()?;
                     Ok(Declaration::Memo(memo))
@@ -744,6 +756,168 @@ impl Parser {
             } else {
                 Ok(ImportSpec::Symbol(name))
             }
+        }
+    }
+
+    /// Parse package declaration
+    fn parse_package(&mut self) -> Result<PackageDeclaration, ParseError> {
+        let package_token = self.expect(TokenType::Package, "Expected 'package'")?;
+        let position = Position::new(package_token.line, package_token.column);
+
+        let name_token = self.expect(TokenType::Identifier(String::new()), "Expected package name")?;
+        let name = if let TokenType::Identifier(n) = &name_token.token_type {
+            n.clone()
+        } else {
+            return Err(ParseError::new("Expected package name".to_string(), position));
+        };
+
+        // Parse optional version
+        let version = if self.match_token(TokenType::Identifier("version".to_string())) {
+            let version_token = self.expect(TokenType::String(String::new()), "Expected version string")?;
+            if let TokenType::String(v) = &version_token.token_type {
+                Some(v.clone())
+            } else {
+                return Err(ParseError::new("Expected version string".to_string(), position));
+            }
+        } else {
+            None
+        };
+
+        // Parse optional author
+        let author = if self.match_token(TokenType::Identifier("author".to_string())) {
+            let author_token = self.expect(TokenType::String(String::new()), "Expected author string")?;
+            if let TokenType::String(a) = &author_token.token_type {
+                Some(a.clone())
+            } else {
+                return Err(ParseError::new("Expected author string".to_string(), position));
+            }
+        } else {
+            None
+        };
+
+        self.expect(TokenType::Semicolon, "Expected ';' after package declaration")?;
+
+        Ok(PackageDeclaration {
+            name,
+            version,
+            author,
+            dependencies: Vec::new(), // TODO: Add dependency parsing
+            position,
+        })
+    }
+
+    /// Parse import declaration
+    fn parse_import(&mut self) -> Result<ImportDeclaration, ParseError> {
+        let import_token = self.expect(TokenType::Import, "Expected 'import'")?;
+        let position = Position::new(import_token.line, import_token.column);
+
+        // Parse package path
+        let package_path = self.parse_package_path()?;
+
+        // Parse optional alias
+        let alias = if self.match_token(TokenType::Identifier("as".to_string())) {
+            let alias_token = self.expect(TokenType::Identifier(String::new()), "Expected alias name after 'as'")?;
+            if let TokenType::Identifier(a) = &alias_token.token_type {
+                Some(a.clone())
+            } else {
+                return Err(ParseError::new("Expected alias name".to_string(), position));
+            }
+        } else {
+            None
+        };
+
+        // Parse optional selective imports
+        let selective_imports = if self.match_token(TokenType::LeftBrace) {
+            let mut imports = Vec::new();
+
+            if !self.check(&TokenType::RightBrace) {
+                imports.push(self.parse_import_spec()?);
+
+                while self.match_token(TokenType::Comma) {
+                    if !self.check(&TokenType::RightBrace) {
+                        imports.push(self.parse_import_spec()?);
+                    }
+                }
+            }
+
+            self.expect(TokenType::RightBrace, "Expected '}' after selective imports")?;
+            Some(imports)
+        } else {
+            None
+        };
+
+        self.expect(TokenType::Semicolon, "Expected ';' after import declaration")?;
+
+        Ok(ImportDeclaration {
+            package_path,
+            alias,
+            selective_imports,
+            position,
+        })
+    }
+
+    /// Parse export declaration
+    fn parse_export(&mut self) -> Result<ExportDeclaration, ParseError> {
+        let export_token = self.expect(TokenType::Export, "Expected 'export'")?;
+        let position = Position::new(export_token.line, export_token.column);
+
+        // Parse the declaration to export (without recursing into parse_declaration)
+        let declaration = if self.check(&TokenType::Fn) {
+            Box::new(Declaration::Function(self.parse_function()?))
+        } else if self.check(&TokenType::Const) {
+            // Parse const declaration as a statement
+            Box::new(Declaration::Variable(self.parse_variable_declaration()?))
+        } else if self.check(&TokenType::Var) {
+            // Parse var declaration as a statement
+            Box::new(Declaration::Variable(self.parse_variable_declaration()?))
+        } else if self.check(&TokenType::Struct) {
+            Box::new(Declaration::Struct(self.parse_struct()?))
+        } else if self.check(&TokenType::Class) {
+            Box::new(Declaration::Class(self.parse_class()?))
+        } else if self.check(&TokenType::Enum) {
+            Box::new(Declaration::Enum(self.parse_enum()?))
+        } else {
+            return Err(ParseError::new("Expected exportable declaration after 'export'".to_string(), position));
+        };
+
+        Ok(ExportDeclaration {
+            declaration,
+            position,
+        })
+    }
+
+    /// Parse package path (std::io, ./utils, ../common, math)
+    fn parse_package_path(&mut self) -> Result<PackagePath, ParseError> {
+        if self.check(&TokenType::String(String::new())) {
+            // Relative path: "./utils" or "../common"
+            if let Some(path_token) = self.advance() {
+                if let TokenType::String(path) = &path_token.token_type {
+                    let components: Vec<String> = path.split('/').map(|s| s.to_string()).collect();
+                    return Ok(PackagePath::Relative(components));
+                }
+            }
+        }
+
+        // Absolute or local path: std::io or math
+        let name_token = self.expect(TokenType::Identifier(String::new()), "Expected package name")?;
+        let mut components = Vec::new();
+
+        if let TokenType::Identifier(name) = &name_token.token_type {
+            components.push(name.clone());
+        }
+
+        // Check for :: separator (absolute path)
+        if self.check(&TokenType::DoubleColon) {
+            while self.match_token(TokenType::DoubleColon) {
+                let part_token = self.expect(TokenType::Identifier(String::new()), "Expected package component")?;
+                if let TokenType::Identifier(part) = &part_token.token_type {
+                    components.push(part.clone());
+                }
+            }
+            Ok(PackagePath::Absolute(components))
+        } else {
+            // Local path
+            Ok(PackagePath::Local(components[0].clone()))
         }
     }
 

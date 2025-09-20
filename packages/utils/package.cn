@@ -1,0 +1,50 @@
+// Utils package - Utility functions
+package utils version "1.0.0" author "CodeNothing Team";
+
+// Export string utility functions
+export fn string_length(s: string) : int {
+    // Placeholder implementation
+    return 10; // Simplified for demo
+}
+
+export fn is_even(n: int) : int {
+    return (n % 2) == 0;
+}
+
+export fn is_odd(n: int) : int {
+    return (n % 2) != 0;
+}
+
+export fn max(a: int, b: int) : int {
+    if (a > b) {
+        return a;
+    }
+    return b;
+}
+
+export fn min(a: int, b: int) : int {
+    if (a < b) {
+        return a;
+    }
+    return b;
+}
+
+// Export array utility functions
+export fn array_sum(arr: int, size: int) : int {
+    // Simplified implementation
+    return arr * size;
+}
+
+// Export constants
+export const MAX_INT: int = 2147483647;
+export const MIN_INT: int = -2147483648;
+
+// Private helper
+fn internal_swap(a: int, b: int) : int {
+    return a + b; // Simplified
+}
+
+// Export swap function
+export fn swap_values(a: int, b: int) : int {
+    return internal_swap(a, b);
+}

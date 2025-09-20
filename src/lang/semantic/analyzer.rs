@@ -3,6 +3,7 @@
 use crate::lang::ast::*;
 use crate::lang::types::{Type, TypeEnvironment, TypeError, TypeInference};
 use crate::lang::builtins::BuiltinRegistry;
+use crate::lang::package_processor::PackageProcessor;
 use super::access_control::AccessChecker;
 use super::vtable::VTableManager;
 use std::collections::HashMap;
@@ -21,6 +22,7 @@ pub struct SemanticAnalyzer {
     pub(super) in_loop: bool,
     pub(super) in_switch: bool,
     pub(super) debug_mode: bool,
+    pub(super) package_processor: Option<PackageProcessor>,
 }
 
 impl SemanticAnalyzer {
@@ -38,6 +40,7 @@ impl SemanticAnalyzer {
             in_loop: false,
             in_switch: false,
             debug_mode: false,
+            package_processor: None,
         };
         
         // Populate type environment with built-in functions
@@ -51,6 +54,11 @@ impl SemanticAnalyzer {
         }
         
         analyzer
+    }
+
+    /// Set package processor
+    pub fn set_package_processor(&mut self, package_processor: PackageProcessor) {
+        self.package_processor = Some(package_processor);
     }
 
     /// Set debug mode
