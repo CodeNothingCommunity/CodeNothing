@@ -1,0 +1,28 @@
+// Test library package
+package testlib version "1.0.0" author "Test";
+
+// Public function - should be accessible from outside
+export fn public_add(a: int, b: int): int {
+    return a + b;
+}
+
+// Public function that uses internal helper
+export fn public_calculate(x: int): int {
+    return internal_double(x) + internal_triple(x);
+}
+
+// Package-level function - should NOT be accessible from outside
+fn internal_double(n: int): int {
+    return n * 2;
+}
+
+// Another package-level function
+fn internal_triple(n: int): int {
+    return n * 3;
+}
+
+// Public constant
+export const PUBLIC_VERSION: int = 1;
+
+// Package-level constant
+const INTERNAL_SECRET: int = 42;

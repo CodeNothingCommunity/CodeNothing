@@ -4,8 +4,7 @@
 
 use crate::lang::ast::*;
 use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
-use std::fs;
+use std::path::PathBuf;
 
 /// Package context for tracking symbols and dependencies
 #[derive(Debug, Clone)]
@@ -56,6 +55,7 @@ pub struct PackageProcessor {
     search_paths: Vec<PathBuf>,
     processed_files: HashSet<PathBuf>,
     dependency_stack: Vec<String>, // For circular dependency detection
+    current_package: Option<String>, // Track the current package being processed
 }
 
 impl PackageProcessor {
@@ -71,6 +71,7 @@ impl PackageProcessor {
             ],
             processed_files: HashSet::new(),
             dependency_stack: Vec::new(),
+            current_package: None,
         }
     }
 
@@ -91,10 +92,12 @@ impl PackageProcessor {
             self.add_dummy_main(program);
         }
 
-        // First pass: collect package declarations
+        // First pass: collect package declarations and set current package
         for declaration in &program.declarations {
             if let Declaration::Package(package_decl) = declaration {
                 self.register_package(package_decl)?;
+                // Set this as the current package being processed
+                self.current_package = Some(package_decl.name.clone());
             }
         }
 
@@ -361,9 +364,22 @@ impl PackageProcessor {
 
     /// Get current package context (mutable)
     fn get_current_package_mut(&mut self) -> Option<&mut PackageContext> {
-        // For now, return the first package
-        // TODO: Implement proper current package tracking
-        self.packages.values_mut().next()
+        if let Some(current_package_name) = &self.current_package {
+            self.packages.get_mut(current_package_name)
+        } else {
+            // Fallback to first package if no current package is set
+            self.packages.values_mut().next()
+        }
+    }
+
+    /// Get current package name
+    pub fn get_current_package_name(&self) -> Option<&String> {
+        self.current_package.as_ref()
+    }
+
+    /// Set current package
+    pub fn set_current_package(&mut self, package_name: Option<String>) {
+        self.current_package = package_name;
     }
 
     /// Add search path

@@ -199,10 +199,30 @@ impl SemanticAnalyzer {
             }
 
             Expression::NamespaceAccess { namespace_path, name, position } => {
-                // Look up function or variable in the specified namespace
-                // First try single-level namespace lookup (for static members)
+                // Check package-level access control for namespace access
                 if namespace_path.len() == 1 {
-                    if let Some(var_type) = self.type_env.lookup_in_namespace(&namespace_path[0], name) {
+                    let namespace = &namespace_path[0];
+                    
+                    // Check if this is a cross-package access that should be restricted
+                    if let Some(package_processor) = &self.package_processor {
+                        if let Some(target_package) = package_processor.get_package(namespace) {
+                            // Check if the symbol is exported (public) or if we're accessing from the same package
+                            let current_package = self.access_checker.get_package_context();
+                            let is_same_package = current_package.as_ref() == Some(namespace);
+                            
+                            if !is_same_package && !target_package.exported_symbols.contains_key(name) {
+                                // This is a cross-package access to a non-exported symbol
+                                self.add_error(TypeError::new(
+                                    format!("Cannot access non-exported symbol '{}' from package '{}'. Only exported symbols are accessible across packages.", name, namespace),
+                                    position.clone(),
+                                ));
+                                return Type::Unknown;
+                            }
+                        }
+                    }
+                    
+                    // Proceed with normal lookup
+                    if let Some(var_type) = self.type_env.lookup_in_namespace(namespace, name) {
                         return var_type.clone();
                     }
                 }

@@ -58,6 +58,10 @@ impl SemanticAnalyzer {
 
     /// Set package processor
     pub fn set_package_processor(&mut self, package_processor: PackageProcessor) {
+        // Set the current package context in access checker if available
+        if let Some(current_package_name) = package_processor.get_current_package_name() {
+            self.access_checker.set_package_context(Some(current_package_name.clone()));
+        }
         self.package_processor = Some(package_processor);
     }
 
