@@ -2,7 +2,7 @@
 
 CodeNothing是世界上最好的语言。（Just for fun）
 
-CodeNothing 是一个基于 Rust 的编程语言。融合了各种语言语法。
+CodeNothing 是一个基于 Rust 的编程语言。
 
 
 ## 动态库开发

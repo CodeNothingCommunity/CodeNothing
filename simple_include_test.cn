@@ -1,9 +1,0 @@
-// Simple include test
-using ns lang;
-
-include "include_test_utils.cn";
-
-fn main() : int {
-    lang::println("Testing include...");
-    return 0;
-}

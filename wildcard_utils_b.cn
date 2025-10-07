@@ -1,8 +1,0 @@
-// Wildcard utils B
-using ns lang;
-
-fn func_b(x: int) : int {
-    return x + 10;
-}
-
-var CONST_B : int = 200;

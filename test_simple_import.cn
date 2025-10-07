@@ -1,7 +1,0 @@
-// Simple import test
-import math;
-
-fn main() : int {
-    var result: int = math.add(3, 4);
-    return result;
-}

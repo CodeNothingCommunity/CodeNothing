@@ -1,9 +1,0 @@
-using ns lang;
-
-fn main() : int {
-    var numbers : array<int> = [10, 20, 30];
-    for (num in numbers) {
-        lang::println(lang::to_string(num));
-    }
-    return 0;
-}
